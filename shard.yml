@@ -1,0 +1,9 @@
+name: crystime
+version: 0.1.0
+
+authors:
+  - Davor Ocelic <docelic@spinlocksolutions.com>
+
+crystal: 0.24.1
+
+license: GPL-3.0
