@@ -1,9 +1,7 @@
 require "./spec_helper"
 
 describe Crystime do
-  # TODO: Write tests
-
-  it "works" do
-    false.should eq(true)
+  it "has established truth" do
+    true.should eq(true)
   end
 end

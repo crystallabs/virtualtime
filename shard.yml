@@ -7,3 +7,7 @@ authors:
 crystal: 0.24.1
 
 license: GPL-3.0
+
+development_dependencies:
+  specreporter-spec:
+    github: docelic/specreporter-spec
