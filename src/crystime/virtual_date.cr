@@ -17,5 +17,32 @@ module Crystime
 
     include Comparable(self)
 
-	end
-end
+    #property :relative
+    protected getter :time
+    property :ts
+
+    # XXX need to move to model where user input is separate from actual values.
+    # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
+    # And until we know year and month, we can't fill in weekday/jd, nor evaluate that -1.
+    # But while treated as object or in yaml, it needs to be -1, not actual value.
+    # Weekday, jd and date -X require dates to be materialized...
+
+    # XXX Use Int instead of Int32 when it becomes possible in Crystal
+    alias Virtual = Nil | Int32 | Bool | Range(Int32, Int32) | Enumerable(Int32) | Proc(Int32, Bool)
+
+    YAML.mapping({
+      # Date-related properties
+      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      weekday:     { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      # Time-related properties
+      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+    })
+
+    end
+		end
