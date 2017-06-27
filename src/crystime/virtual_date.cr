@@ -44,5 +44,37 @@ module Crystime
       millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
     })
 
+    #@relative: Nil | Bool
+
+		# "ts" is a variable which keeps track of which fields were actually specified in VirtualDate.
+		# E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
+		# This is important for matching VirtualDates, because if one VirtualDate has ts[5] set to nil (not specified), and
+		# the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
+    #      0    1     2     3     4     5     6
+    #      year month day   hour  min   sec   ms
+    @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
+
+    # Empty constructor. Must be here since when fields are defined, the
+    # default empty constructor is not created.
+    def initialize
+    end
+
+    def year=( v)        @year= v;   @ts[0]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def month=( v)       @month= v;  @ts[1]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def day=( v)         @day= v;    @ts[2]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def hour=( v)        @hour= v;   @ts[3]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def minute=( v)      @minute= v; @ts[4]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def second=( v)      @second= v; @ts[5]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def millisecond=( v) @millisecond= v; @ts[6]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    # Weekday does not affect actual date, only adds a constraint.
+    def weekday=( v)
+      @weekday= v
+      true
+    end
+    # Julian Day Number does affect actual date, but is not used in calculations.
+    def jd=( v)
+      from_jd! if @jd= v
+      true
+    end
     end
 		end
