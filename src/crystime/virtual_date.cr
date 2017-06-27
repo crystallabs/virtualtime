@@ -253,6 +253,7 @@ module Crystime
 		# Parses string and produces VirtualDate.
 		def self.[]( date)
 			return date if date.is_a? self
+      #puts "TRYING TO PARSE #{date}"
 
       #formats= {
       #  "%FT%X%z",
@@ -314,5 +315,97 @@ module Crystime
     end
 
 	end
+
+  class Span
+    getter :ts
+
+    #      0   1   2   3   4
+    #      d   h   m   s   ms
+    @ts= [ nil,nil,nil,nil,nil] of Bool?
+
+    include Comparable(self)
+
+    def initialize(d,h,m,s,ms)
+      @span= Time::Span.new(d,h,m,s,ms* 1_000_000)
+      @ts[0..4]= [true,true,true,true,true]
+      #after_initialize
+    end
+    def initialize(d,h,m,s)
+      @span= Time::Span.new(d,h,m,s)
+      @ts[0..3]= [true,true,true,true]
+      #after_initialize
+    end
+    def initialize(h,m,s)
+      @span= Time::Span.new(h,m,s)
+      @ts[1..3]= [true,true,true]
+      #fter_initialize
+    end
+    #def initialize(ticks)
+    #  @span= Time::Span.new(ticks)
+    #  #after_initialize
+    #end
+		def initialize( seconds, nanoseconds)
+			@span= Time::Span.new(
+				seconds: seconds,
+				nanoseconds: nanoseconds,
+			)
+			#after_initialize
+		end
+
+    #def after_initialize
+    #  s= @span
+    #  raise "Missing Time::Span!" unless s
+    #  @ticks= s.ticks
+    #end
+
+    #def ticks()
+		#	raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+    #  @span.ticks
+    #end
+    def total_seconds()
+			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+			@span.total_seconds
+		end
+    def total_milliseconds()
+			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+			@span.total_milliseconds
+		end
+    def total_nanoseconds()
+			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+			@span.total_nanoseconds
+		end
+    def nanoseconds()
+			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+			@span.nanoseconds
+		end
+    def abs() @span.ticks.abs end
+    def to_f() @span.to_f end
+    def +( other : self)
+			Span.new(
+				seconds: (total_seconds+ other.total_seconds).floor.to_i64,
+				nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
+			)
+		end
+    def -( other : self)
+			Span.new(
+				seconds: (total_seconds- other.total_seconds).floor.to_i64,
+				nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
+			)
+		end
+
+    def <=>( other : self)
+      # TODO this code prevents to perfectly simple/comparable VDs from being compared (at least for literal ==)
+      #return {@year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.weekday, other.jd, other.hour, other.minute, other.second, other.millisecond}
+      total_nanoseconds<=> other.total_nanoseconds
+    end
+
+    #def days=( v, update?= true)         @days= v;         @ts[0]= v.is_a?( Int) ? true : false; update if update? end
+    #def hours=( v, update?= true)        @hours= v;        @ts[1]= v.is_a?( Int) ? true : false; update if update? end
+    #def seconds=( v, update?= true)      @seconds= v;      @ts[3]= v.is_a?( Int) ? true : false; update if update? end
+    #def minutes=( v, update?= true)      @minutes= v;      @ts[2]= v.is_a?( Int) ? true : false; update if update? end
+    #def milliseconds=( v, update?= true) @millisecond = v; @ts[4]= v.is_a?( Int) ? true : false; update if update? end
+    #def update
+    #end
+  end
 
   end
