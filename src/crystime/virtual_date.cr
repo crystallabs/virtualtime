@@ -138,5 +138,43 @@ module Crystime
       end
     end
 
-    end 
+    def <=>( other : self)
+      #p "<=>"
+      to_time<=>other.to_time
+    end
+    def +( other : Span)
+			self_time= self.to_time
+      t= Time.epoch(0) + Time::Span.new(
+				seconds: (self_time.epoch+ other.total_seconds).floor.to_i64,
+				nanoseconds: (self_time.nanosecond+ other.nanoseconds).floor.to_i32,
+			)
+      if (t.year        != 0)                     ; self.year= t.year               end
+      if (t.month       != 0)                     ; self.month= t.month             end
+      if (t.day         != 0) || !other.ts[0].nil?; self.day= t.day                 end
+      if (t.hour        != 0) || !other.ts[1].nil?; self.hour= t.hour               end
+      if (t.minute      != 0) || !other.ts[2].nil?; self.minute= t.minute           end
+      if (t.second      != 0) || !other.ts[3].nil?; self.second= t.second           end
+      if (t.millisecond != 0) || !other.ts[4].nil?; self.millisecond= t.millisecond end
+      self
+    end
+    # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
+    def -( other : Span) self+ -other end
+    def +( other : self)
+			self_time= self.to_time
+			other_time= other.to_time
+			Span.new(
+				seconds: (self_time.epoch+ other_time.epoch).floor,
+				nanoseconds: (self_time.nanosecond+ other_time.nanosecond).floor
+			)
+		end
+    def -( other : self)
+			self_time= self.to_time
+			other_time= other.to_time
+			Span.new(
+				seconds: (self_time.epoch- other_time.epoch).floor,
+				nanoseconds: (self_time.nanosecond- other_time.nanosecond).floor
+			)
+		end
+
+    end
 		end
