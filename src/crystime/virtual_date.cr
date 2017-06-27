@@ -76,5 +76,67 @@ module Crystime
       from_jd! if @jd= v
       true
     end
+    def from_jd!
+      raise Crystime::Errors.invalid_jd unless jd= from_jd
+      @year, @month, @day= jd[0], jd[1], jd[2]
+      true
     end
+
+		# Called when year, month, or day are re-set and we need to re-calculate which weekday and
+		# Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
+		# If it is not specified (meaning that the VirtualDate does not refer to a specific date),
+		# then they are set to nil.
+    def update!
+      if @ts[0]&& @ts[1]&& @ts[2]
+        #puts "date is: "+ self.inspect
+        t= Time.new(@year.as( Int), @month.as( Int), @day.as( Int), kind: Time::Kind::Utc)
+        @weekday= t.day_of_week.to_i
+        @jd= to_jd!
+      else
+        @weekday= @jd= nil
+      end
+      true
+    end
+
+		# Expand a partial VirtualDate into a materialized/specific date/time.
+    def expand
+      [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
+    end
+
+		# Creates VirtualDate from Julian Day Number.
+    def from_jd
+      jd= @jd
+      if jd.nil?
+        self.year= nil
+        self.month= nil
+        self.day= nil
+        return
+      elsif !jd.is_a? Int
+        raise Crystime::Errors.invalid_jd
+      end
+      # https://en.wikipedia.org/wiki/Julian_day
+      y= 4716; j= 1401; m= 2; n= 12; r= 4; p= 1461;
+      v= 3; u= 5; s= 153; w= 2; b= 274277; c= -38;
+      f = jd + j + (((4 * jd + b) / 146097) * 3) / 4 + c
+      e = r * f + v
+      g = (e % p) / r
+      h = u * g + w
+      gd = (h % s) / u + 1
+      gm = ((h / s + m) % n) + 1
+      gy = (e / p) - y + (n + m - gm) / n
+      {gy, gm, gd}
+    end
+		# Creates Julian Day Number from VirtualDate, when possible. Raises otherwise.
+    def to_jd!
+      if @ts[0]&& @ts[1]&& @ts[2]
+        a= ((14-@month.as( Int))/12).floor
+        y= @year.as( Int)+ 4800- a
+        m= @month.as( Int)+ 12*a- 3
+        @day.as( Int)+ ((153*m+ 2)/5).floor+ 365*y+ (y/4).floor- (y/100).floor+ (y/400).floor- 32045
+      else
+        raise "Can't convert non-specific date to Julian Day Number"
+      end
+    end
+
+    end 
 		end
