@@ -250,5 +250,69 @@ module Crystime
       { @year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond}
     end
 
-end
-end
+		# Parses string and produces VirtualDate.
+		def self.[]( date)
+			return date if date.is_a? self
+
+      #formats= {
+      #  "%FT%X%z",
+      #  "%F %T %z",
+      #  "%F %T",
+      #  "%F",
+      #  "%T %z",
+      #  "%T",
+      #}
+
+			r= new
+      ret= false
+
+      if m= date.match /(?<year>\d{4})[\-\/\.](?<month>\d{1,2})[\-\/\.](?<day>\d{1,2})/
+        r.year=   m["year"].to_i
+        r.month=  m["month"].to_i
+        r.day=    m["day"].to_i
+        ret= true
+      end
+
+      if m= date.match /(?<hour>\d{1,2}):(?<minute>\d{1,2}):(?<second>\d{1,2})(?:\.(?<millisecond>\d{1,6}))?/
+        r.hour=   m["hour"].to_i
+        r.minute= m["minute"].to_i
+        r.second= m["second"].to_i
+        r.millisecond= m["millisecond"].to_i if m["millisecond"]?
+        ret= true
+      end
+
+      #def find_any(items, str)
+      #  r = Regex.new(items.map(&->Regex.escape(String)).join('|'))
+      #  str.scan(r) do |m|
+      #    return m[0]
+      #  end
+      #end
+      #p find_any({"one", "two", "three"}, "adfgagtwowafg")
+
+      date= date.upcase
+      if date=~ /\b(\d{4})\b/;  r.year= $1.to_i end
+      if v= find_weekday( date); r.day= W2I[v]? &&( ret= true) end
+      if v= find_month( date); r.month= M2I[v]? &&( ret= true) end
+      unless ret
+        if m= date.match /(?<day>\-?\d{1,2})/
+          r.day=   m["day"].to_i
+          ret= true
+        end
+      end
+      raise Crystime::Errors.incorrect_input unless ret
+      r.update!
+      r
+		end
+
+    private def self.find_weekday( str)
+      str.scan(WR) do |m| return m[0] end
+      nil
+    end
+    private def self.find_month( str)
+      str.scan(MR) do |m| return m[0] end
+      nil
+    end
+
+	end
+
+  end
