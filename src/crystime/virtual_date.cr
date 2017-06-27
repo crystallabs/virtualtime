@@ -208,5 +208,47 @@ module Crystime
 
     def utc?() true end
 
+    def materialized?
+      #@ts[0..2]= [true,true,true]
+      @ts.all?{ |x| x== true}
     end
-		end
+    def materialize!
+    # XXX this should work with the help of "other" date; if one
+    # is not specified default time is used.
+      #t= Time.now
+      # XXX modify so that if value is proc, we call it;
+      # if value is range, we take range.begin,
+      # if value is 
+      # It's OK to use these values here because if a person does not
+      # want to materialize to these probably-not-useful values,
+      # they simply need to provide 'other' as argument.
+      # XXX but do solve the case of field== false. Right now we override
+      # those with these default values, which is incorrect. (E.g. a 
+      # range needs to materialize to range.begin, not to 1 or 0).
+      self.year        ||= 1
+      self.month       ||= 1
+      self.day         ||= 1
+      # XXX use some configurable defaults?
+      self.hour        ||= 0
+      self.minute      ||= 0
+      self.second      ||= 0
+      self.millisecond ||= 0
+    end
+    # Replace with macro and fix logic
+    def merge( other : self)
+      self.year        ||= other.year
+      self.month       ||= other.month
+      self.day         ||= other.day
+      # XXX ditto
+      self.hour        ||= other.hour
+      self.minute      ||= other.minute
+      self.second      ||= other.second
+      self.millisecond ||= other.millisecond
+    end
+
+    def to_tuple
+      { @year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond}
+    end
+
+end
+end
