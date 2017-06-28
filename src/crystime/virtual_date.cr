@@ -468,3 +468,166 @@ module Crystime
     end
   end
 end
+
+# TODO these formats should be supported by our parse:
+#
+#    assert_equal(Time.local( 2001,11,29,21,12), Time.parse("2001/11/29 21:12", now))
+#    assert_equal(Time.local( 2001,11,29), Time.parse("2001/11/29", now))
+#    assert_equal(Time.local( 2001,11,29), Time.parse(     "11/29", now))
+#    #assert_equal(Time.local(2001,11,1), Time.parse("Nov", now))
+#    assert_equal(Time.local( 2001,11,29,10,22), Time.parse(           "10:22", now))
+#    now = Time.new(2001,2,3,0,0,0,"+09:00") # 2001-02-02 15:00:00 UTC
+#    t = Time.parse("10:20:30 GMT", now)
+#    assert_equal(true, Time.parse("2000-01-01T00:00:00Z").utc?)
+#    assert_equal(true, Time.parse("2000-01-01T00:00:00-00:00").utc?)
+#    assert_equal(false, Time.parse("2000-01-01T00:00:00+00:00").utc?)
+#    assert_equal(false, Time.parse("Sat, 01 Jan 2000 00:00:00 GMT").utc?)
+#    assert_equal(true, Time.parse("Sat, 01 Jan 2000 00:00:00 -0000").utc?)
+#    assert_equal(false, Time.parse("Sat, 01 Jan 2000 00:00:00 +0000").utc?)
+#    assert_equal(Time.new(2000,1,1,0,0,0,"+11:00"), Time.parse("2000-01-01T00:00:00+11:00", nil))
+#    t = Time.utc(1998,12,31,23,59,59)
+#    assert_equal(t, Time.parse("Thu Dec 31 23:59:59 UTC 1998"))
+#    assert_equal(t, Time.parse("Fri Dec 31 23:59:59 -0000 1998"));t.localtime
+#    assert_equal(t, Time.parse("Fri Jan  1 08:59:59 +0900 1999"))
+#    assert_equal(t, Time.parse("Fri Jan  1 00:59:59 +0100 1999"))
+#    assert_equal(t, Time.parse("Fri Dec 31 23:59:59 +0000 1998"))
+#    assert_equal(t, Time.parse("Fri Dec 31 22:59:59 -0100 1998"));t.utc
+#    t += 1
+#    assert_equal(t, Time.parse("Thu Dec 31 23:59:60 UTC 1998"))
+#    assert_equal(t, Time.parse("Fri Dec 31 23:59:60 -0000 1998"));t.localtime
+#    assert_equal(t, Time.parse("Fri Jan  1 08:59:60 +0900 1999"))
+#    assert_equal(t, Time.parse("Fri Jan  1 00:59:60 +0100 1999"))
+#    assert_equal(t, Time.parse("Fri Dec 31 23:59:60 +0000 1998"))
+#    assert_equal(t, Time.parse("Fri Dec 31 22:59:60 -0100 1998"));t.utc
+#    t += 1 if t.sec == 60
+#    assert_equal(t, Time.parse("Thu Jan  1 00:00:00 UTC 1999"))
+#    assert_equal(t, Time.parse("Fri Jan  1 00:00:00 -0000 1999"));t.localtime
+#    assert_equal(t, Time.parse("Fri Jan  1 09:00:00 +0900 1999"))
+#    assert_equal(t, Time.parse("Fri Jan  1 01:00:00 +0100 1999"))
+#    assert_equal(t, Time.parse("Fri Jan  1 00:00:00 +0000 1999"))
+#    assert_equal(t, Time.parse("Fri Dec 31 23:00:00 -0100 1998"))
+#    assert_equal(500000, Time.parse("2000-01-01T00:00:00.5+00:00").tv_usec)
+#    assert_equal(123456789, Time.parse("2000-01-01T00:00:00.123456789+00:00").tv_nsec)
+#    h = Date._parse('22:45:59.5')
+#    assert_equal([22, 45, 59, 5.to_r/10**1], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('22:45:59.05')
+#    assert_equal([22, 45, 59, 5.to_r/10**2], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('22:45:59.005')
+#    assert_equal([22, 45, 59, 5.to_r/10**3], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('22:45:59.0123')
+#    assert_equal([22, 45, 59, 123.to_r/10**4], h.values_at(:hour, :min, :sec, :sec_fraction))
+#
+#    h = Date._parse('224559.5')
+#    assert_equal([22, 45, 59, 5.to_r/10**1], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('224559.05')
+#    assert_equal([22, 45, 59, 5.to_r/10**2], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('224559.005')
+#    assert_equal([22, 45, 59, 5.to_r/10**3], h.values_at(:hour, :min, :sec, :sec_fraction))
+#    h = Date._parse('224559.0123')
+#    assert_equal([22, 45, 59, 123.to_r/10**4], h.values_at(:hour, :min, :sec, :sec_fraction))
+#
+#    h = Date._parse('2006-w15-5')
+#    assert_equal([2006, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('2006w155')
+#    assert_equal([2006, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('06w155', false)
+#    assert_equal([6, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('06w155', true)
+#    assert_equal([2006, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#
+#    h = Date._parse('2006-w15')
+#    assert_equal([2006, 15, nil], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('2006w15')
+#    assert_equal([2006, 15, nil], h.values_at(:cwyear, :cweek, :cwday))
+#
+#    h = Date._parse('-w15-5')
+#    assert_equal([nil, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('-w155')
+#    assert_equal([nil, 15, 5], h.values_at(:cwyear, :cweek, :cwday))
+#
+#    h = Date._parse('-w15')
+#    assert_equal([nil, 15, nil], h.values_at(:cwyear, :cweek, :cwday))
+#    h = Date._parse('-w15')
+#    assert_equal([nil, 15, nil], h.values_at(:cwyear, :cweek, :cwday))
+#
+#    h = Date._parse('-w-5')
+#    assert_equal([nil, nil, 5], h.values_at(:cwyear, :cweek, :cwday))
+#
+#    h = Date._parse('--11-29')
+#    assert_equal([nil, 11, 29], h.values_at(:year, :mon, :mday))
+#    h = Date._parse('--1129')
+#    assert_equal([nil, 11, 29], h.values_at(:year, :mon, :mday))
+#    h = Date._parse('--11')
+#    assert_equal([nil, 11, nil], h.values_at(:year, :mon, :mday))
+#    h = Date._parse('---29')
+#    assert_equal([nil, nil, 29], h.values_at(:year, :mon, :mday))
+#    h = Date._parse('-333')
+#    assert_equal([nil, 333], h.values_at(:year, :yday))
+#
+#    h = Date._parse('2006-333')
+#    assert_equal([2006, 333], h.values_at(:year, :yday))
+#    h = Date._parse('2006333')
+#    assert_equal([2006, 333], h.values_at(:year, :yday))
+#    h = Date._parse('06333', false)
+#    assert_equal([6, 333], h.values_at(:year, :yday))
+#    h = Date._parse('06333', true)
+#    assert_equal([2006, 333], h.values_at(:year, :yday))
+#    h = Date._parse('333')
+#    assert_equal([nil, 333], h.values_at(:year, :yday))
+#
+#    h = Date._parse('')
+#    assert_equal({}, h)
+#  end
+#
+#    assert_equal(Date.new, Date.parse)
+#    assert_equal(Date.new(2002,3,14), Date.parse('2002-03-14'))
+#
+#    assert_equal(DateTime.new(2002,3,14,11,22,33, 0), DateTime.parse('2002-03-14T11:22:33Z'))
+#    assert_equal(DateTime.new(2002,3,14,11,22,33, 9.to_r/24), DateTime.parse('2002-03-14T11:22:33+09:00'))
+#    assert_equal(DateTime.new(2002,3,14,11,22,33, -9.to_r/24), DateTime.parse('2002-03-14T11:22:33-09:00'))
+#    assert_equal(DateTime.new(2002,3,14,11,22,33, -9.to_r/24) + 123456789.to_r/1000000000/86400, DateTime.parse('2002-03-14T11:22:33.123456789-09:00'))
+#    d1 = DateTime.parse('2004-03-13T22:45:59.5')
+#    d2 = DateTime.parse('2004-03-13T22:45:59')
+#    assert_equal(d2 + 5.to_r/10**1/86400, d1)
+#    d1 = DateTime.parse('2004-03-13T22:45:59.05')
+#    d2 = DateTime.parse('2004-03-13T22:45:59')
+#    assert_equal(d2 + 5.to_r/10**2/86400, d1)
+#    d1 = DateTime.parse('2004-03-13T22:45:59.005')
+#    d2 = DateTime.parse('2004-03-13T22:45:59')
+#    assert_equal(d2 + 5.to_r/10**3/86400, d1)
+#    d1 = DateTime.parse('2004-03-13T22:45:59.0123')
+#    d2 = DateTime.parse('2004-03-13T22:45:59')
+#    assert_equal(d2 + 123.to_r/10**4/86400, d1)
+#    d1 = DateTime.parse('2004-03-13T22:45:59.5')
+#    d1 += 1.to_r/2/86400
+#    d2 = DateTime.parse('2004-03-13T22:46:00')
+#    assert_equal(d2, d1)
+#    n = DateTime.now
+#
+#    d = DateTime.parse('073')
+#    assert_equal([n.year, 73, 0, 0, 0], [d.year, d.yday, d.hour, d.min, d.sec])
+#    d = DateTime.parse('13')
+#    assert_equal([n.year, n.mon, 13, 0, 0, 0], [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#
+#    d = DateTime.parse('Mar 13')
+#    assert_equal([n.year, 3, 13, 0, 0, 0], [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    d = DateTime.parse('Mar 2004')
+#    assert_equal([2004, 3, 1, 0, 0, 0], [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    d = DateTime.parse('23:55')
+#    assert_equal([n.year, n.mon, n.mday, 23, 55, 0], [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    d = DateTime.parse('23:55:30')
+#    assert_equal([n.year, n.mon, n.mday, 23, 55, 30], [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#
+#    d = DateTime.parse('Sun 23:55')
+#    d2 = d - d.wday
+#    assert_equal([d2.year, d2.mon, d2.mday, 23, 55, 0],
+#		 [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    d = DateTime.parse('Aug 23:55')
+#    assert_equal([n.year, 8, 1, 23, 55, 0],
+#		 [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#
+#    d = Date.new(2002,3,14)
+#    assert_equal(d, Date.parse(d.to_s))
+#
+#    d = DateTime.new(2002,3,14,11,22,33, 9.to_r/24)
+#    assert_equal(d, DateTime.parse(d.to_s))
