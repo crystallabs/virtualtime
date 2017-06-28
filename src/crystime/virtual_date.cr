@@ -408,4 +408,63 @@ module Crystime
     #end
   end
 
+  # A custom to/from YAML converter for VirtualDate.
+  class VirtualDateConverter
+    # Converts VirtualDate object to YAML.
+    # XXX this has to be changed so that the whole object is serialized into yyyy/mm/dd/weekday hh:mm:ss.ms, not each field individually.
+    def self.to_yaml(value : Crystime::VirtualDate::Virtual, yaml : YAML::Builder)
+      case value
+      #when Nil
+      #  yaml.scalar "nil"
+      when Int
+        yaml.scalar value
+      when Bool
+        yaml.scalar value
+      # This case wont match
+      when Range(Int32,Int32)
+        yaml.scalar value #.begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
+      when Enumerable
+        # The IF is here to workaround a bug in Crystal <= 0.23:
+        # https://github.com/crystal-lang/crystal/issues/4684
+        if value.class== Range(Int32,Int32)
+          value= value.unsafe_as Range(Int32,Int32)
+          yaml.scalar value #.begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
+        else
+          # Done in this way because in Crystal <= 0.23 there is
+          # no way to detect a step once it's set:
+          # https://github.com/crystal-lang/crystal/issues/4695
+          yaml.scalar value.join ","
+        end
+      else
+        raise "Unknown type #{value.class}"
+      end
+    end
+    # Converts YAML to VirtualDate object.
+   def self.from_yaml(value : YAML::PullParser) : Crystime::VirtualDate::Virtual
+      v= value.read_scalar
+      case v
+      when "nil"
+        nil
+      when /^\d+$/
+        v.to_i
+      when /^(\d+)\.\.\.(\d+)(?:\/(\d+))$/
+        ( $1.to_i...$2.to_i).step( $3.to_i)
+      when /^(\d+)\.\.\.(\d+)$/
+        $1.to_i...$2.to_i
+      when /^(\d+)\.\.(\d+)(?:\/(\d+))$/
+        ( $1.to_i..$2.to_i).step( $3.to_i)
+      when /^(\d+)\.\.(\d+)$/
+        $1.to_i..$2.to_i
+      when "true"
+        true
+      when "false"
+        false
+      # XXX The next one is here just to satisfy return type. It doesn't really work.
+      when /^->/
+        ->( v : Int32){ true}
+      else
+        raise Crystime::Errors.invalid_yaml_input
+      end
+    end
   end
+end
