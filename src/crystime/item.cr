@@ -219,6 +219,107 @@ module Crystime
       check_time( list, target, nil)
     end
 
+    # Low-level logic functions
+
+    private def virtual_dates( list, default_list= [] of VirtualDate)
+      list= force_array list
+      di= list.index( true)
+      if di
+        list= list.dup
+        list[di..di]= default_list
+      end
+      list
+    end
+
+    def check_date( list, target, default= true)
+      #puts "checking #{list.inspect} re. #{target.inspect}"
+      return default if !list || (list.size==0)
+      y, m= target.year, target.month
+      if y.is_a? Int && m.is_a? Int
+        dayfold= Time.days_in_month( y, m)+ 1
+      end
+      list.each do |e|
+        #puts :IN, e.inspect, target.inspect
+        return true if matches?( e.year, target.year) &&
+          matches?( e.month, target.month) &&
+          matches?( e.day, target.day, dayfold) &&
+          matches?( e.weekday, target.weekday) &&
+          matches?( e.jd, target.jd)
+      end
+      nil
+    end
+    def check_time( list, target, default= true)
+      return default if !list || (list.size==0)
+      list.each do |e|
+        return true if matches?( e.hour, target.hour) &&
+          matches?( e.minute, target.minute) &&
+          matches?( e.second, target.second) &&
+          matches?( e.millisecond, target.millisecond)
+      end
+      nil
+    end
+
+    # Matching rules:
+    # nil=>all,
+    # number=>only that one,
+    # block=>call to get true/false
+    # enumerable(incl. range): includes?
+    # true=> use default value(s)
+    # XXX too many things here are limited to a specific type
+    # XXX throw Undeterminable if one asks for day match on date with no
+    # year, so days_in_month can't be calcd.
+    #             "DUE" "DATE"
+    def matches?( rule, value, fold= nil)
+      #raise ArgumentError.new unless value.is_a? Int32
+      # Fold is the starting value for negative numbers
+      #return true if rule.nil? || value.nil?
+      #ret= case rule
+      #  ##when nil then true
+      #  #when Number
+      #  #  case value
+      #  #  when Number then rule== value
+      #  #  when Range then value=== rule
+      #  #  end
+      #  #when Proc then value.is_a?( Int) ? rule.call( value) : raise Crystime::Errors.unsupported_comparison
+      #  #when Enumerable then
+      #  #  value.is_a?( Int) ? rule=== value :
+      #  #  # XXX switch to using Range(int,Int) when it becomes possible in Crystal
+      #  #  #value.is_a?( Range(Int32,Int32)) ? rule=== value :
+      #  #    value.is_a?( Enumerable(Int32)) ? puts( "kaliopa") :
+      #  #  raise Crystime::Errors.unsupported_comparison
+      #  #else false
+      #end
+      ret= compare( rule, value)
+      if fold && !ret && value.is_a?( Int)
+        # try once again, folding the test value around the specified point
+        # careful with eg day<7 conditions, need to be translated to 1..7
+        ret= matches? rule, value-fold, nil
+      end
+      #puts rule.inspect, value.inspect, ret
+      ret
+    end
+
+    #def compare( a : Range(Int, Int), b : Range( Int, Int))
+    #  if a.exclusive? || b.exclusive?
+    #    raise Crystime::Errors.exclusive_range_comparison
+    #  end
+    #  (a.includes?( b.begin)&& a.includes?( b.end))
+    #end
+    private def compare( a : Enumerable(Int), b : Enumerable(Int))
+      a_set= a.to_set
+      b.all?{ |i| a_set.includes? i}
+    end
+    private def compare( a : Proc(Int32, Bool), b : Int) a.call(b) end
+    private def compare( a : Enumerable(Int), b : Int) a.includes? b end
+    private def compare( a : Int, b : Int) a== b end
+    private def compare( a : Nil, b) true end
+
+    private def compare( a, b : Nil) true end
+    private def compare( a : Int, b : Enumerable(Int)) compare(b, a) end
+
+    private def compare( a, b)
+      raise "No comparator defined between #{a.class} and #{b.class}."
+    end
 
     # Helpers below
 
