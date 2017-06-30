@@ -130,6 +130,59 @@ module Crystime
       end
     end
 
+#		def remind_on?( date= Time.now)
+#			d= date
+#			# separate reminders in absolute and relative
+#			abs= @remind.select{|x| x.is_a? Wrap::Date | Wrap::Time | Wrap::DateTime | Time}
+#			rel= @remind- abs
+#			# see if there is an absolute match
+#			abs.select!{ |x| x== d}
+#			#abs.map!{ |x| x.respond_to? :hour ? x : "XXX no dice" } # XXX we assume all respond to hour
+#			# test for on? on each date-reminder
+#			rel.map! do |x|
+#				unless x.is_a? ::Time::Span
+#					x
+#				else
+#					## negative difference x means in advance/before
+#					## we are catching everything between 0 and 24 h that day:
+#					## check and reverse check:
+#					d00= d - 1.day - x.epoch
+#					d24= (d+1.day) - 1.day - x.epoch
+#					t= nil
+#					if on? d00
+#						t= d00 + x
+#						t= nil unless d== t
+#					end
+#					if !t and on? d24
+#						t= d24 + x
+#						t= nil unless d== t
+#					end
+#					t
+#				end
+#			end
+#			rel.compact!
+#			abs+rel
+#		end
+
+    # Lower-level date/time testers
+
+    # ```
+    # it "uses negative numbers to count from end of month" do
+    #   i= Crystime::Item.new
+    #   due= Crystime::VirtualDate.new
+    #   due.year= 2017
+    #   due.month= 2
+    #   due.day= -1
+    #   i.due<< due
+    #   date= Crystime::VirtualDate.new
+    #   date.year= 2017
+    #   date.month= 2
+    #   date.day= 28
+    #   i.due_on?( date).should eq true
+    # end
+    # ```
+
+
     # Helpers below
 
 #   def parse_timeunit( str)
