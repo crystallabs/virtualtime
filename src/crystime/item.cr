@@ -182,6 +182,43 @@ module Crystime
     # end
     # ```
 
+    def due_on?( target, list= @due)
+      due_on_date?( target, list) &&
+      due_on_time?( target, list)
+    end
+    def due_on_date?( target, list= @due)
+      #puts "DD: "+ target.inspect, "\nLIST"+ list.inspect
+      return if !target
+      a, z= @start, @stop
+      return nil if a &&( a> target)
+      return nil if z &&( z< target)
+      list= virtual_dates list
+      check_date( list, target, true)
+    end
+    def due_on_time?( target, list= @due)
+      return if !target
+      list= virtual_dates list
+      check_time( list, target, true)
+    end
+
+    def omit_on?( target)
+      omit_on_date?( target) &&
+      omit_on_time?( target)
+    end
+    def omit_on_date?( target)
+      return if !target
+      a, z= @start, @stop
+      return nil if a &&( a> target)
+      return nil if z &&( z< target)
+      list= virtual_dates @omit
+      check_date( list, target, nil) # XXX, @@default_omit
+    end
+    def omit_on_time?( target)
+      return if !target
+      list= virtual_dates @omit
+      check_time( list, target, nil)
+    end
+
 
     # Helpers below
 
