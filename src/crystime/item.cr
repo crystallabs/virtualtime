@@ -43,6 +43,8 @@ module Crystime
 		# TODO: non-interruptible/non-shareable tasks (just a flag)
 		# all existing items should be in @omit when checking if term is free
 
+		# TODO Add on? which works with Time objects
+
     # Check whether the item is "on" on the specified date/time. Item is
     # considered "on" if it matches at least one "due" time and does not
     # match any "omit" time.
@@ -306,11 +308,11 @@ module Crystime
     #  (a.includes?( b.begin)&& a.includes?( b.end))
     #end
     private def compare( a : Enumerable(Int), b : Enumerable(Int))
-      a_set= a.to_set
+      a_set= a.dup.to_set
       b.all?{ |i| a_set.includes? i}
     end
     private def compare( a : Proc(Int32, Bool), b : Int) a.call(b) end
-    private def compare( a : Enumerable(Int), b : Int) a.includes? b end
+    private def compare( a : Enumerable(Int), b : Int) a.dup.includes? b end
     private def compare( a : Int, b : Int) a== b end
     private def compare( a : Nil, b) true end
 
