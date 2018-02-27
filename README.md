@@ -136,7 +136,7 @@ weekday=6, day=24..31  -- matches last Saturday in month
 
 Please note that these are the individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due and omit
-dates so virtually any desired rules can be expressed.
+dates so virtually any desired combinations can be expressed.
 
 # Item in Detail
 
