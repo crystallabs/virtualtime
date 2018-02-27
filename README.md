@@ -112,7 +112,7 @@ Each of the above listed fields can have the following values:
 ```
 - Nil / undefined (matches everything it is compared with)
 - A number that is native/accepted for a particular field (e.g. 1)
-  (Negative values count from the end of the range)
+  (Negative values count from the end)
 - A range (e.g. 1..6)
 - A range with a step (e.g. (1..6).step(2))
 - A proc (should returnone of {-1, 0, 1} when invoked) (not tested extensively)
