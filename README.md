@@ -133,6 +133,7 @@ rules:
 ```
 day=-1                 -- matches last day in month
 weekday=6, day=24..31  -- matches last Saturday in month
+weekday=1..5, day=-1   -- matches last day of month if it is a workday
 ```
 
 Please note that these are the individual VirtualDate rules. Complete Items
