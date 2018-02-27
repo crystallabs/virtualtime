@@ -141,6 +141,51 @@ Please note that these are the individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due and omit
 dates so virtually any desired combinations can be expressed.
 
+## VirtualDate from String
+
+There are two ways to create a VirtualDate and both have been implicitly shown
+in use above.
+
+One is by invoking e.g. `vd = VirtualDate.new` and then setting the individual
+fields on `vd`.
+
+Another is creating a VirtualDate from a string, using notation `vd = VirtualDate["... string ..."]`.
+This parser should eventually support everything supported by Ruby's ``Time.parse`, `Date.parse`,
+`DateTime.parse`, etc., but for now it supports the following strings:
+
+```
+# Year-Month-Day
+yyyy-mm?-dd?
+yyyy.mm?.dd?
+yyyy/mm?/dd?
+
+# Hour-Minute-Second-Millisecond
+hh?:mm?:ss?
+hh?:mm?:ss?:mss?
+hh?:mm?:ss?.mss?
+
+# Year
+yyyy
+
+# Month abbreviations in uppercase
+JAN, FEB, ...
+
+# Day names in uppercase
+MON, TUE, ...
+
+```
+
+For example:
+
+```
+vd = VirtualDate["JAN 2018"]
+p vd
+
+vd = VirtualDate["2018 MON"]
+p vd
+```
+
+
 # Item in Detail
 
 As mentioned, Item is the toplevel object representing a task/event/etc.
@@ -208,6 +253,6 @@ own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
 1. Add more compatibility for using Time in place of VirtualDate
 1. Add more features suitable for reimplementation of cron using this module
-1. Add a rbtree or something sorting the items in order of most recent to most distant
+1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 
