@@ -67,6 +67,12 @@ any_mar_20 = Crystime::VirtualDate.new
 any_mar_20.month = 3
 any_mar_20.day = 20
 p item.on?( any_mar_20 )== true
+
+# Also, we can check whether this event is due at any point in
+# March, and it'll tell us yes:
+any_mar = Crystime::VirtualDate.new
+any_mar.month = 3
+p item.on?( any_mar)== true
 ```
 
 This would print
@@ -77,4 +83,82 @@ false
 true
 true
 true
+```
+
+# VirtualDate in Detail
+
+Every date/time object in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
+are based on VirtualDate. That's because VirtualDate does everything Time does (except maybe
+providing some convenience functions) and more, so it is simpler and more powerful to use it
+everywhere.
+
+A VirtualDate has the following fields that can be set after object creation:
+
+```
+year        - Year value
+month       - Month value (1-12)
+day         - Day value (1-31)
+
+weekday     - Day of week (Sunday = 0, Saturday = 6)
+jd          - Julian Day Number
+
+hour        - Hour value (0-23)
+minute      - Minute value (0-59)
+second      - Second value (0-59)
+millisecond - Millisecond value (0-999)
+```
+
+Please note that weekday and Julian Day Number fields are in relation with the
+Y/M/D values. One can't change one without the other.
+
+As long as VirtualDate is materialized (i.e. has specific Y/M/D values), changing
+any of those values will update weekday and jd automatically. Similarly, setting
+a Julian Day Number will automatically update Y/M/D and cause the date to become
+materialized.
+
+Each of the above listed fields can have the following values:
+
+```
+- Nil / undefined (matches everything it is compared with)
+- A number that is native/accepted for a particular field (e.g. 1)
+  (Negative values count from the end of the range)
+- A range (e.g. 1..6)
+- A range with a step (e.g. (1..6).step(2))
+- A proc (should returnone of {-1, 0, 1} when invoked) (not tested extensively)
+```
+
+This allows for specifying even complex rules, such as:
+
+```
+day=-1                 -- matches last day in month
+weekday=6, day=24..31  -- matches last Saturday in month
+```
+
+Please note that these are the individual VirtualDate rules. Complete Items
+(described below) can have multiple VirtualDates set as their due and omit
+dates.
+
+# Item in Detail
+
+As mentioned, Item is the toplevel object representing a task/event/etc.
+
+It does not contain task/event-specific properties, it only concerns itself with
+the scheduling aspect and has the following fields:
+
+```
+start      - Start VirtualDate (item is never "on" before this date)
+stop       - End VirtualDate (item is never "on" after this date)
+due        - List of due/on VirtualDates
+omit       - List of omit/not-on VirtualDates
+shift      - List of VirtualDates which new proposed item time (produced by
+             shifting the date from an omit date in an attempt to schedule it)
+             must match for the item to be considered "on"
+omit_shift - What to do if item falls on an omitted date/time:
+           - nil: ignore it, do not schedule
+           - false: ignore it, treat as not-reschedulable
+           - true: treat it as due, regardless of falling on omitted date
+           - Crystime::Span: amount by which it should be shifted
+
+# Reminder capabilities were previously in, but now they are
+# waiting for a rewrite.
 ```

@@ -31,5 +31,11 @@ p item.on?( Crystime::VirtualDate["2017-03-20"])== true
 any_mar_20 = Crystime::VirtualDate.new
 any_mar_20.month = 3
 any_mar_20.day = 20
-
 p item.on?( any_mar_20 )== true
+
+# Also, we can check whether this event is due at any point in
+# March, and it'll tell us yes:
+any_mar = Crystime::VirtualDate.new
+any_mar.month = 3
+p item.on?( any_mar)== true
+
