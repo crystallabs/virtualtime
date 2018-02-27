@@ -89,8 +89,7 @@ true
 
 Every date/time object in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
 are based on VirtualDate. That's because VirtualDate does everything Time does (except maybe
-providing some convenience functions) and more, so it is simpler and more powerful to use it
-everywhere.
+providing some convenience functions) so it is simpler and more powerful to use it everywhere.
 
 A VirtualDate has the following fields that can be set after object creation:
 
@@ -108,14 +107,6 @@ second      - Second value (0-59)
 millisecond - Millisecond value (0-999)
 ```
 
-Please note that weekday and Julian Day Number fields are in relation with the
-Y/M/D values. One can't change one without the other.
-
-As long as VirtualDate is materialized (i.e. has specific Y/M/D values), changing
-any of those values will update weekday and jd automatically. Similarly, setting
-a Julian Day Number will automatically update Y/M/D and cause the date to become
-materialized.
-
 Each of the above listed fields can have the following values:
 
 ```
@@ -127,7 +118,16 @@ Each of the above listed fields can have the following values:
 - A proc (should returnone of {-1, 0, 1} when invoked) (not tested extensively)
 ```
 
-This allows for specifying even complex rules, such as:
+Please note that weekday and Julian Day Number fields are in relation with the
+Y/M/D values. One can't change one without triggering the change in the other.
+
+As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
+any of those values will update weekday and jd automatically. Similarly, setting
+a Julian Day Number will automatically update Y/M/D and cause the date to become
+materialized.
+
+Altogether, this syntax allows for specifying simple but functionally intricate
+rules:
 
 ```
 day=-1                 -- matches last day in month
@@ -136,7 +136,7 @@ weekday=6, day=24..31  -- matches last Saturday in month
 
 Please note that these are the individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due and omit
-dates.
+dates so virtually any desired rules can be expressed.
 
 # Item in Detail
 
@@ -162,3 +162,9 @@ omit_shift - What to do if item falls on an omitted date/time:
 # Reminder capabilities were previously in, but now they are
 # waiting for a rewrite.
 ```
+
+# Additional Info
+
+All of the features are covered by specs, please see spec/* for more ideas
+and actual, working examples.
+
