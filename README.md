@@ -25,7 +25,7 @@ The basis of the higher-level, user functionality is class "Item". This is inten
 called an "item" not to imply any particular type (task, event, recurring appointment,
 etc.)
 
-An item can have a start and end date, a list of VirtualDates on which it is considered
+An item can have a start and end VirtualDate, a list of VirtualDates on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualDates on which it is specifically
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
