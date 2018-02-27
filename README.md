@@ -148,8 +148,10 @@ the scheduling aspect and has the following fields:
 ```
 start      - Start VirtualDate (item is never "on" before this date)
 stop       - End VirtualDate (item is never "on" after this date)
+
 due        - List of due/on VirtualDates
 omit       - List of omit/not-on VirtualDates
+
 shift      - List of VirtualDates which new proposed item time (produced by
              shifting the date from an omit date in an attempt to schedule it)
              must match for the item to be considered "on"
