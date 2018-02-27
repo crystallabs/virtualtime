@@ -6,38 +6,36 @@ The basis of the low-level functionality is class "VirtualDate". Think of it as 
 a normal "Time" struct, but much more powerful.
 
 With regular Time, all fields (year, month, day, hour, minute, second, millisecond) have
-some value, and that value is some specific number. As such, Time objects always represent
-some specific date and time points.
+a value, and that value is a specific number. As such, Time objects always represent
+specific dates ("materialized" dates in Crystime terminology).
 
-With VirtualDate, each field (year, month, day, hour, minute,
-second, millisecond, day of week, and julian day) can be unspecified, a number, or
-contain a more complex specification (range, range with step, boolean, or
-proc).
+With Crystime's VirtualDate, each field (year, month, day, hour, minute,
+second, millisecond, day of week, and julian day) can either remain unspecified, or
+be a number, or contain a more complex specification (range, range with step, boolean,
+or proc).
 
 For example, you could construct a VirtualDate with a month of "March" and a day range
 of 10..20 with step 2. This would represent a "virtual date" that matches any Time or
-another VirtualDate which falls within, or overlaps, dates March 10, 12, 14, 16, 
+another VirtualDate which falls on, or overlaps, the dates March 10, 12, 14, 16, 
 18, or 20.
 
 ## Item
 
-The basis of a higher-level, user functionality is class "Item". This is intentionally
+The basis of the higher-level, user functionality is class "Item". This is intentionally
 called an "item" not to imply any particular type (task, event, recurring appointment,
 etc.)
 
 An item can have a start and end date, a list of VirtualDates on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualDates on which it is specifically
-"omitted" (i.e. "not on", like on weekends, individual holidays dates, times of day, etc.),
+"omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
+day, etc.),
 and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
-it can be still "on", or ignored, or scheduled before, or scheduled after.
+it can be still "on", or ignored, or scheduled some time before, or some time after.
 
 Here's a simple example from the examples/ folder to begin with, with comments:
 
 ```crystal
-#
-# Create an item and assign due dates to it:
-#
-
+# Create an item:
 item = Crystime::Item.new
 
 # Create a VirtualDate that matches every other
@@ -46,12 +44,10 @@ due_march = Crystime::VirtualDate.new
 due_march.month = 3
 due_march.day = (10..20).step 2
 
-# Add this VirtualDate specification to item:
+# Add this VirtualDate as due date to item:
 item.due<< due_march
 
-#
 # Now we can check when the item is due and when not:
-#
 
 # Item is not due on Feb 15, 2017 because that's not in March:
 p item.on?( Crystime::VirtualDate["2017-02-15"])== true
