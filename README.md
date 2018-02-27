@@ -115,7 +115,7 @@ Each of the above listed fields can have the following values:
   (Negative values count from the end)
 - A range (e.g. 1..6)
 - A range with a step (e.g. (1..6).step(2))
-- A proc (should returnone of {-1, 0, 1} when invoked) (not tested extensively)
+- A proc (should return one of {-1, 0, 1} when invoked) (not tested extensively)
 ```
 
 Please note that weekday and Julian Day Number fields are in relation with the
