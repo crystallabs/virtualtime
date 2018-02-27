@@ -5,8 +5,9 @@ Crystime is an advanced time, calendar, scheduling, and reminding library for Cr
 The basis of the low-level functionality is class "VirtualDate". Think of it as of
 a normal "Time" struct, but much more powerful.
 
-With Time, all fields (year, month, day, hour, minute, second, millisecond) have
-a value, and that value can only be a specific number.
+With regular Time, all fields (year, month, day, hour, minute, second, millisecond) have
+some value, and that value is some specific number. As such, Time objects always represent
+some specific date and time points.
 
 With VirtualDate, each field (year, month, day, hour, minute,
 second, millisecond, day of week, and julian day) can be unspecified, a number, or
