@@ -1,9 +1,6 @@
 require "../src/crystime"
 
-#
-# Create an item and assign due dates to it:
-#
-
+# Create an item:
 item = Crystime::Item.new
 
 # Create a VirtualDate that matches every other
@@ -12,12 +9,10 @@ due_march = Crystime::VirtualDate.new
 due_march.month = 3
 due_march.day = (10..20).step 2
 
-# Add this VirtualDate specification to item:
+# Add this VirtualDate as due date to item:
 item.due<< due_march
 
-#
 # Now we can check when the item is due and when not:
-#
 
 # Item is not due on Feb 15, 2017 because that's not in March:
 p item.on?( Crystime::VirtualDate["2017-02-15"])== true
