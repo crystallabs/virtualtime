@@ -114,6 +114,7 @@ Each of the above listed fields can have the following values:
 - Nil / undefined (matches everything it is compared with)
 - A number that is native/accepted for a particular field (e.g. 1)
   (Negative values count from the end)
+- A list of numbers native/accepted for a particular field (e.g. [1, 8, 12, 13, 14])
 - A range (e.g. 1..6)
 - A range with a step (e.g. (1..6).step(2))
 - A proc (should return one of {-1, 0, 1} when invoked) (not tested extensively)
@@ -167,8 +168,46 @@ omit_shift - What to do if item falls on an omitted date/time:
 # waiting for a rewrite.
 ```
 
+Here's an example of an item that's due every other day in March, but if it falls
+on a weekend it is ignored. (This is also one from examples/ folder.)
+
+```crystal
+# Create an item:
+item = Crystime::Item.new
+
+# Create a VirtualDate that matches every other day in March:
+due_march = Crystime::VirtualDate.new
+due_march.month = 3
+due_march.day = (2..31).step 2
+# Add this VirtualDate as due date to item:
+item.due<< due_march
+
+# But on weekends it should not be scheduled:
+not_due_weekend = Crystime::VirtualDate.new
+not_due_weekend.weekday = [0,6]
+# Add this VirtualDate as due date to item:
+item.omit<< not_due_weekend
+
+item.omit_shift = nil
+
+# Now let's check when it is due and when not:
+(1..31).each do |d|
+  p "2017-03-#{d} = #{item.on?( Crystime::VirtualDate["2017-03-#{d}"])== true}"
+end
+```
+
 # Additional Info
 
 All of the features are covered by specs, please see spec/* for more ideas
 and actual, working examples.
+
+# TODO
+
+1. Add reminder functions. Previously remind features were implemented using their
+own code/approach. But maybe reminders should be just regular Items whose exact
+due date/time is certain offset from the original Item's date/time.
+1. Add more compatibility for using Time in place of VirtualDate
+1. Add more features suitable for reimplementation of cron using this module
+1. Add a rbtree or something sorting the items in order of most recent to most distant
+1. Possibly add some support for triggering actions on exact due dates of items/reminders
 
