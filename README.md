@@ -139,7 +139,7 @@ weekday=1..5, day=-1   -- matches last day of month if it is a workday
 
 Please note that these are individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due, omit,
-and check dates so virtually any desired rules can be expressed.
+and check dates so many desired rules can be expressed.
 
 ## VirtualDate from String
 
