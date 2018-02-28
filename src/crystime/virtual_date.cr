@@ -6,7 +6,7 @@
 require "yaml"
 
 module Crystime
-	class VirtualDate
+  class VirtualDate
     W2I= { "SUN" => 0, "MON" => 1, "TUE" => 2, "WED" => 3, "THU" => 4, "FRI" => 5, "SAT" => 6}
     I2W= W2I.invert
     WR=  Regex.new "\\b("+ W2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
@@ -46,10 +46,10 @@ module Crystime
 
     #@relative: Nil | Bool
 
-		# "ts" is a variable which keeps track of which fields were actually specified in VirtualDate.
-		# E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
-		# This is important for matching VirtualDates, because if one VirtualDate has ts[5] set to nil (not specified), and
-		# the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
+    # "ts" is a variable which keeps track of which fields were actually specified in VirtualDate.
+    # E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
+    # This is important for matching VirtualDates, because if one VirtualDate has ts[5] set to nil (not specified), and
+    # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
     #      0    1     2     3     4     5     6
     #      year month day   hour  min   sec   ms
     @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
@@ -62,10 +62,10 @@ module Crystime
     def year=( v)        @year= v;   @ts[0]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def month=( v)       @month= v;  @ts[1]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def day=( v)         @day= v;    @ts[2]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
-    def hour=( v)        @hour= v;   @ts[3]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
-    def minute=( v)      @minute= v; @ts[4]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
-    def second=( v)      @second= v; @ts[5]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
-    def millisecond=( v) @millisecond= v; @ts[6]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
+    def hour=( v)        @hour= v;   @ts[3]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
+    def minute=( v)      @minute= v; @ts[4]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
+    def second=( v)      @second= v; @ts[5]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
+    def millisecond=( v) @millisecond= v; @ts[6]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
     # Weekday does not affect actual date, only adds a constraint.
     def weekday=( v)
       @weekday= v
@@ -82,10 +82,10 @@ module Crystime
       true
     end
 
-		# Called when year, month, or day are re-set and we need to re-calculate which weekday and
-		# Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
-		# If it is not specified (meaning that the VirtualDate does not refer to a specific date),
-		# then they are set to nil.
+    # Called when year, month, or day are re-set and we need to re-calculate which weekday and
+    # Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
+    # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
+    # then they are set to nil.
     def update!
       if @ts[0]&& @ts[1]&& @ts[2]
         #puts "date is: "+ self.inspect
@@ -98,12 +98,12 @@ module Crystime
       true
     end
 
-		# Expand a partial VirtualDate into a materialized/specific date/time.
+    # Expand a partial VirtualDate into a materialized/specific date/time.
     def expand
       [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
     end
 
-		# Creates VirtualDate from Julian Day Number.
+    # Creates VirtualDate from Julian Day Number.
     def from_jd
       jd= @jd
       if jd.nil?
@@ -126,7 +126,7 @@ module Crystime
       gy = (e / p) - y + (n + m - gm) / n
       {gy, gm, gd}
     end
-		# Creates Julian Day Number from VirtualDate, when possible. Raises otherwise.
+    # Creates Julian Day Number from VirtualDate, when possible. Raises otherwise.
     def to_jd!
       if @ts[0]&& @ts[1]&& @ts[2]
         a= ((14-@month.as( Int))/12).floor
@@ -143,11 +143,11 @@ module Crystime
       to_time<=>other.to_time
     end
     def +( other : Span)
-			self_time= self.to_time
+      self_time= self.to_time
       t= Time.epoch(0) + Time::Span.new(
-				seconds: (self_time.epoch+ other.total_seconds).floor.to_i64,
-				nanoseconds: (self_time.nanosecond+ other.nanoseconds).floor.to_i32,
-			)
+        seconds: (self_time.epoch+ other.total_seconds).floor.to_i64,
+        nanoseconds: (self_time.nanosecond+ other.nanoseconds).floor.to_i32,
+      )
       if (t.year        != 0)                     ; self.year= t.year               end
       if (t.month       != 0)                     ; self.month= t.month             end
       if (t.day         != 0) || !other.ts[0].nil?; self.day= t.day                 end
@@ -160,21 +160,21 @@ module Crystime
     # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
     def -( other : Span) self+ -other end
     def +( other : self)
-			self_time= self.to_time
-			other_time= other.to_time
-			Span.new(
-				seconds: (self_time.epoch+ other_time.epoch).floor,
-				nanoseconds: (self_time.nanosecond+ other_time.nanosecond).floor
-			)
-		end
+      self_time= self.to_time
+      other_time= other.to_time
+      Span.new(
+        seconds: (self_time.epoch+ other_time.epoch).floor,
+        nanoseconds: (self_time.nanosecond+ other_time.nanosecond).floor
+      )
+    end
     def -( other : self)
-			self_time= self.to_time
-			other_time= other.to_time
-			Span.new(
-				seconds: (self_time.epoch- other_time.epoch).floor,
-				nanoseconds: (self_time.nanosecond- other_time.nanosecond).floor
-			)
-		end
+      self_time= self.to_time
+      other_time= other.to_time
+      Span.new(
+        seconds: (self_time.epoch- other_time.epoch).floor,
+        nanoseconds: (self_time.nanosecond- other_time.nanosecond).floor
+      )
+    end
 
     def to_time
       # XXX ability to define default values for nils
@@ -250,9 +250,9 @@ module Crystime
       { @year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond}
     end
 
-		# Parses string and produces VirtualDate.
-		def self.[]( date)
-			return date if date.is_a? self
+    # Parses string and produces VirtualDate.
+    def self.[]( date)
+      return date if date.is_a? self
       #puts "TRYING TO PARSE #{date}"
 
       #formats= {
@@ -264,13 +264,14 @@ module Crystime
       #  "%T",
       #}
 
-			r= new
+      r= new
       ret= false
 
       if m= date.match /(?<year>\d{4})[\-\/\.](?<month>\d{1,2})[\-\/\.](?<day>\d{1,2})/
         r.year=   m["year"].to_i
         r.month=  m["month"].to_i
         r.day=    m["day"].to_i
+        r.update!
         ret= true
       end
 
@@ -291,19 +292,19 @@ module Crystime
       #p find_any({"one", "two", "three"}, "adfgagtwowafg")
 
       date= date.upcase
-      if date=~ /\b(\d{4})\b/;  r.year= $1.to_i end
-      if v= find_weekday( date); r.day= W2I[v]? &&( ret= true) end
-      if v= find_month( date); r.month= M2I[v]? &&( ret= true) end
+      if date=~ /\b(\d{4})\b/;  r.year= $1.to_i; r.update! end
+      if v= find_weekday( date); (r.weekday= W2I[v]?) &&( ret= true) end
+      if v= find_month( date);     (r.month= M2I[v]?) &&( ret= true); r.update! end
       unless ret
         if m= date.match /(?<day>\-?\d{1,2})/
-          r.day=   m["day"].to_i
+          r.day= m["day"].to_i
+          r.update!
           ret= true
         end
       end
       raise Crystime::Errors.incorrect_input unless ret
-      r.update!
       r
-		end
+    end
 
     private def self.find_weekday( str)
       str.scan(WR) do |m| return m[0] end
@@ -314,7 +315,7 @@ module Crystime
       nil
     end
 
-	end
+  end
 
   class Span
     getter :ts
@@ -344,13 +345,13 @@ module Crystime
     #  @span= Time::Span.new(ticks)
     #  #after_initialize
     #end
-		def initialize( seconds, nanoseconds)
-			@span= Time::Span.new(
-				seconds: seconds,
-				nanoseconds: nanoseconds,
-			)
-			#after_initialize
-		end
+    def initialize( seconds, nanoseconds)
+      @span= Time::Span.new(
+        seconds: seconds,
+        nanoseconds: nanoseconds,
+      )
+      #after_initialize
+    end
 
     #def after_initialize
     #  s= @span
@@ -359,39 +360,39 @@ module Crystime
     #end
 
     #def ticks()
-		#	raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+    # raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
     #  @span.ticks
     #end
     def total_seconds()
-			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
-			@span.total_seconds
-		end
+      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      @span.total_seconds
+    end
     def total_milliseconds()
-			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
-			@span.total_milliseconds
-		end
+      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      @span.total_milliseconds
+    end
     def total_nanoseconds()
-			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
-			@span.total_nanoseconds
-		end
+      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      @span.total_nanoseconds
+    end
     def nanoseconds()
-			raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
-			@span.nanoseconds
-		end
+      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      @span.nanoseconds
+    end
     def abs() @span.ticks.abs end
     def to_f() @span.to_f end
     def +( other : self)
-			Span.new(
-				seconds: (total_seconds+ other.total_seconds).floor.to_i64,
-				nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
-			)
-		end
+      Span.new(
+        seconds: (total_seconds+ other.total_seconds).floor.to_i64,
+        nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
+      )
+    end
     def -( other : self)
-			Span.new(
-				seconds: (total_seconds- other.total_seconds).floor.to_i64,
-				nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
-			)
-		end
+      Span.new(
+        seconds: (total_seconds- other.total_seconds).floor.to_i64,
+        nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
+      )
+    end
 
     def <=>( other : self)
       # TODO this code prevents to perfectly simple/comparable VDs from being compared (at least for literal ==)
@@ -621,10 +622,10 @@ end
 #    d = DateTime.parse('Sun 23:55')
 #    d2 = d - d.wday
 #    assert_equal([d2.year, d2.mon, d2.mday, 23, 55, 0],
-#		 [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
 #    d = DateTime.parse('Aug 23:55')
 #    assert_equal([n.year, 8, 1, 23, 55, 0],
-#		 [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
+#    [d.year, d.mon, d.mday, d.hour, d.min, d.sec])
 #
 #    d = Date.new(2002,3,14)
 #    assert_equal(d, Date.parse(d.to_s))
