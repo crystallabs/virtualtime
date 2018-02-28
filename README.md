@@ -125,11 +125,11 @@ Y/M/D values. One can't change one without triggering the change in the other.
 
 As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
 any of those values will update weekday and jd automatically. Similarly, setting
-a Julian Day Number will automatically update Y/M/D and cause the date to become
+Julian Day Number will automatically update Y/M/D and cause the date to become
 materialized.
 
-Altogether, this syntax allows for specifying simple but functionally intricate
-rules:
+Altogether, the described syntax allows for specifying simple but functionally intricate
+rules, of which just some of them are:
 
 ```
 day=-1                 -- matches last day in month
@@ -137,9 +137,9 @@ weekday=6, day=24..31  -- matches last Saturday in month
 weekday=1..5, day=-1   -- matches last day of month if it is a workday
 ```
 
-Please note that these are the individual VirtualDate rules. Complete Items
-(described below) can have multiple VirtualDates set as their due and omit
-dates so virtually any desired combinations can be expressed.
+Please note that these are individual VirtualDate rules. Complete Items
+(described below) can have multiple VirtualDates set as their due, omit,
+and check dates so virtually any desired rules can be expressed.
 
 ## VirtualDate from String
 
