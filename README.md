@@ -11,8 +11,8 @@ specific dates ("materialized" dates in Crystime terminology).
 
 With Crystime's VirtualDate, each field (year, month, day, hour, minute,
 second, millisecond, day of week, and julian day) can either remain unspecified, or
-be a number, or contain a more complex specification (range, range with step, boolean,
-or proc).
+be a number, or contain a more complex specification (list, range, range with step,
+boolean, or proc).
 
 For example, you could construct a VirtualDate with a month of "March" and a day range
 of 10..20 with step 2. This would represent a "virtual date" that matches any Time or
