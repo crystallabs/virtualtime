@@ -42,7 +42,11 @@ describe Crystime do
 		a.millisecond.should eq 40000
   end
   it "can parse weekday names" do
-    a= Crystime::VirtualDate["Sun"]
-    #puts a.inspect
+    a= Crystime::VirtualDate["Mon"]
+    a.weekday.should eq 1
+  end
+  it "can parse month names" do
+    a= Crystime::VirtualDate["Aug"]
+    a.month.should eq 8
   end
 end
