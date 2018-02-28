@@ -150,7 +150,7 @@ One is by invoking e.g. `vd = VirtualDate.new` and then setting the individual
 fields on `vd`.
 
 Another is creating a VirtualDate from a string, using notation `vd = VirtualDate["... string ..."]`.
-This parser should eventually support everything supported by Ruby's ``Time.parse`, `Date.parse`,
+This parser should eventually support everything supported by Ruby's `Time.parse`, `Date.parse`,
 `DateTime.parse`, etc., but for now it supports the following strings:
 
 ```
