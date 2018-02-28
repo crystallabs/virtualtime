@@ -20,5 +20,5 @@ item.omit_shift = nil
 
 # Now let's check when it is due and when not:
 (1..31).each do |d|
-	p "2017-03-#{d} = #{item.on?( Crystime::VirtualDate["2017-03-#{d}"])== true}"
+	p "2017-03-#{d} = #{item.on?( Crystime::VirtualDate["2017-03-#{d}"])}"
 end
