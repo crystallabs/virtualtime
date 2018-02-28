@@ -251,7 +251,7 @@ and actual, working examples.
 own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
 1. Add more compatibility for using Time in place of VirtualDate
-1. Add more features suitable for reimplementation of cron using this module
+1. Add more features suitable to be used in a reimplementation of cron using this module
 1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 
