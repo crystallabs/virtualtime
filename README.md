@@ -209,7 +209,7 @@ omit_shift - What to do if item falls on an omitted date/time:
            - Crystime::Span: amount by which it should be shifted
 
 # Reminder capabilities were previously in, but now they are
-# waiting for a rewrite.
+# waiting for a rewrite and essentially aren't available.
 ```
 
 Here's an example of an item that's due every other day in March, but if it falls
