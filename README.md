@@ -25,7 +25,7 @@ The basis of the high-level user functionality is class "Item". This is intentio
 called an "item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
-An item can have a start and end VirtualDate, a list of VirtualDates on which it is considered
+An item can have an absolute start and end VirtualDate, a list of VirtualDates on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualDates on which it is specifically
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
