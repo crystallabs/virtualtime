@@ -179,12 +179,11 @@ For example:
 
 ```
 vd = VirtualDate["JAN 2018"]
-p vd
+p vd.month == 1
 
-vd = VirtualDate["2018 MON"]
-p vd
+vd = VirtualDate["2018 SUN"]
+p vd.weekday == 0
 ```
-
 
 # Item in Detail
 
