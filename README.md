@@ -30,7 +30,7 @@ An item can have an absolute start and end VirtualDate, a list of VirtualDates o
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
 and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
-it can be still "on", or ignored, or scheduled some time before, or some time after.
+it can still be "on", or ignored, or scheduled some time before, or some time after.
 
 Here's a simple example from the examples/ folder to begin with, with comments:
 
