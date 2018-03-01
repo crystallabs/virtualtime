@@ -181,7 +181,7 @@ For example:
 vd = VirtualDate["JAN 2018"]
 p vd.month == 1
 
-vd = VirtualDate["2018 SUN"]
+vd = VirtualDate["2018 sun"]
 p vd.weekday == 0
 ```
 
