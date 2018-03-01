@@ -243,7 +243,11 @@ end
 # Additional Info
 
 All of the features are covered by specs, please see spec/* for more ideas
-and actual, working examples.
+and actual, working examples. To run specs, run the usual command:
+
+```
+crystal spec
+```
 
 # TODO
 
