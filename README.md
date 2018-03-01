@@ -10,7 +10,7 @@ a value, and that value is a specific number. As such, Time objects always repre
 specific dates ("materialized" dates in Crystime terminology).
 
 With Crystime's VirtualDate, each field (year, month, day, hour, minute,
-second, millisecond, day of week, and julian day) can either remain unspecified, or
+second, millisecond, day of week, and [julian day](https://en.wikipedia.org/wiki/Julian_day)) can either remain unspecified, or
 be a number, or contain a more complex specification (list, range, range with step,
 boolean, or proc).
 
@@ -120,7 +120,7 @@ Each of the above listed fields can have the following values:
 - A proc (should return one of {-1, 0, 1} when invoked) (not tested extensively)
 ```
 
-Please note that weekday and Julian Day Number fields are in relation with the
+Please note that weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
 Y/M/D values. One can't change one without triggering the change in the other.
 
 As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
