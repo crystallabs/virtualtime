@@ -167,11 +167,11 @@ hh?:mm?:ss?.mss?
 # Year
 yyyy
 
-# Month abbreviations in uppercase
-JAN, FEB, ...
+# Month abbreviations
+JAN, Feb, ...
 
-# Day names in uppercase
-MON, TUE, ...
+# Day names
+MON, Tue, ...
 
 ```
 
