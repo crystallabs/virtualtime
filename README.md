@@ -2,7 +2,7 @@ Crystime is an advanced time, calendar, scheduling, and reminding library for Cr
 
 ## VirtualDate
 
-The basis of the low-level functionality is class "VirtualDate". Think of it as of
+First, the basis of the low-level functionality is class "VirtualDate". Think of it as of
 a normal "Time" struct, but much more flexible.
 
 With regular Time, all fields (year, month, day, hour, minute, second, millisecond) have
@@ -21,7 +21,7 @@ another VirtualDate which falls on, or overlaps, the dates March 10, 12, 14, 16,
 
 ## Item
 
-The basis of the high-level user functionality is class "Item". This is intentionally
+Second, the basis of the high-level user functionality is class "Item". This is intentionally
 called an "item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
@@ -75,7 +75,7 @@ any_mar.month = 3
 p item.on?( any_mar)
 ```
 
-This would print
+If you run the above code, it would print:
 
 ```
 false
@@ -88,7 +88,7 @@ true
 
 # VirtualDate in Detail
 
-Every date/time object in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
+All date/time objects in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
 are based on VirtualDate. That's because VirtualDate does everything Time does (except maybe
 providing some convenience functions) so it is simpler and more powerful to use it everywhere.
 
@@ -121,10 +121,10 @@ Each of the above listed fields can have the following values:
 ```
 
 Please note that weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
-Y/M/D values. One can't change one without triggering the change in the other.
+Y/M/D values. One can't change one without triggering an automatic change in the other. Specifically:
 
 As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
-any of those values will update weekday and jd automatically. Similarly, setting
+any of those values will update `weekday` and `jd` automatically. Similarly, setting
 Julian Day Number will automatically update Y/M/D and cause the date to become
 materialized.
 
@@ -139,7 +139,7 @@ weekday=1..5, day=-1   -- matches last day of month if it is a workday
 
 Please note that these are individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due, omit,
-and check dates so many desired rules can be expressed.
+and check dates, so many desired rules can be expressed.
 
 ## VirtualDate from String
 
@@ -258,4 +258,6 @@ due date/time is certain offset from the original Item's date/time.
 1. Add more features suitable to be used in a reimplementation of cron using this module
 1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
+1. Implement a complete task tracking program using Crystime
+1. Write support for exporting items into other calendar apps
 
