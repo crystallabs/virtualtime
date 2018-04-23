@@ -5,9 +5,9 @@ Crystime is an advanced time, calendar, scheduling, and reminding library for Cr
 First, the basis of the low-level functionality is class "VirtualDate". Think of it as of
 a normal "Time" struct, but much more flexible.
 
-With regular Time, all fields (year, month, day, hour, minute, second, millisecond) have
-a value, and that value is a specific number. As such, Time objects always represent
-specific dates ("materialized" dates in Crystime terminology).
+With regular Time, all fields (year, month, day, hour, minute, second, millisecond) must
+have a value, and that value must be a specific number. As such, Time objects always
+represent specific dates ("materialized" dates in Crystime terminology).
 
 With Crystime's VirtualDate, each field (year, month, day, hour, minute,
 second, millisecond, day of week, and [julian day](https://en.wikipedia.org/wiki/Julian_day)) can either remain unspecified, or
@@ -16,7 +16,7 @@ boolean, or proc).
 
 For example, you could construct a VirtualDate with a month of "March" and a day range
 of 10..20 with step 2. This would represent a "virtual date" that matches any Time or
-another VirtualDate which falls on, or overlaps, the dates March 10, 12, 14, 16, 
+another VirtualDate which falls on, or overlaps, the dates of March 10, 12, 14, 16, 
 18, or 20.
 
 ## Item
