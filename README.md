@@ -209,10 +209,10 @@ if materialization is attempted.
 Currently, unset values and specific integers are materializable, while fields containing
 any other specification are not. This is one of the areas where maybe some improvements
 could be made to support more of all possible cases without throwing an Exception.
-
 Also, materialization rules could be added so that a person could choose what the
 default values are. For example, to materialize unset hours and minutes to 12:00
-instead of to 00:00.
+instead of to 00:00. Both of these tasks are mentioned in the TODO at the bottom
+of the README.
 
 For convenience, the VD's ability to materialize using its current values can be
 retrieved by using a getter named `ts`:
