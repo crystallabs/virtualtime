@@ -219,6 +219,7 @@ retrieved by using a getter named `ts`:
 
 ```crystal
 vd = Crystime::VirtualDate.new
+
 vd.year = nil
 vd.month = 3
 vd.day = [1,2]
