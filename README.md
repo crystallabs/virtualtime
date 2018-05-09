@@ -8,7 +8,7 @@ a normal "Time" struct, but much more flexible.
 With regular Time, all fields (year, month, day, hour, minute, second, millisecond) must
 have a value, and that value must be a specific number. Even if some of Time's fields don't
 require you to set a value (such as hour or minute values), they still default to 0
-internally. As such, Time objects always represent specific dates and times ("materialized"
+internally. As such, Time objects always represent specific dates ("materialized"
 dates in Crystime terminology).
 
 With Crystime's VirtualDate, each field (year, month, day, hour, minute,
@@ -305,7 +305,7 @@ crystal spec
 own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
 1. Add more compatibility for using Time in place of VirtualDate
-1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values is anything else other than unset or a number)
+1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number)
 1. Extend the configuration options for specifying how VDs will be materialized, when materialization is requested or implicitly done
 1. Add more features suitable to be used in a reimplementation of cron using this module
 1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
