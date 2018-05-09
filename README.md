@@ -149,6 +149,7 @@ For example:
 
 ```crystal
 vd = Crystime::VirtualDate.new
+
 vd.year = nil # Remains unspecified, matches everything it is compared with
 vd.month = 3
 vd.day = [1,2]
@@ -160,7 +161,7 @@ vd.millisecond = ->() { return 1 }
 
 Another is creating a VirtualDate from a string, using notation `vd = VirtualDate["... string ..."]`.
 This parser should eventually support everything supported by Ruby's `Time.parse`, `Date.parse`,
-`DateTime.parse`, etc., but for now it supports the following strings:
+`DateTime.parse`, etc., but for now it supports the following strings and their combinations:
 
 ```
 # Year-Month-Day
@@ -192,6 +193,9 @@ p vd.month == 1
 
 vd = VirtualDate["2018 sun"]
 p vd.weekday == 0
+
+vd = VirtualDate["2018 wed 12:00:00"]
+p vd.weekday == 3
 ```
 
 ## VirtualDate Materialization
