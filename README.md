@@ -112,6 +112,7 @@ Each of the above listed fields can have the following values:
 - A range, e.g. 1..6
 - A range with a step, e.g. (1..6).step(2)
 - A proc (must accept Int32 as arg, and return Bool) (not tested extensively)
+```
 
 Please note that weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
 Y/M/D values. One can't change one without triggering an automatic change in the other. Specifically:
@@ -120,7 +121,6 @@ As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then ch
 any of those values will update `weekday` and `jd` automatically. Similarly, setting
 Julian Day Number will automatically update Y/M/D and cause the date to become
 materialized.
-```
 
 Altogether, the described syntax allows for specifying simple but functionally intricate
 rules, of which just some of them are:
