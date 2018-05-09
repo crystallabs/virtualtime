@@ -200,7 +200,7 @@ p vd.weekday == 3
 
 ## VirtualDate Materialization
 
-VirtualDates sometimes need to be materialized for
+VirtualDates sometimes need to be fully materialized for
 the purpose of display, calculation, comparison, or conversion. An obvious such case
 is when `to_time()` is invoked on a VD, because a Time object must have all of its
 fields set.
