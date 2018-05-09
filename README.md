@@ -203,10 +203,10 @@ fields set.
 
 For that purpose, each VirtualDate keeps track of which of its 7 fields (YMD, hms, and
 millisecond) are set, and which of them are materializable. If any of the individual
-fields are not materializable, then the VD is not either and an Exception is thrown
-when materialization is attempted.
+fields are not materializable, then the VD is not either, and an Exception is thrown
+if materialization is attempted.
 
-Currently, unset values and specific integers are materializable while fields containing
+Currently, unset values and specific integers are materializable, while fields containing
 any other specification are not. This is one of the areas where maybe some improvements
 could be done to support more of all possible cases without throwing an Exception.
 
