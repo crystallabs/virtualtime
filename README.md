@@ -114,7 +114,7 @@ Each of the above listed fields can have the following values:
 - A proc (must accept Int32 as arg, and return Bool) (not tested extensively)
 ```
 
-Please note that the weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) are in relation with the
+Please note that the weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
 Y/M/D values. One can't change one without triggering an automatic change in the other. Specifically:
 
 As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
