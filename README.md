@@ -262,7 +262,7 @@ omit_shift - What to do if item falls on an omitted date/time:
 ```
 
 Here's an example of an item that's due every other day in March, but if it falls
-on a weekend it is ignored. (This is also one from examples/ folder.)
+on a weekend it is ignored. (This is also one from the examples/ folder.)
 
 ```crystal
 # Create an item:
