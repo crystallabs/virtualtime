@@ -250,14 +250,15 @@ omit       - List of omit/not-on VirtualDates
 shift      - List of VirtualDates which new proposed item time (produced by
              shifting the date from an omit date in an attempt to schedule it)
              must match for the item to be considered "on"
+
 omit_shift - What to do if item falls on an omitted date/time:
            - nil: ignore it, do not schedule
            - false: ignore it, treat as not-reschedulable
            - true: treat it as due, regardless of falling on omitted date
-           - Crystime::Span: amount by which it should be shifted
+           - Crystime::Span: amount by which it should be shifted (can be + or -)
 
-# Reminder capabilities were previously in, but now they are
-# waiting for a rewrite and essentially aren't available.
+# (Reminder capabilities were previously in, but now they are
+# waiting for a rewrite and essentially aren't available.)
 ```
 
 Here's an example of an item that's due every other day in March, but if it falls
