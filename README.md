@@ -133,8 +133,9 @@ weekday=1..5, day=-1   -- matches last day of month if it is a workday
 
 Please note that these are individual VirtualDate rules. Complete Items
 (described below) can have multiple VirtualDates set as their due, omit,
-and check dates. Lists of VDs are OR-ed together, i.e. in the case of multiple
-VDs set as item's due dates it is enough that one of them matches.
+and check dates, so arbitrary rules can be expressed. (In the case of
+multiple VDs for a field, the matches are logically OR-ed, i.e. one match is
+enough for the field to match.)
 
 ## VirtualDate from String
 
