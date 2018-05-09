@@ -52,6 +52,7 @@ module Crystime
     # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
     #      0    1     2     3     4     5     6
     #      year month day   hour  min   sec   ms
+    getter ts : Array(Bool?)
     @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
 
     # Empty constructor. Must be here since when fields are defined, the
@@ -59,6 +60,7 @@ module Crystime
     def initialize
     end
 
+    # XXX should boolean value be treated as materializable and have ts=true?
     def year=( v)        @year= v;   @ts[0]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def month=( v)       @month= v;  @ts[1]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def day=( v)         @day= v;    @ts[2]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
