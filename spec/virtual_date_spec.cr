@@ -28,11 +28,11 @@ describe Crystime::VirtualDate do
   it "parses iso8601 datetime when string" do
     # XXX ignores the timezone
     a= Crystime::VirtualDate["2017-06-24T18:23:47+00:00"]
-    raise "a is nil!" unless a
+    a.is_a?( Crystime::VirtualDate).should eq(true)
+    #raise "a is nil!" unless a
     a.year.should eq 2017
     a.month.should eq 6
     a.day.should eq 24
-    a.is_a?( Crystime::VirtualDate).should eq(true)
   end
   it "can parse time with milliseconds" do
     a= Crystime::VirtualDate["1:2:3.40000"]
@@ -137,7 +137,7 @@ describe Crystime::VirtualDate do
     Crystime::VirtualDate.new.utc?.should be_true
   end
 
-  it "does set ymd from jd" do
+  it "does set Ymd from jd" do
     vd= Crystime::VirtualDate.new
     vd.weekday.should eq nil
     vd.jd= 2457828
@@ -147,7 +147,7 @@ describe Crystime::VirtualDate do
     vd.weekday.should eq 3
   end
 
-  it "does set jd from ymd" do
+  it "does set jd from Ymd" do
     vd= Crystime::VirtualDate.new
     vd.year= 2017
     vd.month= 3
@@ -178,12 +178,19 @@ describe Crystime::VirtualDate do
     vd.materialized?.should be_false
   end
 
-  it "changes weekday according to ymd" do
+  it "changes weekday according to Ymd" do
     vd= Crystime::VirtualDate["2017-07-02"]
     #puts vd.inspect
     vd.weekday.should eq 0
     vd.day= 1
     vd.weekday.should eq 6
+  end
+
+  it "setting weekday does not affect Ymd" do
+    vd= Crystime::VirtualDate["2017-07-02"]
+    vd.weekday= 4
+    vd.weekday.should eq 4
+    vd.day.should eq 2
   end
 
 end
