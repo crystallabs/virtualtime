@@ -244,7 +244,7 @@ vd.day = [1,2]
 vd.hour = (10..20)
 vd.minute = (10..20).step(2)
 vd.second = true
-vd.millisecond = ->( val : Int32) { return true }
+vd.millisecond = ->( val : Int32) { true }
 
 # Fields containing nil or true are materializable; fields containing false are not:
 vd.ts # ==> [nil, true, false, false, false, false, false]
