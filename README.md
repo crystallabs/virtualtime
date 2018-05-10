@@ -153,7 +153,7 @@ vd.day = [1,2]
 vd.hour = (10..20)
 vd.minute = (10..20).step(2)
 vd.second = true
-vd.millisecond = ->() { return 1 }
+vd.millisecond = ->( val : Int32) { true }
 ```
 
 Another is creating a VirtualDate from a string, using notation `vd = VirtualDate["... string ..."]`.
