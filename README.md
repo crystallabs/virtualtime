@@ -203,13 +203,13 @@ For example:
 
 ```
 vd = VirtualDate["JAN 2018"]
-p vd.month == 1
+p vd.month == 1 # ==> true
 
 vd = VirtualDate["2018 sun"]
-p vd.weekday == 0
+p vd.weekday == 0 # ==> true
 
 vd = VirtualDate["2018 wed 12:00:00"]
-p vd.weekday == 3
+p vd.weekday == 3 # ==> true
 ```
 
 ## VirtualDate Materialization
