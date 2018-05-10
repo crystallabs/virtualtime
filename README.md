@@ -31,7 +31,7 @@ An item can have an absolute start and end VirtualDate, a list of VirtualDates o
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
 and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
-it can still be "on", or ignored, or scheduled some time before, or some time after.
+it can still be "on", or ignored, or re-scheduled to some time before, or some time after.
 
 Here is a simple example from the examples/ folder to begin with, with comments:
 
@@ -48,7 +48,7 @@ due_march.day = (10..20).step 2
 # Add this VirtualDate as due date to item:
 item.due<< due_march
 
-# Now we can check when the item is due and when not:
+# Now we can check when the item is due and when it is not:
 
 # Item is not due on Feb 15, 2017 because that's not in March:
 p item.on?( Crystime::VirtualDate["2017-02-15"]) # ==> false
@@ -79,8 +79,8 @@ p item.on?( any_mar) # ==> true
 # VirtualDate in Detail
 
 All date/time objects in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
-are based on VirtualDate. That is because VirtualDate does everything Time does, except maybe
-providing some convenience functions, so it is simpler and more powerful to use it everywhere.
+are based on VirtualDate. That is because VirtualDate does everything Time does (except maybe
+providing some convenience functions), so it is simpler and more powerful to use it everywhere.
 
 (If you are missing any particular convenience/compatibility functions from Time, please report
 them or submit a PR.)
@@ -103,16 +103,13 @@ millisecond - Millisecond value (0-999)
 
 Each of the above listed fields can have the following values:
 
-```
-- Nil / undefined (matches everything it is compared with)
-- A number that is native/accepted for a particular field, e.g. 1 or -2
-  (negative values count from the end)
-- A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2]
-  (negative values count from the end)
-- A range, e.g. 1..6
-- A range with a step, e.g. (1..6).step(2)
-- A proc (must accept Int32 as arg, and return Bool) (not tested extensively)
-```
+1. Nil / undefined (matches everything it is compared with)
+1. A number that is native/accepted for a particular field, e.g. 1 or -2 (negative values count from the end)
+1. A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2] (negative values count from the end)
+1. A range, e.g. 1..6
+1. A range with a step, e.g. (1..6).step(2)
+1. A boolean
+1. A proc (accepts Int32 as arg, and returns Bool) (not tested extensively)
 
 Please note that the weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
 Y/M/D values. One can't change one without triggering an automatic change in the other. Specifically:
