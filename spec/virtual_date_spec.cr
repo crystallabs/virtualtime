@@ -139,10 +139,22 @@ describe Crystime::VirtualDate do
 
   it "does set ymd from jd" do
     vd= Crystime::VirtualDate.new
-		vd.jd= 2457828
+    vd.weekday.should eq nil
+    vd.jd= 2457828
     vd.year.should eq 2017
     vd.month.should eq 3
     vd.day.should eq 15
+    vd.weekday.should eq 3
+  end
+
+  it "does set jd from ymd" do
+    vd= Crystime::VirtualDate.new
+    vd.year= 2017
+    vd.month= 3
+    vd.day= 17
+
+    vd.jd.should eq 2457830
+    vd.weekday.should eq 5
   end
 
   it "knows materialized virtual dates" do
