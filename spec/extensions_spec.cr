@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Crystime do
+describe "Crystime Extensions" do
 
   it "can expand arrays" do
     [1, 2, [:a, :b], 8..10, [:e, :f]].expand==
