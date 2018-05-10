@@ -381,8 +381,15 @@ module Crystime
       raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
       @span.nanoseconds
     end
+
+    # XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
     def abs() @span.ticks.abs end
+
     def to_f() @span.to_f end
+
+    # XXX Since on the underlying level we're working with two Time::Spans,
+    # can't we just use their +/- methods? (Assuming we're materialized,
+    # of course)
     def +( other : self)
       Span.new(
         seconds: (total_seconds+ other.total_seconds).floor.to_i64,
@@ -397,7 +404,7 @@ module Crystime
     end
 
     def <=>( other : self)
-      # TODO this code prevents to perfectly simple/comparable VDs from being compared (at least for literal ==)
+      # TODO this code prevents two perfectly simple/comparable VDs from being compared (at least for literal ==)
       #return {@year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.weekday, other.jd, other.hour, other.minute, other.second, other.millisecond}
       total_nanoseconds<=> other.total_nanoseconds
     end

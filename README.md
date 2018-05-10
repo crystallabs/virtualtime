@@ -108,7 +108,7 @@ Each of the above listed fields can have the following values:
 1. A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2] (negative values count from the end)
 1. A range, e.g. 1..6
 1. A range with a step, e.g. (1..6).step(2)
-1. A boolean
+1. A boolean, e.g. true
 1. A proc (accepts Int32 as arg, and returns Bool) (not tested extensively)
 
 Please note that the weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
