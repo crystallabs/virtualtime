@@ -247,15 +247,18 @@ stop       - End VirtualDate (item is never "on" after this date)
 due        - List of due/on VirtualDates
 omit       - List of omit/not-on VirtualDates
 
-shift      - List of VirtualDates which new proposed item time (produced by
-             shifting the date from an omit date in an attempt to schedule it)
-             must match for the item to be considered "on"
-
 omit_shift - What to do if item falls on an omitted date/time:
-           - nil: ignore it, do not schedule
-           - false: ignore it, treat as not-reschedulable
+           - nil: ignore it due to not being "on"
+           - false: ignore it due to being "on", but falling on an omitted
+             and non-reschedulable date
            - true: treat it as due, regardless of falling on omitted date
-           - Crystime::Span: amount by which it should be shifted (can be + or -)
+           - Crystime::Span: attempt shifting (rescheduling) by specified span on
+             each attempt. The span to shift can be negative or positive for
+             shifting to an earlier or later date.
+
+shift      - List of VirtualDates which the new proposed item time (produced by
+             shifting the date by omit_shift span in an attempt to reschedule it)
+             must match for the item to be considered "on"
 
 # (Reminder capabilities were previously in, but now they are
 # waiting for a rewrite and essentially aren't available.)
