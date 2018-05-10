@@ -202,21 +202,21 @@ the purpose of display, calculation, comparison, or conversion. An obvious such 
 is when `to_time()` is invoked on a VD, because a Time object must have all of its
 fields set.
 
-For that purpose, each VirtualDate keeps track of which of its 7 fields (YMD, hms, and
+For that purpose, each VirtualDate keeps track of which of its 7 fields (Y, m, d, H, M, S, and
 millisecond) are set, and which of them are materializable. If any of the individual
 fields are not materializable, then the VD is not either, and an Exception is thrown
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not. This is one of the areas where maybe some improvements
+any other specification are not. (This is one of the areas where some improvements
 could be made to support more of all possible cases without throwing an Exception.
 Also, materialization rules could be added so that a person could choose what the
 default values are. For example, to materialize unset hours and minutes to 12:00
 instead of to 00:00. Both of these tasks are mentioned in the TODO at the bottom
-of the README.
+of the README.)
 
-For convenience, the VD's ability to materialize using its current values can be
-retrieved by using a getter named `ts`:
+For convenience, the VD's ability to materialize each of its individual fields using their
+current values can be checked through a getter named `ts`:
 
 ```crystal
 vd = Crystime::VirtualDate.new
@@ -229,10 +229,9 @@ vd.minute = (10..20).step(2)
 vd.second = true
 vd.millisecond = ->( val : Int32) { return true }
 
+# Fields containing nil or true are materializable; fields containing false are not:
 vd.ts # ==> [nil, true, false, false, false, false, false]
 ```
-
-(Fields containing nil or true are materializable; fields containing false are not.)
 
 # Item in Detail
 
