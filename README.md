@@ -116,8 +116,8 @@ Y/M/D values. One can't change one without triggering an automatic change in the
 
 As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
 any of those values will update `weekday` and `jd` automatically. Similarly, setting
-Julian Day Number will automatically update Y/M/D and cause the date to become
-materialized.
+Julian Day Number will automatically update Y/M/D (and implicitly also weekday), and cause the
+date to become materialized.
 
 Altogether, the described syntax allows for specifying simple but functionally intricate
 rules, of which just some of them are:
