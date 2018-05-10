@@ -237,7 +237,7 @@ vd.ts # ==> [nil, true, false, false, false, false, false]
 
 As mentioned, Item is the toplevel object representing a task/event/etc.
 
-It does not contain task/event-specific properties, it only concerns itself with
+It does not contain any task/event-specific properties, it only concerns itself with
 the scheduling aspect and has the following fields:
 
 ```
