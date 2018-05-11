@@ -26,7 +26,7 @@ Second, the basis of the high-level user functionality is class "Item". This is 
 called an "item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
-An item can have an absolute start and end VirtualDate, a list of VirtualDates on which it is considered
+An item has an absolute start and end VirtualDate, a list of VirtualDates on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualDates on which it is specifically
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
@@ -76,6 +76,9 @@ any_mar.month = 3
 p item.on?( any_mar) # ==> true
 ```
 
+If the item's list of due dates is empty, it is considered as always "on".
+If the item's list of omit dates is empty, it is considered as never omitted.
+
 # VirtualDate in Detail
 
 All date/time objects in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
@@ -108,7 +111,7 @@ Each of the above listed fields can have the following values:
 1. A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2] (negative values count from the end)
 1. A range, e.g. 1..6
 1. A range with a step, e.g. (1..6).step(2)
-1. A boolean, e.g. true
+1. True (inserts default values in place of 'true')
 1. A proc (accepts Int32 as arg, and returns Bool) (not tested extensively)
 
 ## Weekday (Day of Week) and Julian Day Number
@@ -265,10 +268,10 @@ due        - List of due/on VirtualDates
 omit       - List of omit/not-on VirtualDates
 
 omit_shift - What to do if item falls on an omitted date/time:
-           - nil: ignore it due to not being "on"
-           - false: ignore it due to being "on", but falling on an omitted
-             and non-reschedulable date
-           - true: treat it as due, regardless of falling on omitted date
+           - nil: treat it as not being "on"
+           - false: treat it as being "on", but falling on an omitted
+             and non-reschedulable date, so effectively it is not "on"
+           - true: treat it as "on", regardless of falling on omitted date
            - Crystime::Span: attempt shifting (rescheduling) by specified span on
              each attempt. The span to shift can be negative or positive for
              shifting to an earlier or later date.
@@ -325,6 +328,7 @@ crystal spec
 own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
 1. Add more compatibility for using Time in place of VirtualDate
+1. Currently, there is good code for inserting default values is field's value is "true", but there is no ways for users to fill in those defaults
 1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number)
 1. Extend the configuration options for specifying how VDs will be materialized, when materialization is requested or implicitly done
 1. Add more features suitable to be used in a reimplementation of cron using this module

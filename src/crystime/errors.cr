@@ -7,7 +7,7 @@ module Crystime
 
     # Error when trying to compare partial VirtualDates.
     def self.virtual_comparison( text= nil); ArgumentError.new \
-      "Comparing VirtualDates containing non-Int values not supported. Need to #expand your virtual date? (#{text})" end
+      "Comparing VirtualDates containing non-Int values not supported. Need to expand() your virtual date? (#{text})" end
 
     # Error when trying to compare uncomparable types.
     def self.unsupported_comparison( text= nil); ArgumentError.new \
@@ -28,5 +28,9 @@ module Crystime
     # Error for incorrect YAML input.
     def self.invalid_yaml_input( text= nil); ArgumentError.new \
       "Invalid YAML input. (#{text})" end
+
+    # Error for nonexistent comparator between types.
+    def self.no_comparator( a, b); ArgumentError.new \
+      "No comparator defined between #{a.class} and #{b.class}." end
   end
 end
