@@ -60,7 +60,7 @@ omit_march_20.day = 20
 item.omit<< omit_march_20
 
 # If event falls on an omitted date, try rescheduling it for 2 days later:
-item.omit_shift = Crystime::Span.new 86400 * 2
+item.omit_shift = Crystime::Span.new(86400 * 2)
 
 
 # Now we can check when the item is due and when it is not:
