@@ -81,30 +81,10 @@ module Crystime
     def from_jd!
       raise Crystime::Errors.invalid_jd unless jd= from_jd
       @year, @month, @day= jd[0], jd[1], jd[2]
+      @ts[0..2]= [true,true,true]
+      update!( jd: false)
       true
     end
-
-    # Called when year, month, or day are re-set and we need to re-calculate which weekday and
-    # Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
-    # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
-    # then they are set to nil.
-    def update!
-      if @ts[0]&& @ts[1]&& @ts[2]
-        #puts "date is: "+ self.inspect
-        t= Time.new(@year.as( Int), @month.as( Int), @day.as( Int), kind: Time::Kind::Utc)
-        @weekday= t.day_of_week.to_i
-        @jd= to_jd!
-      else
-        @weekday= @jd= nil
-      end
-      true
-    end
-
-    # Expand a partial VirtualDate into a materialized/specific date/time.
-    def expand
-      [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
-    end
-
     # Creates VirtualDate from Julian Day Number.
     def from_jd
       jd= @jd
@@ -138,6 +118,27 @@ module Crystime
       else
         raise "Can't convert non-specific date to Julian Day Number"
       end
+    end
+
+    # Called when year, month, or day are re-set and we need to re-calculate which weekday and
+    # Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
+    # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
+    # then they are set to nil.
+    def update!(jd = true)
+      if @ts[0]&& @ts[1]&& @ts[2]
+        #puts "date is: "+ self.inspect
+        t= Time.new(@year.as( Int), @month.as( Int), @day.as( Int), kind: Time::Kind::Utc)
+        @weekday= t.day_of_week.to_i
+        @jd= to_jd! if jd
+      else
+        @weekday= @jd= nil
+      end
+      true
+    end
+
+    # Expand a partial VirtualDate into a materialized/specific date/time.
+    def expand
+      [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
     end
 
     def <=>( other : self)
@@ -382,8 +383,15 @@ module Crystime
       raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
       @span.nanoseconds
     end
+
+    # XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
     def abs() @span.ticks.abs end
+
     def to_f() @span.to_f end
+
+    # XXX Since on the underlying level we're working with two Time::Spans,
+    # can't we just use their +/- methods? (Assuming we're materialized,
+    # of course)
     def +( other : self)
       Span.new(
         seconds: (total_seconds+ other.total_seconds).floor.to_i64,
@@ -398,7 +406,7 @@ module Crystime
     end
 
     def <=>( other : self)
-      # TODO this code prevents to perfectly simple/comparable VDs from being compared (at least for literal ==)
+      # TODO this code prevents two perfectly simple/comparable VDs from being compared (at least for literal ==)
       #return {@year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.weekday, other.jd, other.hour, other.minute, other.second, other.millisecond}
       total_nanoseconds<=> other.total_nanoseconds
     end

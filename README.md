@@ -26,12 +26,15 @@ Second, the basis of the high-level user functionality is class "Item". This is 
 called an "item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
-An item can have an absolute start and end VirtualDate, a list of VirtualDates on which it is considered
+An item has an absolute start and end VirtualDate, a list of VirtualDates on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualDates on which it is specifically
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
 day, etc.),
 and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
-it can still be "on", or ignored, or scheduled some time before, or some time after.
+it can still be "on", or ignored, or re-scheduled to some time before, or some time after.
+
+If the item's list of due dates is empty, it is considered as always "on".
+If the item's list of omit dates is empty, it is considered as never omitted.
 
 Here is a simple example from the examples/ folder to begin with, with comments:
 
@@ -60,7 +63,7 @@ item.omit<< omit_march_20
 item.omit_shift = Crystime::Span.new 86400 * 2
 
 
-# Now we can check when the item is due and when not:
+# Now we can check when the item is due and when it is not:
 
 # Item is not due on Feb 15, 2017 because that's not in March:
 p item.on?( Crystime::VirtualDate["2017-02-15"]) # ==> false
@@ -72,11 +75,14 @@ p item.on?( Crystime::VirtualDate["2017-03-15"]) # ==> false
 # Item is due on Mar 16, 2017:
 p item.on?( Crystime::VirtualDate["2017-03-16"]) # ==> true
 
-# And it is due on any Mar 16, doesn't need to be in 2017:
-any_mar_16 = Crystime::VirtualDate.new
-any_mar_16.month = 3
-any_mar_16.day = 16
-p item.on?( any_mar_16 ) # ==> true
+# Item is due on Mar 18, 2017:
+p item.on?( Crystime::VirtualDate["2017-03-18"]) # ==> true
+
+# And it is due on any Mar 18, doesn't need to be in 2017:
+any_mar_18 = Crystime::VirtualDate.new
+any_mar_18.month = 3
+any_mar_18.day = 18
+p item.on?( any_mar_18 ) # ==> true
 
 # We can check whether this event is due at any point in March:
 any_mar = Crystime::VirtualDate.new
@@ -91,8 +97,8 @@ p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.
 # VirtualDate in Detail
 
 All date/time objects in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
-are based on VirtualDate. That is because VirtualDate does everything Time does, except maybe
-providing some convenience functions, so it is simpler and more powerful to use it everywhere.
+are based on VirtualDate. That is because VirtualDate does everything Time does (except maybe
+providing some convenience functions), so it is simpler and more powerful to use it everywhere.
 
 (If you are missing any particular convenience/compatibility functions from Time, please report
 them or submit a PR.)
@@ -115,24 +121,38 @@ millisecond - Millisecond value (0-999)
 
 Each of the above listed fields can have the following values:
 
-```
-- Nil / undefined (matches everything it is compared with)
-- A number that is native/accepted for a particular field, e.g. 1 or -2
-  (negative values count from the end)
-- A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2]
-  (negative values count from the end)
-- A range, e.g. 1..6
-- A range with a step, e.g. (1..6).step(2)
-- A proc (must accept Int32 as arg, and return Bool) (not tested extensively)
-```
+1. Nil / undefined (matches everything it is compared with)
+1. A number that is native/accepted for a particular field, e.g. 1 or -2 (negative values count from the end)
+1. A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2] (negative values count from the end)
+1. A range, e.g. 1..6
+1. A range with a step, e.g. (1..6).step(2)
+1. True (inserts default values in place of 'true')
+1. A proc (accepts Int32 as arg, and returns Bool) (not tested extensively)
 
-Please note that the weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
-Y/M/D values. One can't change one without triggering an automatic change in the other. Specifically:
+## Weekday (Day of Week) and Julian Day Number
 
-As long as VirtualDate is materialized (i.e. has specific Y/M/D values), then changing
+The weekday and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
+Y/m/d values. One can't change one without triggering an automatic change in the other. Specifically:
+
+As long as VirtualDate is materialized (i.e. has specific Y/m/d values), then changing
 any of those values will update `weekday` and `jd` automatically. Similarly, setting
-Julian Day Number will automatically update Y/M/D and cause the date to become
-materialized.
+Julian Day Number will automatically update Y/m/d (and implicitly also weekday), and cause the
+date to become materialized.
+
+Please note that in the current behavior, setting `weekday` will not affect Y/m/d or jd.
+In essence if Y/m/d is set and weekday is later changed
+from its existing/auto-computed value, it will probably no longer match any date,
+because the date and day of week will be out of sync. This behavior
+may be useful only in rare circumstances (most probably generated by some
+automated script) where you want to match a fixed date, but only if
+that date also happens to fall on the specified day of week.
+
+Please also note that in the current behavior, de-materializing a VD
+resets both `weekday` and `jd` to nil.
+
+The current behavior was choosen based on the assumption on what would
+be the most intuitive / most useful behavior. It could be changed if
+some other behavior is deemed more appropriate.
 
 Altogether, the described syntax allows for specifying simple but functionally intricate
 rules, of which just some of them are:
@@ -168,7 +188,7 @@ vd.day = [1,2]
 vd.hour = (10..20)
 vd.minute = (10..20).step(2)
 vd.second = true
-vd.millisecond = ->() { return 1 }
+vd.millisecond = ->( val : Int32) { true }
 ```
 
 Another is creating a VirtualDate from a string, using notation `vd = VirtualDate["... string ..."]`.
@@ -201,13 +221,13 @@ For example:
 
 ```
 vd = VirtualDate["JAN 2018"]
-p vd.month == 1
+p vd.month == 1 # ==> true
 
 vd = VirtualDate["2018 sun"]
-p vd.weekday == 0
+p vd.weekday == 0 # ==> true
 
 vd = VirtualDate["2018 wed 12:00:00"]
-p vd.weekday == 3
+p vd.weekday == 3 # ==> true
 ```
 
 ## VirtualDate Materialization
@@ -217,21 +237,21 @@ the purpose of display, calculation, comparison, or conversion. An obvious such 
 is when `to_time()` is invoked on a VD, because a Time object must have all of its
 fields set.
 
-For that purpose, each VirtualDate keeps track of which of its 7 fields (YMD, hms, and
+For that purpose, each VirtualDate keeps track of which of its 7 fields (Y, m, d, H, M, S, and
 millisecond) are set, and which of them are materializable. If any of the individual
 fields are not materializable, then the VD is not either, and an Exception is thrown
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not. This is one of the areas where maybe some improvements
+any other specification are not. (This is one of the areas where some improvements
 could be made to support more of all possible cases without throwing an Exception.
 Also, materialization rules could be added so that a person could choose what the
 default values are. For example, to materialize unset hours and minutes to 12:00
 instead of to 00:00. Both of these tasks are mentioned in the TODO at the bottom
-of the README.
+of the README.)
 
-For convenience, the VD's ability to materialize using its current values can be
-retrieved by using a getter named `ts`:
+For convenience, the VD's ability to materialize each of its individual fields using their
+current values can be checked through a getter named `ts`:
 
 ```crystal
 vd = Crystime::VirtualDate.new
@@ -242,18 +262,17 @@ vd.day = [1,2]
 vd.hour = (10..20)
 vd.minute = (10..20).step(2)
 vd.second = true
-vd.millisecond = ->( val : Int32) { return true }
+vd.millisecond = ->( val : Int32) { true }
 
+# Fields containing nil or true are materializable; fields containing false are not:
 vd.ts # ==> [nil, true, false, false, false, false, false]
 ```
-
-(Fields containing nil or true are materializable; fields containing false are not.)
 
 # Item in Detail
 
 As mentioned, Item is the toplevel object representing a task/event/etc.
 
-It does not contain task/event-specific properties, it only concerns itself with
+It does not contain any task/event-specific properties, it only concerns itself with
 the scheduling aspect and has the following fields:
 
 ```
@@ -263,15 +282,18 @@ stop       - End VirtualDate (item is never "on" after this date)
 due        - List of due/on VirtualDates
 omit       - List of omit/not-on VirtualDates
 
-shift      - List of VirtualDates which new proposed item time (produced by
-             shifting the date from an omit date in an attempt to schedule it)
-             must match for the item to be considered "on"
-
 omit_shift - What to do if item falls on an omitted date/time:
-           - nil: ignore it, do not schedule
-           - false: ignore it, treat as not-reschedulable
-           - true: treat it as due, regardless of falling on omitted date
-           - Crystime::Span: amount by which it should be shifted (can be + or -)
+           - nil: treat it as not being "on"
+           - false: treat it as being "on", but falling on an omitted
+             and non-reschedulable date, so effectively it is not "on"
+           - true: treat it as "on", regardless of falling on omitted date
+           - Crystime::Span: attempt shifting (rescheduling) by specified span on
+             each attempt. The span to shift can be negative or positive for
+             shifting to an earlier or later date.
+
+shift      - List of VirtualDates which the new proposed item time (produced by
+             shifting the date by omit_shift span in an attempt to reschedule it)
+             must match for the item to be considered "on"
 
 # (Reminder capabilities were previously in, but now they are
 # waiting for a rewrite and essentially aren't available.)
@@ -316,11 +338,12 @@ crystal spec
 
 # TODO
 
-1. Add fully working serialization to/from JSON and YAML. Currently YAML serialization works fine, but serializes the object field by field (i.e. year, month, day, etc.) instead of serializing the whole content into an efficient string like "Y/M/D". This makes it inconvenient to serialize Items, as their lists of potentially many serialized VDs are unwieldy to edit or look into by hand
+1. Add fully working serialization to/from JSON and YAML. Currently YAML serialization works fine, but serializes the object field by field (i.e. year, month, day, etc.) instead of serializing the whole content into an efficient string like "Y/m/d". This makes it inconvenient to serialize Items, as their lists of potentially many serialized VDs would be unwieldy to edit or look into by hand
 1. Add reminder functions. Previously remind features were implemented using their
 own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
 1. Add more compatibility for using Time in place of VirtualDate
+1. Currently, there is good code for inserting default values is field's value is "true", but there is no ways for users to fill in those defaults
 1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number)
 1. Extend the configuration options for specifying how VDs will be materialized, when materialization is requested or implicitly done
 1. Add more features suitable to be used in a reimplementation of cron using this module

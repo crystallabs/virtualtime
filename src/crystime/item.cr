@@ -16,16 +16,18 @@ module Crystime
     @due = [] of VirtualDate
     # List of VirtualDates which should be "omitted", i.e. VirtualDates on which the item can't be "on".
     @omit= [] of VirtualDate
-    # List of VirtualDates which item must match, after it was shifted due to omit, to be considered "on".
-    @shift= [] of VirtualDate
     # Action to take if item is due on an omitted date/time. Possible values are:
     # - nil: treat the item as non-applicable/not-scheduled on the specified date/time
     # - false: treat the item as not due because we are unable to (re)schedule it to any other date/time
     # - true: treat the item as due regardless of falling on an omitted date/time
-    # - Time::Span: the rescheduled date/time by specified time span (can be negative (for
-    # rescheduling before the original due) or positive (for rescheduling after the original due))
+    # - Time::Span: shift the scheduled date/time by specified time span. Can be negative (for
+    # rescheduling before the original due) or positive (for rescheduling after the original due)).
+    # Shifting is performed until a suitable date/time is found, or until max. number of shift
+    # attempts is reached.
     @omit_shift : Nil | Bool | Crystime::Span
     @omit_shift= false
+    # List of VirtualDates which item must match, after it was shifted due to omit, to be considered "on".
+    @shift= [] of VirtualDate
 
     #@remind = [] of Nil | Wrap::Date | Wrap::Time | Wrap::DateTime | Time
     #@omit_remind
@@ -40,25 +42,33 @@ module Crystime
 
     # Main functions intended for public use
 
-		# TODO: non-interruptible/non-shareable tasks (just a flag)
-		# all existing items should be in @omit when checking if term is free
+    # TODO: non-interruptible/non-shareable tasks (just a flag)
+    # all existing items should be in @omit when checking if term is free
 
-		# TODO Add on? which works with Time objects
+    # TODO Add on? which works with Time objects
 
-    # Check whether the item is "on" on the specified date/time. Item is
+    # Checks whether the item is "on" on the specified date/time. Item is
     # considered "on" if it matches at least one "due" time and does not
-    # match any "omit" time.
+    # match any "omit" time. If it matches an omit time, then depending on
+    # the value of omit_shift it may still be "on", or attempted to be
+    # rescheduled.
     # Return values are:
+    # nil - item is not "on" / not "due"
     # true - item is "on" (it is "due" and not on "omit" list)
-    # false - item is due, but is also omitted, and no reschedule was requested or possible
-    # Time::Span - increments by which "due" should be adjusted until suitable rescheduled date/time is found
-    # nil - not applicable/ not scheduled
+    # false - item is due, but that date is omitted, and no reschedule was requested or possible, so effectively it is not "on"
+    # Time::Span - span which is to be added to asked date to reach the closes time when item is "on"
     def on?( date= VirtualDate.now, max_before= nil, max_after= max_before, max_shifts= 1000)
       d= date
       return unless d
+
+      # XXX
+      # It seems to me this check shouldn't be here. It is a matter of VDs whether some comparison is
+      # possible or not. Item shouldn't be concerned with it. Specifically, if this check is here, it
+      # prevents passing a VD with a range in one of the fields.
       if d.ts.any?{ |x| x== false}
         raise Crystime::Errors.virtual_comparison
       end
+
       yes= due_on? d
       no=  omit_on? d
       #puts self.inspect
@@ -75,9 +85,9 @@ module Crystime
           elsif omit_shift.total_milliseconds== 0
             #p "No shift"
             false
-          else # Here, omit_shift is virtualdate
+          else # Here omit_shift is virtualdate
             #puts "Some shift from #{d}"
-            # -1=>search into the future, +1=>search into the past
+            # +1=>search into the future, -1=>search into the past
             od= d.dup
             od.ts= d.ts.dup
             #puts od.class
@@ -98,7 +108,7 @@ module Crystime
                (max_after&& ((od-d).total_milliseconds.abs> max_after.total_milliseconds)) ||
                 (max_shifts&& (shifts> max_shifts))
                 #puts shifts
-								#puts od.inspect
+                #puts od.inspect
                 #puts @shift.inspect
                 break false
               end
@@ -132,39 +142,39 @@ module Crystime
       end
     end
 
-#		def remind_on?( date= Time.now)
-#			d= date
-#			# separate reminders in absolute and relative
-#			abs= @remind.select{|x| x.is_a? Wrap::Date | Wrap::Time | Wrap::DateTime | Time}
-#			rel= @remind- abs
-#			# see if there is an absolute match
-#			abs.select!{ |x| x== d}
-#			#abs.map!{ |x| x.respond_to? :hour ? x : "XXX no dice" } # XXX we assume all respond to hour
-#			# test for on? on each date-reminder
-#			rel.map! do |x|
-#				unless x.is_a? ::Time::Span
-#					x
-#				else
-#					## negative difference x means in advance/before
-#					## we are catching everything between 0 and 24 h that day:
-#					## check and reverse check:
-#					d00= d - 1.day - x.epoch
-#					d24= (d+1.day) - 1.day - x.epoch
-#					t= nil
-#					if on? d00
-#						t= d00 + x
-#						t= nil unless d== t
-#					end
-#					if !t and on? d24
-#						t= d24 + x
-#						t= nil unless d== t
-#					end
-#					t
-#				end
-#			end
-#			rel.compact!
-#			abs+rel
-#		end
+#   def remind_on?( date= Time.now)
+#     d= date
+#     # separate reminders in absolute and relative
+#     abs= @remind.select{|x| x.is_a? Wrap::Date | Wrap::Time | Wrap::DateTime | Time}
+#     rel= @remind- abs
+#     # see if there is an absolute match
+#     abs.select!{ |x| x== d}
+#     #abs.map!{ |x| x.respond_to? :hour ? x : "XXX no dice" } # XXX we assume all respond to hour
+#     # test for on? on each date-reminder
+#     rel.map! do |x|
+#       unless x.is_a? ::Time::Span
+#         x
+#       else
+#         ## negative difference x means in advance/before
+#         ## we are catching everything between 0 and 24 h that day:
+#         ## check and reverse check:
+#         d00= d - 1.day - x.epoch
+#         d24= (d+1.day) - 1.day - x.epoch
+#         t= nil
+#         if on? d00
+#           t= d00 + x
+#           t= nil unless d== t
+#         end
+#         if !t and on? d24
+#           t= d24 + x
+#           t= nil unless d== t
+#         end
+#         t
+#       end
+#     end
+#     rel.compact!
+#     abs+rel
+#   end
 
     # Lower-level date/time testers
 
@@ -233,7 +243,7 @@ module Crystime
       list
     end
 
-    def check_date( list, target, default= true)
+    private def check_date( list, target, default= true)
       #puts "checking #{list.inspect} re. #{target.inspect}"
       return default if !list || (list.size==0)
       y, m= target.year, target.month
@@ -250,7 +260,7 @@ module Crystime
       end
       nil
     end
-    def check_time( list, target, default= true)
+    private def check_time( list, target, default= true)
       return default if !list || (list.size==0)
       list.each do |e|
         return true if matches?( e.hour, target.hour) &&
@@ -262,15 +272,16 @@ module Crystime
     end
 
     # Matching rules:
-    # nil=>all,
+    # nil=>matches all,
     # number=>only that one,
-    # block=>call to get true/false
+    # block=>block is called to return true/false
     # enumerable(incl. range): includes?
     # true=> use default value(s)
     # XXX too many things here are limited to a specific type
     # XXX throw Undeterminable if one asks for day match on date with no
     # year, so days_in_month can't be calcd.
     #             "DUE" "DATE"
+    # XXX private?
     def matches?( rule, value, fold= nil)
       #raise ArgumentError.new unless value.is_a? Int32
       # Fold is the starting value for negative numbers
@@ -287,14 +298,14 @@ module Crystime
       #  #  value.is_a?( Int) ? rule=== value :
       #  #  # XXX switch to using Range(int,Int) when it becomes possible in Crystal
       #  #  #value.is_a?( Range(Int32,Int32)) ? rule=== value :
-      #  #    value.is_a?( Enumerable(Int32)) ? puts( "kaliopa") :
+      #  #    value.is_a?( Enumerable(Int32)) ? puts( "") :
       #  #  raise Crystime::Errors.unsupported_comparison
       #  #else false
       #end
       ret= compare( rule, value)
       if fold && !ret && value.is_a?( Int)
-        # try once again, folding the test value around the specified point
-        # careful with eg day<7 conditions, need to be translated to 1..7
+        # try once again, folding the test value around the specified point.
+        # Careful with e.g. day<7 conditions, need to be translated to 1..7
         ret= matches? rule, value-fold, nil
       end
       #puts rule.inspect, value.inspect, ret
@@ -320,7 +331,7 @@ module Crystime
     private def compare( a : Int, b : Enumerable(Int)) compare(b, a) end
 
     private def compare( a, b)
-      raise "No comparator defined between #{a.class} and #{b.class}."
+      raise Crystime::Errors.no_comparator(a, b)
     end
 
     # Helpers below

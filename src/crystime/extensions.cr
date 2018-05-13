@@ -1,5 +1,6 @@
 class Array
-  # Adds a convenience method to Array class.
+  # Expands ranges and other expandable types into a long list of all possible options.
+  # E.g. [1, 2..3, 4..5] is expanded into [[1, 2, 4], [1,2, 5], [1,3,4], [1,3,5]].
   def expand
     Array.product map { |e|
       case e
