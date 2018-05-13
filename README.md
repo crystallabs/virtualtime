@@ -35,7 +35,6 @@ it can still be "on", or ignored, or re-scheduled to some time before, or some t
 
 If the item's list of due dates is empty, it is considered as always "on".
 If the item's list of omit dates is empty, it is considered as never omitted.
-
 If there are multiple VDs set for a field, the matches are logically OR-ed, i.e. one match is enough for the field to match.
 
 Here is a simple example from the examples/ folder to begin with, with comments:
