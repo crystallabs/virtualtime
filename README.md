@@ -95,7 +95,7 @@ p item.on?( any_mar) # ==> true
 p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
 
 # Asking whether the item is due on the rescheduled date (Mar 22) will tell us no, because currently
-# re-schedules are not counted as due/on dates:
+# rescheduled dates are not counted as due/on dates:
 p item.on?( Crystime::VirtualDate["2017-03-22"]) # ==> nil
 ```
 
