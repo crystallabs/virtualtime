@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Crystime do
+describe Crystime::Item do
   #it "can parse timeunit" do
 	#	a= Crystime::Item.new
 	#	a.parse_timeunit("M").should eq(60)
@@ -143,20 +143,6 @@ describe Crystime do
 		vd2.month= 9
 		# Now it no longer matches:
 		item.due_on?(date).should be_nil
-  end
-
-  it "knows Julian Day Number" do
-    vd= Crystime::VirtualDate.new
-    vd.year= 2017
-    vd.month= 6
-    vd.day= 28
-    vd.to_jd!.should eq 2457933
-  end
-
-  it "can materialize!" do
-    vd= Crystime::VirtualDate.new
-    vd.materialize!
-    vd.to_tuple.should eq( {1,1,1,1,1721426,0,0,0,0})
   end
 
 	# Identical copy of the above, but testing omit dates instead of due dates
@@ -324,18 +310,6 @@ describe Crystime do
 		item.omit<< vd
 		item.on?(date).should be_false
 	end
-
-  it "resets weekday/jd after de-materializing" do
-    v= Crystime::VirtualDate.new
-    v.year= 2017
-    v.month= 12
-    v.day= 1
-    v.jd.should eq 2458089
-    v.weekday.should eq 5
-    v.day= nil
-    v.jd.should eq nil
-    v.weekday.should eq nil
-  end
 
   it "reports shift amount on omitted due days" do
 		date= Crystime::VirtualDate["2017-3-15"]
@@ -609,33 +583,6 @@ describe Crystime do
     item.on?(date).should eq Crystime::Span.new 14,20,41,0
   end
 
-  it "can expand VDs" do
-    d= Crystime::VirtualDate.new
-    d.year= 2017
-    #d.month= 1..3
-    d.day= 14..17
-    d.hour= 9..12
-    d.millisecond= 1
-    d.expand.should eq [
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 12, nil, nil, 1])
-    ]
-  end
-
   it "can check due on dates with ranges" do
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
@@ -662,14 +609,6 @@ describe Crystime do
     dates.map{ |d| item.on? d}.any?{ |x| x}.should be_true
   end
 
-  it "can initialize from array" do
-    a= Crystime::VirtualDate.new
-    a.month= 1..3
-    vds= a.expand
-    vds[0].month.should eq 1
-    vds[1].month.should eq 2
-  end
-
 #    omit= Crystime::VirtualDate["2017-3-15"]
 #    item.on?(date).should be_false
     #item.on?(date).should eq Crystime::Span.new 0,0,-15,0
@@ -688,29 +627,6 @@ describe Crystime do
 #    p "Date: "+ date.inspect
   #end
 
-  it "does set ymd from jd" do
-    vd= Crystime::VirtualDate.new
-		vd.jd= 2457828
-    vd.year.should eq 2017
-    vd.month.should eq 3
-    vd.day.should eq 15
-  end
-
-  it "is in UTC" do
-    Crystime::VirtualDate.new.utc?.should be_true
-  end
-
-  it "can do Span math" do
-    a= Crystime::Span.new 10, 10, 10
-    b= Crystime::Span.new 12, 12, 12
-    a.total_seconds.should eq 36610
-    b.total_seconds.should eq 43932
-    c= a+ b
-    c.total_seconds.should eq 36610+ 43932
-    d= b- a
-    d.total_seconds.should eq 43932- 36610
-  end
-
   it "can shift til !due_on?( @omit) && due_on?( @shift)" do
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
@@ -726,27 +642,6 @@ describe Crystime do
     item.omit= [omit]
     item.shift= [shift]
     item.on?(date).should eq Crystime::Span.new 13,0,0,0
-  end
-
-  it "knows materialized virtual dates" do
-    vd= Crystime::VirtualDate.new
-    vd.materialized?.should be_false
-    vd.year= 1
-    vd.month= 2
-    vd.day= 3
-    vd.materialized?.should be_false
-    vd.hour= 4
-    vd.minute= 5
-    vd.second= 6
-    vd.materialized?.should be_false
-    vd.millisecond= 7
-    vd.materialized?.should be_true
-    vd.second= 9..12
-    vd.materialized?.should be_false
-    vd.second= 1
-    vd.materialized?.should be_true
-    vd.second= nil
-    vd.materialized?.should be_false
   end
 
   it "respects max_shifts" do
@@ -769,14 +664,6 @@ describe Crystime do
     #puts shift.inspect
     item.shift= [shift]
     item.on?(date, nil, nil, 30).should eq false
-  end
-
-  it "changes weekday according to ymd" do
-    vd= Crystime::VirtualDate["2017-07-02"]
-    #puts vd.inspect
-    vd.weekday.should eq 0
-    vd.day= 1
-    vd.weekday.should eq 6
   end
 
 #  it "can remind" do
