@@ -49,6 +49,11 @@ describe Crystime do
     a= Crystime::VirtualDate["Aug"]
     a.month.should eq 8
   end
+  it "can parse combinations of supported string pieces" do
+    vd = Crystime::VirtualDate["2018 wed 12:00:00"]
+    vd.weekday.should eq 3
+    vd.hour.should eq 12
+  end
   it "supports all 7 documented types of values" do
     a = Crystime::VirtualDate.new
     a.year = nil # Remains unspecified, matches everything it is compared with
