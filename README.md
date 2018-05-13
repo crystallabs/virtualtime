@@ -39,14 +39,26 @@ Here is a simple example from the examples/ folder to begin with, with comments:
 # Create an item:
 item = Crystime::Item.new
 
-# Create a VirtualDate that matches every other
-# day from Mar 10 to Mar 20:
+# Create a VirtualDate that matches every other day from Mar 10 to Mar 20:
 due_march = Crystime::VirtualDate.new
 due_march.month = 3
 due_march.day = (10..20).step 2
 
 # Add this VirtualDate as due date to item:
 item.due<< due_march
+
+# Create a VirtualDate that matches Mar 20 specifically. We will use this
+# to actually prevent event from being due on that day.
+omit_march_20 = Crystime::VirtualDate.new
+omit_march_20.month = 3
+omit_march_20.day = 20
+
+# Add this VirtualDate as omit date to item:
+item.omit<< omit_march_20
+
+# If event falls on an omitted date, try rescheduling it for 2 days later:
+item.omit_shift = Crystime::Span.new 86400 * 2
+
 
 # Now we can check when the item is due and when not:
 
@@ -57,24 +69,24 @@ p item.on?( Crystime::VirtualDate["2017-02-15"]) # ==> false
 # March 10, 12, 14, 16, 18, or 20:
 p item.on?( Crystime::VirtualDate["2017-03-15"]) # ==> false
 
-# But item is due on Mar 16, 2017:
+# Item is due on Mar 16, 2017:
 p item.on?( Crystime::VirtualDate["2017-03-16"]) # ==> true
 
-# Also it is due on Mar 20, 2017:
-p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> true
+# And it is due on any Mar 16, doesn't need to be in 2017:
+any_mar_16 = Crystime::VirtualDate.new
+any_mar_16.month = 3
+any_mar_16.day = 16
+p item.on?( any_mar_16 ) # ==> true
 
-# And it is due on any Mar 20, doesn't need to be in 2017:
-any_mar_20 = Crystime::VirtualDate.new
-any_mar_20.month = 3
-any_mar_20.day = 20
-p item.on?( any_mar_20 ) # ==> true
-
-# Also, we can check whether this event is due at any point in
-# March, and it'll tell us yes:
+# We can check whether this event is due at any point in March:
 any_mar = Crystime::VirtualDate.new
 any_mar.month = 3
 p item.on?( any_mar) # ==> true
-```
+
+# But item is not due on Mar 20, 2017, because that date is omitted, and the
+# system will give us a span of time (offset) when it can be scheduled. Based
+# on our reschedule settings above, this will be a span for 2 days later.
+p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
 
 # VirtualDate in Detail
 
