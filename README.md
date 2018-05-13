@@ -50,8 +50,8 @@ due_march.day = (10..20).step 2
 # Add this VirtualDate as due date to item:
 item.due<< due_march
 
-# Create a VirtualDate that matches Mar 20 specifically. We will use this
-# to actually prevent event from being due on that day.
+# Create a VirtualDate that matches Mar 20 specifically. We will use this to actually omit
+# the event on that day:
 omit_march_20 = Crystime::VirtualDate.new
 omit_march_20.month = 3
 omit_march_20.day = 20
