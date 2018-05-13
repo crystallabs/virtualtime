@@ -89,9 +89,9 @@ any_mar = Crystime::VirtualDate.new
 any_mar.month = 3
 p item.on?( any_mar) # ==> true
 
-# But item is not due on Mar 20, 2017, because that date is omitted, and the
-# system will give us a span of time (offset) when it can be scheduled. Based
-# on our reschedule settings above, this will be a span for 2 days later.
+# But item is not due on Mar 20, 2017, because that date is omitted, and the system will give us
+# a span of time (offset) when it can be scheduled. Based on our reschedule settings above, this
+# will be a span for 2 days later.
 p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
 ```
 
