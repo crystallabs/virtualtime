@@ -93,6 +93,7 @@ p item.on?( any_mar) # ==> true
 # system will give us a span of time (offset) when it can be scheduled. Based
 # on our reschedule settings above, this will be a span for 2 days later.
 p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
+```
 
 # VirtualDate in Detail
 
