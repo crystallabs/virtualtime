@@ -347,11 +347,12 @@ module Crystime
     #  @span= Time::Span.new(ticks)
     #  #after_initialize
     #end
-    def initialize( seconds, nanoseconds)
+    def initialize( seconds, nanoseconds = 0)
       @span= Time::Span.new(
         seconds: seconds,
         nanoseconds: nanoseconds,
       )
+      @ts[3,4]= [true,true]
       #after_initialize
     end
 
