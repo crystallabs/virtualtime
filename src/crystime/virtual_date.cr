@@ -64,6 +64,12 @@ module Crystime
     def initialize(@year, @month, @day, @hour = nil, @minute = nil, @second = nil)
     end
 
+    def self.from_array( arg)
+      r= new
+      r.year, r.month, r.day, r.hour, r.minute, r.second, r.millisecond= arg[0..6]
+      r
+    end
+
     # XXX should boolean value be treated as materializable and have ts=true?
     def year=( v)        @year= v;   @ts[0]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def month=( v)       @month= v;  @ts[1]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
@@ -200,6 +206,7 @@ module Crystime
       if @ts.any?{ |x| x== false}
         raise Crystime::Errors.cant_materialize(self)
       end
+      # XXX When more types become materializable, make changes here
       ms, sec, min, h, d, m, y= @millisecond, @second, @minute, @hour, @day, @month, @year
       ms= ms.nil?   ? 0 : ms.as( Int)
       sec= sec.nil? ? 0 : sec.as( Int)
@@ -211,19 +218,8 @@ module Crystime
       Time.new( y, m, d, hour: h, minute: min, second: sec, nanosecond: ms* 1_000_000, kind: Time::Kind::Utc)
     end
 
-    def self.from_array( arg)
-      r= new
-      r.year= arg[0]
-      r.month= arg[1]
-      r.day= arg[2]
-      r.hour= arg[3]
-      r.minute= arg[4]
-      r.second= arg[5]
-      r.millisecond= arg[6]
-      r
-    end
-
-    def utc?() true end
+    ## Checks if this VD is in UTC. Responds with fixed value.
+    #def utc?() true end
 
     def materialized?
       #@ts[0..2]= [true,true,true]
