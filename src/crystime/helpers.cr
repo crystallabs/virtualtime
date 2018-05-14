@@ -48,6 +48,7 @@ module Crystime
       b.all?{ |i| a_set.includes? i}
     end
     def self.compare( a : Proc(Int32, Bool), b : Int) a.call(b) end
+    def self.compare( a : Int, b : Proc(Int32, Bool)) compare(b, a) end
     def self.compare( a : Enumerable(Int), b : Int) a.dup.includes? b end
     def self.compare( a : Int, b : Int) a== b end
     def self.compare( a : Nil, b) true end
