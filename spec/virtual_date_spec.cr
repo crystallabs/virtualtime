@@ -138,9 +138,9 @@ describe Crystime::VirtualDate do
     vds[1].month.should eq 2
   end
 
-  it "is in UTC" do
-    Crystime::VirtualDate.new.utc?.should be_true
-  end
+  #it "is in UTC" do
+  #  Crystime::VirtualDate.new.utc?.should be_true
+  #end
 
   it "does set Ymd from jd" do
     vd= Crystime::VirtualDate.new
