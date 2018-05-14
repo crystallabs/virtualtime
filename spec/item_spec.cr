@@ -446,14 +446,14 @@ describe Crystime::Item do
     g= 8..10
     h= 10..12
     i= 9..11
-    item.matches?( a, b).should be_false
-    item.matches?( a, c).should be_false
-    item.matches?( a, d).should be_true
-    item.matches?( a, e).should be_false
-    item.matches?( a, f).should be_true
-    item.matches?( a, g).should be_true
-    item.matches?( a, h).should be_false
-    item.matches?( a, i).should be_false
+    Crystime::Helpers.matches?( a, b).should be_false
+    Crystime::Helpers.matches?( a, c).should be_false
+    Crystime::Helpers.matches?( a, d).should be_true
+    Crystime::Helpers.matches?( a, e).should be_false
+    Crystime::Helpers.matches?( a, f).should be_true
+    Crystime::Helpers.matches?( a, g).should be_true
+    Crystime::Helpers.matches?( a, h).should be_false
+    Crystime::Helpers.matches?( a, i).should be_false
   end
 
   it "can match virtual dates" do
