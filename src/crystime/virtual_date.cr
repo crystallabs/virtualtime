@@ -29,8 +29,7 @@ module Crystime
 
     #property :relative
     protected getter time
-    property ts
-    getter ts : Array(Bool?)
+    property ts : Array(Bool?)
 
     #@relative: Nil | Bool
 
@@ -61,6 +60,7 @@ module Crystime
     def initialize
     end
 
+    # Similar to Time constructor
     def initialize(@year, @month, @day, @hour = nil, @minute = nil, @second = nil)
     end
 
@@ -159,13 +159,25 @@ module Crystime
     def <( other : Time) to_time<other end
     def ==( other : Time) to_time==other end
     def <=>( other : Time) to_time<=>other end
-
-    # Helpers for interoperability with self and Crystime::Span
-
-    def <=>( other : self)
-      to_time<=>other.to_time
+    # Btw, this is not supported with Time struct. (I.e. you can do Time-Time, but not Time+Time)
+    def +( other : Time)
+      self_time= self.to_time
+      Span.new(
+        seconds: (self_time.epoch+ other.epoch),
+        nanoseconds: (self_time.nanosecond+ other.nanosecond),
+      )
     end
-		# XXX see what to do about this: after +, VD essentially becomes fully materialized, which isn't ideal
+    def -( other : Time)
+      self_time= self.to_time
+      Span.new(
+        seconds: (self_time.epoch- other.epoch),
+        nanoseconds: (self_time.nanosecond- other.nanosecond),
+      )
+    end
+
+    # Helpers for interoperability with Crystime::Span and Time::Span
+
+    # XXX see what to do about this: after +, VD essentially becomes fully materialized, which isn't ideal
     def +( other : Span | Time::Span)
       self_time= self.to_time
       t= self_time+ other
@@ -181,6 +193,12 @@ module Crystime
     # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
     def -( other : Span | Time::Span) self+ -other end
 
+    # Helpers for interoperability with self
+
+    def <=>( other : self)
+      to_time<=>other.to_time
+    end
+    # Btw, this is not supported with Time struct. (I.e. you can do Time-Time, but not Time+Time)
     def +( other : self)
       self_time= self.to_time
       other_time= other.to_time
@@ -197,6 +215,8 @@ module Crystime
         nanoseconds: (self_time.nanosecond- other_time.nanosecond),
       )
     end
+
+    # End of helpers
 
     # Converts a VD to Time. If VD is non-materializable, the process raises an exception.
     def to_time(kind = Time::Kind::Utc)
