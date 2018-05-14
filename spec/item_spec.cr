@@ -40,7 +40,7 @@ describe Crystime::Item do
     # @year    : Nil | ...
 		# @month   : Nil | ...
 		# @day     : Nil | ...
-		# @weekday : Nil | ...
+		# @day_of_week : Nil | ...
 		# @jd  : Nil | ...
 		# @hour    : Nil | ...
 		# @minute  : Nil | ...
@@ -95,15 +95,15 @@ describe Crystime::Item do
 		vd.month= nil
 		vd.day= nil
 		item.due_on?(date).should be_true
-		vd.weekday= 0
+		vd.day_of_week= 0
     #puts item.inspect
     #puts date.inspect
 		item.due_on?(date).should be_nil
-		vd.weekday= 2
+		vd.day_of_week= 2
 		item.due_on?(date).should be_nil
-		vd.weekday= 4
+		vd.day_of_week= 4
 		item.due_on?(date).should be_nil
-		vd.weekday= 3
+		vd.day_of_week= 3
 		date= Crystime::VirtualDate["2017-3-15 10:10:10"]
     #puts item.inspect
 		#puts date.inspect
@@ -111,7 +111,7 @@ describe Crystime::Item do
 
 		# jd Day Number tests:
 
-		vd.weekday= nil
+		vd.day_of_week= nil
 		item.due_on?(date).should be_true
 		vd.jd= 2457827
 		item.due_on?(date).should be_nil
@@ -157,7 +157,7 @@ describe Crystime::Item do
     # @year    : Nil | ...
 		# @month   : Nil | ...
 		# @day     : Nil | ...
-		# @weekday : Nil | ...
+		# @day_of_week : Nil | ...
 		# @jd  : Nil | ...
 		# @hour    : Nil | ...
 		# @minute  : Nil | ...
@@ -210,18 +210,18 @@ describe Crystime::Item do
 		vd.month= nil
 		vd.day= nil
 		item.omit_on?(date).should be_true
-		vd.weekday= 0
+		vd.day_of_week= 0
 		item.omit_on?(date).should be_nil
-		vd.weekday= 2
+		vd.day_of_week= 2
 		item.omit_on?(date).should be_nil
-		vd.weekday= 4
+		vd.day_of_week= 4
 		item.omit_on?(date).should be_nil
-		vd.weekday= 3
+		vd.day_of_week= 3
 		item.omit_on?(date).should be_true
 
 		# jd Day Number tests:
 
-		vd.weekday= nil
+		vd.day_of_week= nil
 		item.omit_on?(date).should be_true
 		vd.jd= 2457827
 		item.omit_on?(date).should be_nil

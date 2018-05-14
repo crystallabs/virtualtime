@@ -1,6 +1,6 @@
 module Crystime
 
-  # Group of module-level methods that return common Error objects for use in 'raise'.
+  # Group of module-level methods that return common Error objects for use in `raise`.
   # This method of doing it is just a convenience at the moment; it may be changed to
   # something else in the future.
   module Errors
