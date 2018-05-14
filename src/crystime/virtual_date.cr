@@ -1,12 +1,12 @@
-# VirtualDate is a flexible representation of a date, allowing
+# VirtualTime is a flexible representation of a date, allowing
 # it to be full, partial, contain ranges, procs, etc.
 # It also offers out of the box support for comparing and
-# matching VirtualDates.
+# matching VirtualTimes.
 
 require "yaml"
 
 module Crystime
-  class VirtualDate
+  class VirtualTime
 
     include Comparable(self)
 
@@ -25,9 +25,9 @@ module Crystime
 
     #@relative: Nil | Bool
 
-    # "ts" is a variable which keeps track of which fields were actually specified in VirtualDate.
+    # "ts" is a variable which keeps track of which fields were actually specified in VirtualTime.
     # E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
-    # This is important for matching VirtualDates, because if one VirtualDate has ts[5] set to nil (not specified), and
+    # This is important for matching VirtualTimes, because if one VirtualTime has ts[5] set to nil (not specified), and
     # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
     #      0    1     2     3     4     5     6
     #      year month day   hour  min   sec   ms
@@ -35,16 +35,16 @@ module Crystime
 
     YAML.mapping({
       # Date-related properties
-      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      day_of_week: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      day_of_week: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
       # Time-related properties
-      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
+      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
     })
 
     # Empty constructor. Must be here since when fields are defined, the
@@ -87,7 +87,7 @@ module Crystime
       update!( jd: false)
       true
     end
-    # Creates VirtualDate from Julian Day Number.
+    # Creates VirtualTime from Julian Day Number.
     def from_jd
       jd= @jd
       if jd.nil?
@@ -110,7 +110,7 @@ module Crystime
       gy = (e / p) - y + (n + m - gm) / n
       {gy, gm, gd}
     end
-    # Creates Julian Day Number from VirtualDate, when possible. Raises otherwise.
+    # Creates Julian Day Number from VirtualTime, when possible. Raises otherwise.
     def to_jd!
       if @ts[0]&& @ts[1]&& @ts[2]
         a= ((14-@month.as( Int))/12).floor
@@ -124,7 +124,7 @@ module Crystime
 
     # Called when year, month, or day are re-set and we need to re-calculate which day_of_week and
     # Julian Day Number the new date corresponds to. This is only filled if Y/m/d is specified.
-    # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
+    # If it is not specified (meaning that the VirtualTime does not refer to a specific date),
     # then they are set to nil.
     # In the case where the change is caused by a jd that was just set, a 'jd: false' parameter
     # could be passed not to touch jd again, even though there's no harm even if it is modified.
@@ -140,9 +140,9 @@ module Crystime
       true
     end
 
-    # Expands a partial VirtualDate into a materialized/specific date/time.
+    # Expands a partial VirtualTime into a materialized/specific date/time.
     def expand
-      [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
+      [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualTime.from_array v}
     end
 
     # Quick helpers for interoperability with Time
@@ -169,7 +169,7 @@ module Crystime
 
     # Helpers for interoperability with Crystime::Span and Time::Span
 
-    # XXX see what to do about this: after +, VD essentially becomes fully materialized, which isn't ideal
+    # XXX see what to do about this: after +, VT essentially becomes fully materialized, which isn't ideal
     def +( other : Span | Time::Span)
       self_time= self.to_time
       t= self_time+ other
@@ -182,7 +182,7 @@ module Crystime
       self.millisecond= t.millisecond
       self
     end
-    # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
+    # XXX add tests for @ts=[...] looking correct after VirtualTime+ Span
     def -( other : Span | Time::Span) self+ -other end
 
     # Helpers for interoperability with self
@@ -210,7 +210,7 @@ module Crystime
 
     # End of helpers
 
-    # Converts a VD to Time. If VD is non-materializable, the process raises an exception.
+    # Converts a VT to Time. If VT is non-materializable, the process raises an exception.
     def to_time(kind = Time::Kind::Utc)
       # XXX ability to define default values for nils
       #p "in ticks: "+ @ts.inspect
@@ -229,7 +229,7 @@ module Crystime
       Time.new( y, m, d, hour: h, minute: min, second: sec, nanosecond: ms* 1_000_000, kind: kind)
     end
 
-    ## Checks if this VD is in UTC. Responds with fixed value.
+    ## Checks if this VT is in UTC. Responds with fixed value.
     #def utc?() true end
 
     def materialized?
@@ -276,7 +276,7 @@ module Crystime
       { @year, @month, @day, @day_of_week, @jd, @hour, @minute, @second, @millisecond}
     end
 
-    # Parses string and produces VirtualDate.
+    # Parses string and produces VirtualTime.
     def self.[]( date)
       return date if date.is_a? self
       #puts "TRYING TO PARSE #{date}"
@@ -416,11 +416,11 @@ module Crystime
     #end
   end
 
-  # A custom to/from YAML converter for VirtualDate.
-  class VirtualDateConverter
-    # Converts VirtualDate object to YAML.
+  # A custom to/from YAML converter for VirtualTime.
+  class VirtualTimeConverter
+    # Converts VirtualTime object to YAML.
     # XXX this has to be changed so that the whole object is serialized into yyyy/mm/dd/day_of_week hh:mm:ss.ms, not each field individually.
-    def self.to_yaml(value : Crystime::VirtualDate::Virtual, yaml : YAML::Builder)
+    def self.to_yaml(value : Crystime::VirtualTime::Virtual, yaml : YAML::Builder)
       case value
       #when Nil
       #  yaml.scalar "nil"
@@ -447,8 +447,8 @@ module Crystime
         raise "Unknown type #{value.class}"
       end
     end
-    # Converts YAML to VirtualDate object.
-   def self.from_yaml(value : YAML::PullParser) : Crystime::VirtualDate::Virtual
+    # Converts YAML to VirtualTime object.
+   def self.from_yaml(value : YAML::PullParser) : Crystime::VirtualTime::Virtual
       v= value.read_scalar
       case v
       when "nil"

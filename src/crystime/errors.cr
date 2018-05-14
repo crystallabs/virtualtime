@@ -5,9 +5,9 @@ module Crystime
   # something else in the future.
   module Errors
 
-    # Error when trying to compare partial VirtualDates.
+    # Error when trying to compare partial VirtualTimes.
     def self.virtual_comparison( text= nil); ArgumentError.new \
-      "Comparing VirtualDates containing non-Int values not supported. Need to expand() your virtual date? (#{text})" end
+      "Comparing VirtualTimes containing non-Int values not supported. Need to expand() your virtual date? (#{text})" end
 
     # Error when trying to compare uncomparable types.
     def self.unsupported_comparison( text= nil); ArgumentError.new \
@@ -33,7 +33,7 @@ module Crystime
     def self.no_comparator( a, b); ArgumentError.new \
       "No comparator defined between #{a.class} and #{b.class}." end
 
-    # Error when VD can't be materialized due to some values being non-materializable.
+    # Error when VT can't be materialized due to some values being non-materializable.
     def self.cant_materialize( text= nil); ArgumentError.new \
       "Non-materializable values found. Materialization not supported (yet?). (#{text})" end
   end

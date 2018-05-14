@@ -1,5 +1,5 @@
 module Crystime
-  # Collection of helpers independent of VirtualDate or Item,
+  # Collection of helpers independent of VirtualTime or Item,
   # and which work solely based on their input parameters.
   module Helpers
     # Wraps object in an Array if it is not an Array already.
@@ -11,8 +11,8 @@ module Crystime
       end
     end
 
-    # Replaces any values of 'true' with a list of VDs. By default, the list is emtpy.
-    def self.virtual_dates( list, default_list= [] of VirtualDate)
+    # Replaces any values of 'true' with a list of VTs. By default, the list is emtpy.
+    def self.virtual_dates( list, default_list= [] of VirtualTime)
       list= force_array list
       di= list.index( true)
       if di
@@ -42,7 +42,7 @@ module Crystime
       nil
     end
 
-    # Compares all 7 types of accepted values for a VD against each other.
+    # Compares all 7 types of accepted values for a VT against each other.
     def self.compare( a : Enumerable(Int), b : Enumerable(Int))
       a_set= a.dup.to_set
       b.all?{ |i| a_set.includes? i}
