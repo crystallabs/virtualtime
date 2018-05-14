@@ -25,7 +25,7 @@ module Crystime
     # rescheduling before the original due) or positive (for rescheduling after the original due)).
     # Shifting is performed until a suitable date/time is found, or until max. number of shift
     # attempts is reached.
-    @omit_shift : Nil | Bool | Crystime::Span
+    @omit_shift : Nil | Bool | Time::Span
     @omit_shift= false
 
     # List of VirtualDates which item must match, after it was shifted due to omit, to be considered "on".
@@ -96,11 +96,7 @@ module Crystime
               shifts+= 1
               #p od.inspect
               #p span.inspect
-              if od.is_a? Crystime::VirtualDate
-                od+= span
-              else
-                od+= span.span
-              end
+              od+= span
               #STDERR.puts od.inspect
               #p "AFTER +: "+ od.inspect
               if (max_before&& ((od-d).total_milliseconds.abs> max_before.total_milliseconds)) ||
