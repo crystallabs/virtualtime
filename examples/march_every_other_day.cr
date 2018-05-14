@@ -12,7 +12,7 @@ item.due<< due_march
 
 # But on weekends it should not be scheduled:
 not_due_weekend = Crystime::VirtualDate.new
-not_due_weekend.weekday = [0,6]
+not_due_weekend.day_of_week = [0,6]
 # Add this VirtualDate as omit date to item:
 item.omit<< not_due_weekend
 

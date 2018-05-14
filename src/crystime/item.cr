@@ -255,7 +255,7 @@ module Crystime
         return true if matches?( e.year, target.year) &&
           matches?( e.month, target.month) &&
           matches?( e.day, target.day, dayfold) &&
-          matches?( e.weekday, target.weekday) &&
+          matches?( e.day_of_week, target.day_of_week) &&
           matches?( e.jd, target.jd)
       end
       nil

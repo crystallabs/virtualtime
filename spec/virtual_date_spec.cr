@@ -16,7 +16,7 @@ describe Crystime::VirtualDate do
     a.year.should eq nil
     a.month.should eq nil
     a.day.should eq nil
-    a.weekday.should eq nil
+    a.day_of_week.should eq nil
     #a.relative.should eq nil
     a.jd.should eq nil
   end
@@ -41,9 +41,9 @@ describe Crystime::VirtualDate do
     a.second.should eq 3
     a.millisecond.should eq 40000
   end
-  it "can parse weekday names" do
+  it "can parse day_of_week names" do
     a= Crystime::VirtualDate["Mon"]
-    a.weekday.should eq 1
+    a.day_of_week.should eq 1
   end
   it "can parse month names" do
     a= Crystime::VirtualDate["Aug"]
@@ -51,7 +51,7 @@ describe Crystime::VirtualDate do
   end
   it "can parse combinations of supported string pieces" do
     vd = Crystime::VirtualDate["2018 wed 12:00:00"]
-    vd.weekday.should eq 3
+    vd.day_of_week.should eq 3
     vd.hour.should eq 12
   end
   it "supports all 7 documented types of values" do
@@ -91,16 +91,16 @@ describe Crystime::VirtualDate do
     vd.to_tuple.should eq( {1,1,1,1,1721426,0,0,0,0})
   end
 
-  it "resets weekday/jd after de-materializing" do
+  it "resets day_of_week/jd after de-materializing" do
     v= Crystime::VirtualDate.new
     v.year= 2017
     v.month= 12
     v.day= 1
     v.jd.should eq 2458089
-    v.weekday.should eq 5
+    v.day_of_week.should eq 5
     v.day= nil
     v.jd.should eq nil
-    v.weekday.should eq nil
+    v.day_of_week.should eq nil
   end
 
   it "can expand VDs" do
@@ -144,12 +144,12 @@ describe Crystime::VirtualDate do
 
   it "does set Ymd from jd" do
     vd= Crystime::VirtualDate.new
-    vd.weekday.should eq nil
+    vd.day_of_week.should eq nil
     vd.jd= 2457828
     vd.year.should eq 2017
     vd.month.should eq 3
     vd.day.should eq 15
-    vd.weekday.should eq 3
+    vd.day_of_week.should eq 3
   end
 
   it "does set jd from Ymd" do
@@ -159,7 +159,7 @@ describe Crystime::VirtualDate do
     vd.day= 17
 
     vd.jd.should eq 2457830
-    vd.weekday.should eq 5
+    vd.day_of_week.should eq 5
   end
 
   it "knows materialized virtual dates" do
@@ -183,18 +183,18 @@ describe Crystime::VirtualDate do
     vd.materialized?.should be_false
   end
 
-  it "changes weekday according to Ymd" do
+  it "changes day_of_week according to Ymd" do
     vd= Crystime::VirtualDate["2017-07-02"]
     #puts vd.inspect
-    vd.weekday.should eq 0
+    vd.day_of_week.should eq 0
     vd.day= 1
-    vd.weekday.should eq 6
+    vd.day_of_week.should eq 6
   end
 
-  it "setting weekday does not affect Ymd" do
+  it "setting day_of_week does not affect Ymd" do
     vd= Crystime::VirtualDate["2017-07-02"]
-    vd.weekday= 4
-    vd.weekday.should eq 4
+    vd.day_of_week= 4
+    vd.day_of_week.should eq 4
     vd.day.should eq 2
   end
 

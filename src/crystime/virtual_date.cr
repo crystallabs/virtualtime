@@ -23,7 +23,7 @@ module Crystime
 
     # XXX need to move to model where user input is separate from actual values.
     # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
-    # And until we know year and month, we can't fill in weekday/jd, nor evaluate that -1.
+    # And until we know year and month, we can't fill in day_of_week/jd, nor evaluate that -1.
     # But while treated as object or in yaml, it needs to be -1, not actual value.
     # Weekday, jd and date -X require dates to be materialized...
 
@@ -35,7 +35,7 @@ module Crystime
       month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
       year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
       day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      weekday:     { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      day_of_week:     { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
       jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
       # Time-related properties
       hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
@@ -69,8 +69,8 @@ module Crystime
     def second=( v)      @second= v; @ts[5]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
     def millisecond=( v) @millisecond= v; @ts[6]= v.is_a?( Int) ? true : v.nil? ? nil : false; end
     # Weekday does not affect actual date, only adds a constraint.
-    def weekday=( v)
-      @weekday= v
+    def day_of_week=( v)
+      @day_of_week= v
       true
     end
     # Julian Day Number does affect actual date, but is not used in calculations.
@@ -120,7 +120,7 @@ module Crystime
       end
     end
 
-    # Called when year, month, or day are re-set and we need to re-calculate which weekday and
+    # Called when year, month, or day are re-set and we need to re-calculate which day_of_week and
     # Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
     # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
     # then they are set to nil.
@@ -128,10 +128,10 @@ module Crystime
       if @ts[0]&& @ts[1]&& @ts[2]
         #puts "date is: "+ self.inspect
         t= Time.new(@year.as( Int), @month.as( Int), @day.as( Int), kind: Time::Kind::Utc)
-        @weekday= t.day_of_week.to_i
+        @day_of_week= t.day_of_week.to_i
         @jd= to_jd! if jd
       else
-        @weekday= @jd= nil
+        @day_of_week= @jd= nil
       end
       true
     end
@@ -250,7 +250,7 @@ module Crystime
     end
 
     def to_tuple
-      { @year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond}
+      { @year, @month, @day, @day_of_week, @jd, @hour, @minute, @second, @millisecond}
     end
 
     # Parses string and produces VirtualDate.
@@ -296,7 +296,7 @@ module Crystime
 
       date= date.upcase
       if date=~ /\b(\d{4})\b/;  r.year= $1.to_i; r.update! end
-      if v= find_weekday( date); (r.weekday= W2I[v]?) &&( ret= true) end
+      if v= find_day_of_week( date); (r.day_of_week= W2I[v]?) &&( ret= true) end
       if v= find_month( date);     (r.month= M2I[v]?) &&( ret= true); r.update! end
       unless ret
         if m= date.match /(?<day>\-?\d{1,2})/
@@ -309,7 +309,7 @@ module Crystime
       r
     end
 
-    private def self.find_weekday( str)
+    private def self.find_day_of_week( str)
       str.scan(WR) do |m| return m[0] end
       nil
     end
@@ -407,7 +407,7 @@ module Crystime
 
     def <=>( other : self)
       # TODO this code prevents two perfectly simple/comparable VDs from being compared (at least for literal ==)
-      #return {@year, @month, @day, @weekday, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.weekday, other.jd, other.hour, other.minute, other.second, other.millisecond}
+      #return {@year, @month, @day, @day_of_week, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.day_of_week, other.jd, other.hour, other.minute, other.second, other.millisecond}
       total_nanoseconds<=> other.total_nanoseconds
     end
 
@@ -423,7 +423,7 @@ module Crystime
   # A custom to/from YAML converter for VirtualDate.
   class VirtualDateConverter
     # Converts VirtualDate object to YAML.
-    # XXX this has to be changed so that the whole object is serialized into yyyy/mm/dd/weekday hh:mm:ss.ms, not each field individually.
+    # XXX this has to be changed so that the whole object is serialized into yyyy/mm/dd/day_of_week hh:mm:ss.ms, not each field individually.
     def self.to_yaml(value : Crystime::VirtualDate::Virtual, yaml : YAML::Builder)
       case value
       #when Nil
