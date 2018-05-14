@@ -1,5 +1,5 @@
 module Crystime
-  class Helpers
+  module Helpers
 		# Wraps object in an Array if it is not an Array already.
     def self.force_array( arg)
       if !arg.is_a? Array
