@@ -34,7 +34,7 @@ module Crystime
       "No comparator defined between #{a.class} and #{b.class}." end
 
     # Error when VD can't be materialized due to some values being non-materializable.
-    def self.cant_materialize( a); ArgumentError.new \
-      "Materializing this #{a.class} not supported (yet?). It contains non-materializable fields." end
+    def self.cant_materialize( text= nil); ArgumentError.new \
+      "Non-materializable values found. Materialization not supported (yet?). (#{text})" end
   end
 end
