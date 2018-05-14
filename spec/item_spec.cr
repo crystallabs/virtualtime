@@ -594,12 +594,14 @@ describe Crystime::Item do
     item.omit= [omit]
 
     date= Crystime::VirtualDate.new
-    date.day= 8..14
+    date.day= 8..11
     #puts date.inspect
 
-    expect_raises ArgumentError, "" {
-      item.on?(date).should eq Crystime::Span.new 14,20,41,0
-    }
+    item.on?(date).should be_true
+
+    date.day= 8..14
+
+    item.on?(date).should be_nil
 
     dates= date.expand
     r= dates.map{ |d| item.on? d}

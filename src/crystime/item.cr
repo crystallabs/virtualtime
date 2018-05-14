@@ -61,14 +61,6 @@ module Crystime
       d= date
       return unless d
 
-      # XXX
-      # It seems to me this check shouldn't be here. It is a matter of VDs whether some comparison is
-      # possible or not. Item shouldn't be concerned with it. Specifically, if this check is here, it
-      # prevents passing a VD with a range in one of the fields.
-      if d.ts.any?{ |x| x== false}
-        raise Crystime::Errors.virtual_comparison
-      end
-
       yes= due_on? d
       no=  omit_on? d
       #puts self.inspect
@@ -225,6 +217,7 @@ module Crystime
 
     # Low-level logic functions
 
+    # XXX Move to a class method/helper?
     private def virtual_dates( list, default_list= [] of VirtualDate)
       list= force_array list
       di= list.index( true)
@@ -247,8 +240,12 @@ module Crystime
         return true if matches?( e.year, target.year) &&
           matches?( e.month, target.month) &&
           matches?( e.day, target.day, dayfold) &&
-          matches?( e.day_of_week, target.day_of_week) &&
-          matches?( e.jd, target.jd)
+          matches?( e.day_of_week, target.day_of_week) #&&
+          # Remove checking of #jd for now. First, this check is redundant
+          # since in the current code jd can't get out of sync with Ymd.
+          # Second, because removing this makes it possible to pass Time
+          # objects through this method.
+          #matches?( e.jd, target.jd)
       end
       nil
     end
