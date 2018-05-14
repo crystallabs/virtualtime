@@ -44,17 +44,16 @@ module Crystime
     # 1. Block matches if it returns true when executed
     # 1. Enumerable (including Range) matches if rule.includes?(value) is true
     # XXX throw Undeterminable if one asks for day match on date with no year, so days_in_month can't be calcd.
+    # Fold is the starting value for negative numbers. You set it to days_in_month + 1. (E.g. if you want to wrap around 31st, you pass 32 as fold value.)
     #                 "DUE", "DATE"
     def self.matches?( rule, value, fold= nil)
-      # Fold is the starting value for negative numbers
       ret= compare( rule, value)
 
-      # XXX This code should be re-enabled and then tests written for it.
-      #if fold && !ret && value.is_a?( Int)
-      #  # try once again, folding the test value around the specified point.
-      #  # Careful with e.g. day<7 conditions, need to be translated to 1..7
-      #  ret= matches? rule, value-fold, nil
-      #end
+      if !ret && fold && value.is_a?( Int)
+        # try once again, folding the test value around the specified point.
+        # Careful with e.g. day<7 conditions, need to be translated to 1..7
+        ret= matches? rule, value-fold, nil
+      end
 
       #puts rule.inspect, value.inspect, ret
       ret

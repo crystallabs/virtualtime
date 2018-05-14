@@ -680,6 +680,18 @@ describe Crystime::Item do
     item.on?( Time.new(2018,5,16)).should be_nil
   end
 
+  it "works correctly with fold (negative values counting from the end)" do
+    item = Crystime::Item.new
+    due = Crystime::VirtualDate.new
+    due.month = 5
+    due.day = -2
+    item.due<< due
+    item.on?( Time.new(2018,5,30)).should be_true
+    item.on?( Time.new(2018,5,31)).should be_nil
+    item.on?( Crystime::VirtualDate.new(2018,5,30)).should be_true
+    item.on?( Crystime::VirtualDate.new(2018,5,31)).should be_nil
+  end
+
 #  it "can remind" do
 #   date= Crystime::VirtualDate["2017,3,15,  12,13,14)
 #
