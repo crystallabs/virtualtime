@@ -204,7 +204,7 @@ module Crystime
       # XXX ability to define default values for nils
       #p "in ticks: "+ @ts.inspect
       if @ts.any?{ |x| x== false}
-        raise Crystime::Errors.cant_materialize(self)
+        raise Crystime::Errors.cant_materialize
       end
       # XXX When more types become materializable, make changes here
       ms, sec, min, h, d, m, y= @millisecond, @second, @minute, @hour, @day, @month, @year
@@ -404,13 +404,13 @@ module Crystime
     # can't we just use their +/- methods? (Assuming we're materialized,
     # of course)
     def +( other : self)
-      Span.new(
+      Crystime::Span.new(
         seconds: (total_seconds+ other.total_seconds).floor.to_i64,
         nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
       )
     end
     def -( other : self)
-      Span.new(
+      Crystime::Span.new(
         seconds: (total_seconds- other.total_seconds).floor.to_i64,
         nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
       )
