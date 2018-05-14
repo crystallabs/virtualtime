@@ -195,12 +195,12 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= Crystime::Helpers.virtual_dates list
-      check_date( target, list, true)
+      Helpers.check_date( target, list, true)
     end
     def due_on_time?( target, list= @due)
       return if !target
       list= Crystime::Helpers.virtual_dates list
-      check_time( target, list, true)
+      Helpers.check_time( target, list, true)
     end
 
     def omit_on?( target)
@@ -213,87 +213,12 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= Crystime::Helpers.virtual_dates @omit
-      check_date( target, list, nil) # XXX, @@default_omit
+      Helpers.check_date( target, list, nil) # XXX, @@default_omit
     end
     def omit_on_time?( target)
       return if !target
       list= Crystime::Helpers.virtual_dates @omit
-      check_time( target, list, nil)
-    end
-
-    # Low-level logic functions
-
-    private def check_date( target, list, default= true)
-      #puts "checking #{list.inspect} re. #{target.inspect}"
-      return default if !list || (list.size==0)
-      y, m= target.year, target.month
-      if y.is_a? Int && m.is_a? Int
-        dayfold= Time.days_in_month( y, m)+ 1
-      end
-      list.each do |e|
-        #puts :IN, e.inspect, target.inspect
-        return true if matches?( e.year, target.year) &&
-          matches?( e.month, target.month) &&
-          matches?( e.day, target.day, dayfold) &&
-          matches?( e.day_of_week, target.day_of_week) #&&
-          # Remove checking of #jd for now. First, this check is redundant
-          # since in the current code jd can't get out of sync with Ymd.
-          # Second, because removing this makes it possible to pass Time
-          # objects through this method.
-          #matches?( e.jd, target.jd)
-      end
-      nil
-    end
-    private def check_time(  target, list, default= true)
-      return default if !list || (list.size==0)
-      list.each do |e|
-        return true if matches?( e.hour, target.hour) &&
-          matches?( e.minute, target.minute) &&
-          matches?( e.second, target.second) &&
-          matches?( e.millisecond, target.millisecond)
-      end
-      nil
-    end
-
-    # Matching rules:
-    # nil=>matches all,
-    # number=>only that one,
-    # block=>block is called to return true/false
-    # enumerable(incl. range): includes?
-    # true=> use default value(s)
-    # XXX too many things here are limited to a specific type
-    # XXX throw Undeterminable if one asks for day match on date with no
-    # year, so days_in_month can't be calcd.
-    #             "DUE" "DATE"
-    # XXX private?
-    def matches?( rule, value, fold= nil)
-      #raise ArgumentError.new unless value.is_a? Int32
-      # Fold is the starting value for negative numbers
-      #return true if rule.nil? || value.nil?
-      #ret= case rule
-      #  ##when nil then true
-      #  #when Number
-      #  #  case value
-      #  #  when Number then rule== value
-      #  #  when Range then value=== rule
-      #  #  end
-      #  #when Proc then value.is_a?( Int) ? rule.call( value) : raise Crystime::Errors.unsupported_comparison
-      #  #when Enumerable then
-      #  #  value.is_a?( Int) ? rule=== value :
-      #  #  # XXX switch to using Range(int,Int) when it becomes possible in Crystal
-      #  #  #value.is_a?( Range(Int32,Int32)) ? rule=== value :
-      #  #    value.is_a?( Enumerable(Int32)) ? puts( "") :
-      #  #  raise Crystime::Errors.unsupported_comparison
-      #  #else false
-      #end
-      ret= Crystime::Helpers.compare( rule, value)
-      if fold && !ret && value.is_a?( Int)
-        # try once again, folding the test value around the specified point.
-        # Careful with e.g. day<7 conditions, need to be translated to 1..7
-        ret= matches? rule, value-fold, nil
-      end
-      #puts rule.inspect, value.inspect, ret
-      ret
+      Helpers.check_time( target, list, nil)
     end
 
     # Helpers below
