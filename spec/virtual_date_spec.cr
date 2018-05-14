@@ -1,6 +1,6 @@
 require "./spec_helper"
 
-describe Crystime::VirtualDate do
+describe Crystime::VirtualTime do
   it "contains good hashes" do
     a= Crystime::Helpers::W2I["SUN"]
     a.should eq 0
@@ -12,7 +12,7 @@ describe Crystime::VirtualDate do
     a.should eq 12
   end
   it "can be initialized" do
-    a= Crystime::VirtualDate.new
+    a= Crystime::VirtualTime.new
     a.year.should eq nil
     a.month.should eq nil
     a.day.should eq nil
@@ -21,41 +21,41 @@ describe Crystime::VirtualDate do
     a.jd.should eq nil
   end
   it "returns self when self" do
-    a= Crystime::VirtualDate.new
-    b= Crystime::VirtualDate[a]
+    a= Crystime::VirtualTime.new
+    b= Crystime::VirtualTime[a]
     b.should eq a
   end
   it "parses iso8601 datetime when string" do
     # XXX ignores the timezone
-    a= Crystime::VirtualDate["2017-06-24T18:23:47+00:00"]
-    a.is_a?( Crystime::VirtualDate).should eq(true)
+    a= Crystime::VirtualTime["2017-06-24T18:23:47+00:00"]
+    a.is_a?( Crystime::VirtualTime).should eq(true)
     #raise "a is nil!" unless a
     a.year.should eq 2017
     a.month.should eq 6
     a.day.should eq 24
   end
   it "can parse time with milliseconds" do
-    a= Crystime::VirtualDate["1:2:3.40000"]
+    a= Crystime::VirtualTime["1:2:3.40000"]
     a.hour.should eq 1
     a.minute.should eq 2
     a.second.should eq 3
     a.millisecond.should eq 40000
   end
   it "can parse day_of_week names" do
-    a= Crystime::VirtualDate["Mon"]
+    a= Crystime::VirtualTime["Mon"]
     a.day_of_week.should eq 1
   end
   it "can parse month names" do
-    a= Crystime::VirtualDate["Aug"]
+    a= Crystime::VirtualTime["Aug"]
     a.month.should eq 8
   end
   it "can parse combinations of supported string pieces" do
-    vd = Crystime::VirtualDate["2018 wed 12:00:00"]
+    vd = Crystime::VirtualTime["2018 wed 12:00:00"]
     vd.day_of_week.should eq 3
     vd.hour.should eq 12
   end
   it "supports all 7 documented types of values" do
-    a = Crystime::VirtualDate.new
+    a = Crystime::VirtualTime.new
     a.year = nil # Remains unspecified, matches everything it is compared with
     a.month = 3
     a.day = [1,2]
@@ -65,7 +65,7 @@ describe Crystime::VirtualDate do
     a.millisecond = ->( val : Int32) { return true }
   end
   it "has getter for @ts (materialization ability)" do
-    a = Crystime::VirtualDate.new
+    a = Crystime::VirtualTime.new
     a.year = nil # Remains unspecified, matches everything it is compared with
     a.month = 3
     a.day = [1,2]
@@ -78,7 +78,7 @@ describe Crystime::VirtualDate do
   end
 
   it "knows Julian Day Number" do
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.year= 2017
     vd.month= 6
     vd.day= 28
@@ -86,13 +86,13 @@ describe Crystime::VirtualDate do
   end
 
   it "can materialize!" do
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.materialize!
     vd.to_tuple.should eq( {1,1,1,1,1721426,0,0,0,0})
   end
 
   it "resets day_of_week/jd after de-materializing" do
-    v= Crystime::VirtualDate.new
+    v= Crystime::VirtualTime.new
     v.year= 2017
     v.month= 12
     v.day= 1
@@ -103,35 +103,35 @@ describe Crystime::VirtualDate do
     v.day_of_week.should eq nil
   end
 
-  it "can expand VDs" do
-    d= Crystime::VirtualDate.new
+  it "can expand VTs" do
+    d= Crystime::VirtualTime.new
     d.year= 2017
     #d.month= 1..3
     d.day= 14..17
     d.hour= 9..12
     d.millisecond= 1
     d.expand.should eq [
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 14, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 15, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 16, 12, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 9,  nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 10, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 11, nil, nil, 1]),
-      Crystime::VirtualDate.from_array( [2017, nil, 17, 12, nil, nil, 1])
+      Crystime::VirtualTime.from_array( [2017, nil, 14, 9,  nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 14, 10, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 14, 11, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 14, 12, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 15, 9,  nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 15, 10, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 15, 11, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 15, 12, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 16, 9,  nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 16, 10, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 16, 11, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 16, 12, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 17, 9,  nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 17, 10, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 17, 11, nil, nil, 1]),
+      Crystime::VirtualTime.from_array( [2017, nil, 17, 12, nil, nil, 1])
     ]
   end
 
   it "can initialize from array" do
-    a= Crystime::VirtualDate.new
+    a= Crystime::VirtualTime.new
     a.month= 1..3
     vds= a.expand
     vds[0].month.should eq 1
@@ -139,11 +139,11 @@ describe Crystime::VirtualDate do
   end
 
   #it "is in UTC" do
-  #  Crystime::VirtualDate.new.utc?.should be_true
+  #  Crystime::VirtualTime.new.utc?.should be_true
   #end
 
   it "does set Ymd from jd" do
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.day_of_week.should eq nil
     vd.jd= 2457828
     vd.year.should eq 2017
@@ -153,7 +153,7 @@ describe Crystime::VirtualDate do
   end
 
   it "does set jd from Ymd" do
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.year= 2017
     vd.month= 3
     vd.day= 17
@@ -163,7 +163,7 @@ describe Crystime::VirtualDate do
   end
 
   it "knows materialized virtual dates" do
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.materialized?.should be_false
     vd.year= 1
     vd.month= 2
@@ -184,7 +184,7 @@ describe Crystime::VirtualDate do
   end
 
   it "changes day_of_week according to Ymd" do
-    vd= Crystime::VirtualDate["2017-07-02"]
+    vd= Crystime::VirtualTime["2017-07-02"]
     #puts vd.inspect
     vd.day_of_week.should eq 0
     vd.day= 1
@@ -192,22 +192,22 @@ describe Crystime::VirtualDate do
   end
 
   it "setting day_of_week does not affect Ymd" do
-    vd= Crystime::VirtualDate["2017-07-02"]
+    vd= Crystime::VirtualTime["2017-07-02"]
     vd.day_of_week= 4
     vd.day_of_week.should eq 4
     vd.day.should eq 2
   end
 
-  it "can subtract materializable VDs" do
-    vd1= Crystime::VirtualDate["2018-04-02"]
-    vd2= Crystime::VirtualDate["2018-04-01"]
+  it "can subtract materializable VTs" do
+    vd1= Crystime::VirtualTime["2018-04-02"]
+    vd2= Crystime::VirtualTime["2018-04-01"]
     (vd1-vd2).should eq Crystime::Span.new(1,0,0,0,0)
   end
 
-  it "cannot subtract non-materializable VDs" do
-    vd1= Crystime::VirtualDate.new
+  it "cannot subtract non-materializable VTs" do
+    vd1= Crystime::VirtualTime.new
     vd1.month=3..5
-    vd2= Crystime::VirtualDate.new
+    vd2= Crystime::VirtualTime.new
     vd2.month=4..5
     expect_raises ArgumentError, "" {
       (vd1-vd2).should eq 1

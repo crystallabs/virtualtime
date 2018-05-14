@@ -1,21 +1,21 @@
 module Crystime
   class Item
 
-    #@@default_omit= [] of VirtualDate
+    #@@default_omit= [] of VirtualTime
     #@@default_time= 43200 # Noon of given day
 
     property :start, :stop, :due, :omit, :omit_shift, :shift #, :remind, :omit_remind
 
     # Absolute start date/time. Item is never "on" before this date.
-    @start : Nil | VirtualDate
+    @start : Nil | VirtualTime
     # Absolute stop date/time. Item is never "on" after this date.
-    @stop  : Nil | VirtualDate
+    @stop  : Nil | VirtualTime
     #@time_ssm= 0.0 # XXX set to nil or something
 
-    # List of VirtualDates on which the item is "on".
-    @due = [] of VirtualDate
-    # List of VirtualDates which should be "omitted", i.e. VirtualDates on which the item can't be "on".
-    @omit= [] of VirtualDate
+    # List of VirtualTimes on which the item is "on".
+    @due = [] of VirtualTime
+    # List of VirtualTimes which should be "omitted", i.e. VirtualTimes on which the item can't be "on".
+    @omit= [] of VirtualTime
 
     # Action to take if item is due on an omitted date/time. Possible values are:
     # - nil: treat the item as non-applicable/not-scheduled on the specified date/time
@@ -28,8 +28,8 @@ module Crystime
     @omit_shift : Nil | Bool | Crystime::Span | Time::Span
     @omit_shift= false
 
-    # List of VirtualDates which item must match, after it was shifted due to omit, to be considered "on".
-    @shift= [] of VirtualDate
+    # List of VirtualTimes which item must match, after it was shifted due to omit, to be considered "on".
+    @shift= [] of VirtualTime
 
     #@remind = [] of Nil | Wrap::Date | Wrap::Time | Wrap::DateTime | Time
     #@omit_remind
@@ -57,7 +57,7 @@ module Crystime
     # true - item is "on" (it is "due" and not on "omit" list)
     # false - item is due, but that date is omitted, and no reschedule was requested or possible, so effectively it is not "on"
     # Time::Span - span which is to be added to asked date to reach the closes time when item is "on"
-    def on?( date= VirtualDate.now, max_before= nil, max_after= max_before, max_shifts= 1000)
+    def on?( date= VirtualTime.now, max_before= nil, max_after= max_before, max_shifts= 1000)
       d= date
       return unless d
 
@@ -81,7 +81,7 @@ module Crystime
             #puts "Some shift from #{d}"
             # +1=>search into the future, -1=>search into the past
             od= d.dup
-            if d.is_a? Crystime::VirtualDate
+            if d.is_a? Crystime::VirtualTime
               od.ts= d.ts.dup
             end
             #puts od.class
@@ -170,12 +170,12 @@ module Crystime
     # ```
     # it "uses negative numbers to count from end of month" do
     #   i= Crystime::Item.new
-    #   due= Crystime::VirtualDate.new
+    #   due= Crystime::VirtualTime.new
     #   due.year= 2017
     #   due.month= 2
     #   due.day= -1
     #   i.due<< due
-    #   date= Crystime::VirtualDate.new
+    #   date= Crystime::VirtualTime.new
     #   date.year= 2017
     #   date.month= 2
     #   date.day= 28

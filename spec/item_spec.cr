@@ -10,32 +10,32 @@ describe Crystime::Item do
   #end
 
   it "honors start/stop dates" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
     item= Crystime::Item.new
-    item.start= Crystime::VirtualDate["2017-1-1"]
-    item.stop= Crystime::VirtualDate["2017-2-28"]
+    item.start= Crystime::VirtualTime["2017-1-1"]
+    item.stop= Crystime::VirtualTime["2017-2-28"]
     item.due_on?(date).should be_nil
 
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
     item= Crystime::Item.new
-    item.start= Crystime::VirtualDate["2017-6-1"]
-    item.stop= Crystime::VirtualDate["2017-9-1"]
+    item.start= Crystime::VirtualTime["2017-6-1"]
+    item.stop= Crystime::VirtualTime["2017-9-1"]
     item.due_on?(date).should be_nil
 
-    date= Crystime::VirtualDate["2017-3-15 10:10:10"]
+    date= Crystime::VirtualTime["2017-3-15 10:10:10"]
     item= Crystime::Item.new
-    item.start= Crystime::VirtualDate["2017-1-1"]
-    item.stop= Crystime::VirtualDate["2017-9-1"]
+    item.start= Crystime::VirtualTime["2017-1-1"]
+    item.stop= Crystime::VirtualTime["2017-9-1"]
     item.due_on?(date).should be_true
   end
 
   it "honors due dates" do
-    date= Crystime::VirtualDate["2017-3-15 10:10:10"]
+    date= Crystime::VirtualTime["2017-3-15 10:10:10"]
     date.update!
 
     item= Crystime::Item.new
-    item.start= Crystime::VirtualDate["2017-1-1"]
-    item.stop= Crystime::VirtualDate["2017-9-1"]
+    item.start= Crystime::VirtualTime["2017-1-1"]
+    item.stop= Crystime::VirtualTime["2017-9-1"]
 
     # @year    : Nil | ...
     # @month   : Nil | ...
@@ -49,7 +49,7 @@ describe Crystime::Item do
 
     item.due_on?(date).should be_true
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     item.due<< vd
 
     item.due_on?(date).should be_true
@@ -104,7 +104,7 @@ describe Crystime::Item do
     vd.day_of_week= 4
     item.due_on?(date).should be_nil
     vd.day_of_week= 3
-    date= Crystime::VirtualDate["2017-3-15 10:10:10"]
+    date= Crystime::VirtualTime["2017-3-15 10:10:10"]
     #puts item.inspect
     #puts date.inspect
     item.due_on?(date).should be_true
@@ -122,7 +122,7 @@ describe Crystime::Item do
 
     # Test with more than one due date:
 
-    vd2= Crystime::VirtualDate.new
+    vd2= Crystime::VirtualTime.new
     item.due<< vd2
     # This matches because both vd and vd2 would match:
     item.due_on?(date).should be_true
@@ -147,12 +147,12 @@ describe Crystime::Item do
 
   # Identical copy of the above, but testing omit dates instead of due dates
   it "honors omit dates" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
     date.update!
 
     item= Crystime::Item.new
-    item.start= Crystime::VirtualDate["2017-1-1"]
-    item.stop= Crystime::VirtualDate["2017-9-1"]
+    item.start= Crystime::VirtualTime["2017-1-1"]
+    item.stop= Crystime::VirtualTime["2017-9-1"]
 
     # @year    : Nil | ...
     # @month   : Nil | ...
@@ -166,7 +166,7 @@ describe Crystime::Item do
 
     item.omit_on?(date).should be_nil
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     item.omit<< vd
 
     item.omit_on?(date).should be_true
@@ -232,7 +232,7 @@ describe Crystime::Item do
 
     # Test with more than one omit date:
 
-    vd2= Crystime::VirtualDate.new
+    vd2= Crystime::VirtualTime.new
     item.omit<< vd2
     # This matches because both vd and vd2 would match:
     item.omit_on?(date).should be_true
@@ -256,13 +256,13 @@ describe Crystime::Item do
   end
 
   it "supports ranges" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
 
     item= Crystime::Item.new
 
     item.due_on?(date).should be_true
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     item.due<< vd
 
     item.due_on?(date).should be_true
@@ -278,11 +278,11 @@ describe Crystime::Item do
   end
 
   it "supports procs" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
 
     item= Crystime::Item.new
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     item.due<< vd
 
     item.due_on?(date).should be_true
@@ -295,11 +295,11 @@ describe Crystime::Item do
 
 
   it "returns 'on? # => true' on non-omitted due days" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
 
     item= Crystime::Item.new
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.year= 2017
     vd.month= 3
     vd.day= 15
@@ -312,13 +312,13 @@ describe Crystime::Item do
   end
 
   it "reports shift amount on omitted due days" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
 
     item= Crystime::Item.new
 
     item.on?(date).should be_true
 
-    vd= Crystime::VirtualDate.new
+    vd= Crystime::VirtualTime.new
     vd.year= 2017
     vd.month= 3
     vd.day= 15
@@ -326,12 +326,12 @@ describe Crystime::Item do
 
     item.on?(date).should be_true
 
-    vd2= Crystime::VirtualDate.new
+    vd2= Crystime::VirtualTime.new
     vd2.year= 2017
     vd2.month= 3
     vd2.day= 15
 
-    vd3= Crystime::VirtualDate.new
+    vd3= Crystime::VirtualTime.new
     vd3.year= 2017
     vd3.month= 3
     vd3.day= 16
@@ -350,13 +350,13 @@ describe Crystime::Item do
   end
 
   it "reports false when effective omit larger than allowed boundaries" do
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
 
     item= Crystime::Item.new
 
     item.on?(date).should be_true
 
-    vd3= Crystime::VirtualDate.new
+    vd3= Crystime::VirtualTime.new
     vd3.year= 2017
     vd3.month= 3
     vd3.day= 15..16
@@ -369,7 +369,7 @@ describe Crystime::Item do
   end
 
   it "can check due/omit date/time separately" do
-    date= Crystime::VirtualDate["2017-3-15 12:13:14"]
+    date= Crystime::VirtualTime["2017-3-15 12:13:14"]
 
     item= Crystime::Item.new
 
@@ -380,32 +380,32 @@ describe Crystime::Item do
     #vd3.minute= 2
     #vd3.second= 3
 
-    vd3= Crystime::VirtualDate["2017-3-15 12:0:0"]
+    vd3= Crystime::VirtualTime["2017-3-15 12:0:0"]
     raise "missing vd3!" unless vd3
     item.due<< vd3
     item.due_on?(date).should be_nil
     item.due_on_date?(date).should be_true
     item.due_on_time?(date).should be_nil
 
-    vd4= Crystime::VirtualDate["2017-3-15"]
+    vd4= Crystime::VirtualTime["2017-3-15"]
     raise "missing vd4!" unless vd4
     item.due<< vd4
     item.due_on?(date).should be_true
 
-    vd5= Crystime::VirtualDate["12:13:14"]
+    vd5= Crystime::VirtualTime["12:13:14"]
     raise "missing vd5!" unless vd5
     item.due= [vd5]
     #puts date.inspect
     #puts vd5.inspect
     item.due_on?(date).should be_true
 
-    vd6= Crystime::VirtualDate["12:13:15"]
+    vd6= Crystime::VirtualTime["12:13:15"]
     raise "missing vd6!" unless vd6
     item.due= [vd6]
     item.due_on?(date).should be_nil
 
-    date= Crystime::VirtualDate["2017-3-15 1:2:3"]
-    vd7= Crystime::VirtualDate["2017-3-18"]
+    date= Crystime::VirtualTime["2017-3-15 1:2:3"]
+    vd7= Crystime::VirtualTime["2017-3-18"]
     raise "missing vd7!" unless vd7
     item.due_on?(date).should be_nil
     item.due_on_date?(date).should be_true
@@ -418,13 +418,13 @@ describe Crystime::Item do
   end
 
   it "can reschedule with higher granularity than days" do
-    date= Crystime::VirtualDate["2017-3-15 12:13:14"]
+    date= Crystime::VirtualTime["2017-3-15 12:13:14"]
 
     item= Crystime::Item.new
 
     item.due_on?(date).should be_true
 
-    vd3= Crystime::VirtualDate.new
+    vd3= Crystime::VirtualTime.new
     raise "missing vd3!" unless vd3
     vd3.hour= 12
     item.omit<< vd3
@@ -459,11 +459,11 @@ describe Crystime::Item do
   it "can match virtual dates" do
     item= Crystime::Item.new
 
-    vd= Crystime::VirtualDate["2017-3-15"]
+    vd= Crystime::VirtualTime["2017-3-15"]
     raise "missing vd!" unless vd
     item.due<< vd
 
-    date= Crystime::VirtualDate["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
     raise "no date!" unless date
     item.due_on_date?(date).should be_true
     date.year= nil
@@ -474,7 +474,7 @@ describe Crystime::Item do
     item.due_on_date?(date).should be_true
     date.month= 4
     item.due_on_date?(date).should be_nil
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.month= nil
     date.day= 15
     item.due_on_date?(date).should be_true
@@ -498,10 +498,10 @@ describe Crystime::Item do
     date.day= 13..18
     item.due_on_date?(date).should be_true
 
-    vd2= Crystime::VirtualDate.new
+    vd2= Crystime::VirtualTime.new
     vd2.month= 3
     item.due=[vd2]
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.day= 13..18
     item.due_on_date?(date).should be_true
     date.month= 2
@@ -519,10 +519,10 @@ describe Crystime::Item do
 
   it "can shift on simple rules" do
     item= Crystime::Item.new
-    due= Crystime::VirtualDate["2017-3-15"]
-    date= Crystime::VirtualDate["2017-3-15"]
-    omit= Crystime::VirtualDate["2017-3-15"]
-    omit2= Crystime::VirtualDate["2017-3-14"]
+    due= Crystime::VirtualTime["2017-3-15"]
+    date= Crystime::VirtualTime["2017-3-15"]
+    omit= Crystime::VirtualTime["2017-3-15"]
+    omit2= Crystime::VirtualTime["2017-3-14"]
     shift= Crystime::Span.new -1,0,0,0
 
     item.due= [due]
@@ -536,10 +536,10 @@ describe Crystime::Item do
     item.on?(date).should eq Crystime::Span.new -2,0,0,0
 
     item= Crystime::Item.new
-    due= Crystime::VirtualDate["2017-3-15 01:34:0"]
-    date= Crystime::VirtualDate["2017-3-15 01:34:0"]
+    due= Crystime::VirtualTime["2017-3-15 01:34:0"]
+    date= Crystime::VirtualTime["2017-3-15 01:34:0"]
     item.omit_shift= Crystime::Span.new 0,0,3,0
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.hour= 1
     item.due= [due]
     item.omit= [omit]
@@ -547,36 +547,36 @@ describe Crystime::Item do
   end
   it "can shift on complex rules" do
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.day= 4
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.day= 4
     item.omit_shift= Crystime::Span.new 7,10,20,30
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.day= 4
     item.due= [due]
     item.omit= [omit]
     item.on?(date).should eq Crystime::Span.new 7,10,20,30
 
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.day= 4
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.day= 4
     item.omit_shift= Crystime::Span.new 7,10,20,30
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
     item.on?(date).should eq Crystime::Span.new 14,20,41,0
 
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.day= 4..12
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.month= 4
     item.omit_shift= Crystime::Span.new 7,10,20,30
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
@@ -585,15 +585,15 @@ describe Crystime::Item do
 
   it "can check due on dates with ranges" do
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.day= 4..12
     #item.omit_shift= Crystime::Span.new 7,10,20,30
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.day= 12
     item.due= [due]
     item.omit= [omit]
 
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.day= 8..11
     #puts date.inspect
 
@@ -611,13 +611,13 @@ describe Crystime::Item do
     dates.map{ |d| item.on? d}.any?{ |x| x}.should be_true
   end
 
-#    omit= Crystime::VirtualDate["2017-3-15"]
+#    omit= Crystime::VirtualTime["2017-3-15"]
 #    item.on?(date).should be_false
     #item.on?(date).should eq Crystime::Span.new 0,0,-15,0
 
 #    vd2.day= 15
 #    vd2.year= 2017 # XXX remove this and make sure it works without it too
-#    vd3= Crystime::VirtualDate.new
+#    vd3= Crystime::VirtualTime.new
 #    item.omit_shift= Crystime::Span.new 0,0,-3,0
 #    vd3.minute= 2..15
 #    item.omit= [vd3]
@@ -631,13 +631,13 @@ describe Crystime::Item do
 
   it "can shift til !due_on?( @omit) && due_on?( @shift)" do
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.day= 4..12
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.day= 3..14
-    shift= Crystime::VirtualDate.new
+    shift= Crystime::VirtualTime.new
     shift.day= 23
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.day= 10
     item.omit_shift= Crystime::Span.new 1,0,0,0
     item.due= [due]
@@ -648,11 +648,11 @@ describe Crystime::Item do
 
   it "respects max_shifts" do
     item= Crystime::Item.new
-    due= Crystime::VirtualDate.new
+    due= Crystime::VirtualTime.new
     due.millisecond= 10
-    omit= Crystime::VirtualDate.new
+    omit= Crystime::VirtualTime.new
     omit.millisecond= 10..12
-    date= Crystime::VirtualDate.new
+    date= Crystime::VirtualTime.new
     date.millisecond= 10
     item.omit_shift= Crystime::Span.new 0,0,0,0,1_000_000
     item.due= [due]
@@ -661,7 +661,7 @@ describe Crystime::Item do
     #puts due.inspect
     #puts date.inspect
     item.on?(date, nil, nil, 30).should eq Crystime::Span.new 0,0,0,0,3_000_000
-    shift= Crystime::VirtualDate.new
+    shift= Crystime::VirtualTime.new
     shift.millisecond= 500
     #puts shift.inspect
     item.shift= [shift]
@@ -670,7 +670,7 @@ describe Crystime::Item do
 
   it "can match against Time objects" do
     item = Crystime::Item.new
-    due = Crystime::VirtualDate.new
+    due = Crystime::VirtualTime.new
     due.month = 5
     due.day = 1..15
     item.due<< due
@@ -682,18 +682,18 @@ describe Crystime::Item do
 
   it "works correctly with fold (negative values counting from the end)" do
     item = Crystime::Item.new
-    due = Crystime::VirtualDate.new
+    due = Crystime::VirtualTime.new
     due.month = 5
     due.day = -2
     item.due<< due
     item.on?( Time.new(2018,5,30)).should be_true
     item.on?( Time.new(2018,5,31)).should be_nil
-    item.on?( Crystime::VirtualDate.new(2018,5,30)).should be_true
-    item.on?( Crystime::VirtualDate.new(2018,5,31)).should be_nil
+    item.on?( Crystime::VirtualTime.new(2018,5,30)).should be_true
+    item.on?( Crystime::VirtualTime.new(2018,5,31)).should be_nil
   end
 
 #  it "can remind" do
-#   date= Crystime::VirtualDate["2017,3,15,  12,13,14)
+#   date= Crystime::VirtualTime["2017,3,15,  12,13,14)
 #
 #   item= Crystime::Item.new
 #
