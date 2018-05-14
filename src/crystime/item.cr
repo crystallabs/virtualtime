@@ -197,7 +197,7 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= virtual_dates list
-      check_date( list, target, true)
+      check_date( target, list, true)
     end
     def due_on_time?( target, list= @due)
       return if !target
@@ -215,7 +215,7 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= virtual_dates @omit
-      check_date( list, target, nil) # XXX, @@default_omit
+      check_date( target, list, nil) # XXX, @@default_omit
     end
     def omit_on_time?( target)
       return if !target
@@ -235,7 +235,7 @@ module Crystime
       list
     end
 
-    private def check_date( list, target, default= true)
+    private def check_date( target, list, default= true)
       #puts "checking #{list.inspect} re. #{target.inspect}"
       return default if !list || (list.size==0)
       y, m= target.year, target.month
