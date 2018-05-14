@@ -22,6 +22,26 @@ module Crystime
       list
     end
 
+    # Maps days of week to integers and vice-versa, and provides a regex for scanning for them in strings.
+    W2I= { "SUN" => 0, "MON" => 1, "TUE" => 2, "WED" => 3, "THU" => 4, "FRI" => 5, "SAT" => 6}
+    I2W= W2I.invert
+    WR = Regex.new "\\b("+ W2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
+
+
+    # Maps months to integers and vice-versa, and provides a regex for scanning for them in strings.
+    M2I= { "JAN" => 1, "FEB" => 2, "MAR" => 3, "APR" => 4, "MAY" => 5, "JUN" => 6, "JUL" => 7, "AUG" => 8, "SEP" => 9, "OCT" => 10, "NOV" => 11, "DEC" => 12}
+    I2M= M2I.invert
+    MR = Regex.new "\\b("+ M2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
+
+    def self.find_day_of_week( str)
+      str.scan(WR) do |m| return m[0] end
+      nil
+    end
+    def self.find_month( str)
+      str.scan(MR) do |m| return m[0] end
+      nil
+    end
+
     # Compares all 7 types of accepted values for a VD against each other.
     def self.compare( a : Enumerable(Int), b : Enumerable(Int))
       a_set= a.dup.to_set

@@ -2,13 +2,13 @@ require "./spec_helper"
 
 describe Crystime::VirtualDate do
   it "contains good hashes" do
-    a= Crystime::VirtualDate::W2I["SUN"]
+    a= Crystime::Helpers::W2I["SUN"]
     a.should eq 0
-    a= Crystime::VirtualDate::W2I["SAT"]
+    a= Crystime::Helpers::W2I["SAT"]
     a.should eq 6
-    a= Crystime::VirtualDate::M2I["JAN"]
+    a= Crystime::Helpers::M2I["JAN"]
     a.should eq 1
-    a= Crystime::VirtualDate::M2I["DEC"]
+    a= Crystime::Helpers::M2I["DEC"]
     a.should eq 12
   end
   it "can be initialized" do
