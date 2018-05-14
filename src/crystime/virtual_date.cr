@@ -60,6 +60,9 @@ module Crystime
     def initialize
     end
 
+    def initialize(@year, @month, @day, @hour = nil, @minute = nil, @second = nil)
+    end
+
     # XXX should boolean value be treated as materializable and have ts=true?
     def year=( v)        @year= v;   @ts[0]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
     def month=( v)       @month= v;  @ts[1]= v.is_a?( Int) ? true : v.nil? ? nil : false; update! end
