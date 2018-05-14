@@ -18,7 +18,7 @@ can either remain unspecified, or be a number, or contain a more complex specifi
 
 For example, you could construct a VirtualTime with a month of "March" and a day range
 of 10..20 with step 2. This would represent a "virtual date" that matches any Time or
-another VirtualTime which falls on, or overlaps, the dates of March 10, 12, 14, 16, 18, or 20.
+another VirtualTime which falls on, or contains, the dates of March 10, 12, 14, 16, 18, or 20.
 
 ## Item
 
@@ -109,7 +109,7 @@ providing some convenience functions), so it is simpler and more powerful to use
 (If you are missing any particular convenience/compatibility functions from Time, please report
 them or submit a PR.)
 
-A VirtualTime has the following fields that can be set after object creation:
+A VirtualTime has the following fields that can be set in an initializer or after object creation:
 
 ```
 year        - Year value
@@ -335,6 +335,8 @@ and actual, working examples. To run specs, run the usual command:
 ```
 crystal spec
 ```
+
+In addition to that, also check the examples in the folder `examples/`.
 
 # TODO
 
