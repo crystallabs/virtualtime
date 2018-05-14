@@ -194,12 +194,12 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= Crystime::Helpers.virtual_dates list
-      Helpers.check_date( target, list, true)
+      Helpers.matches_date?( target, list, true)
     end
     def due_on_time?( target, list= @due)
       return if !target
       list= Crystime::Helpers.virtual_dates list
-      Helpers.check_time( target, list, true)
+      Helpers.matches_time?( target, list, true)
     end
 
     def omit_on?( target)
@@ -212,12 +212,12 @@ module Crystime
       return nil if a &&( a> target)
       return nil if z &&( z< target)
       list= Crystime::Helpers.virtual_dates @omit
-      Helpers.check_date( target, list, nil) # XXX, @@default_omit
+      Helpers.matches_date?( target, list, nil) # XXX, @@default_omit
     end
     def omit_on_time?( target)
       return if !target
       list= Crystime::Helpers.virtual_dates @omit
-      Helpers.check_time( target, list, nil)
+      Helpers.matches_time?( target, list, nil)
     end
 
     # Helpers below
