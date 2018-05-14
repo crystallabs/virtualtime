@@ -7,19 +7,16 @@ require "yaml"
 
 module Crystime
   class VirtualDate
+
     W2I= { "SUN" => 0, "MON" => 1, "TUE" => 2, "WED" => 3, "THU" => 4, "FRI" => 5, "SAT" => 6}
     I2W= W2I.invert
-    WR=  Regex.new "\\b("+ W2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
+    WR = Regex.new "\\b("+ W2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
 
     M2I= { "JAN" => 1, "FEB" => 2, "MAR" => 3, "APR" => 4, "MAY" => 5, "JUN" => 6, "JUL" => 7, "AUG" => 8, "SEP" => 9, "OCT" => 10, "NOV" => 11, "DEC" => 12}
     I2M= M2I.invert
-    MR=  Regex.new "\\b("+ M2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
+    MR = Regex.new "\\b("+ M2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
 
     include Comparable(self)
-
-    #property :relative
-    protected getter time
-    property ts
 
     # XXX need to move to model where user input is separate from actual values.
     # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
@@ -30,19 +27,10 @@ module Crystime
     # XXX Use Int instead of Int32 when it becomes possible in Crystal
     alias Virtual = Nil | Int32 | Bool | Range(Int32, Int32) | Enumerable(Int32) | Proc(Int32, Bool)
 
-    YAML.mapping({
-      # Date-related properties
-      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      day_of_week:     { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      # Time-related properties
-      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
-    })
+    #property :relative
+    protected getter time
+    property ts
+    getter ts : Array(Bool?)
 
     #@relative: Nil | Bool
 
@@ -52,8 +40,21 @@ module Crystime
     # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
     #      0    1     2     3     4     5     6
     #      year month day   hour  min   sec   ms
-    getter ts : Array(Bool?)
     @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
+
+    YAML.mapping({
+      # Date-related properties
+      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      day_of_week: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      # Time-related properties
+      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualDateConverter},
+    })
 
     # Empty constructor. Must be here since when fields are defined, the
     # default empty constructor is not created.
@@ -119,14 +120,16 @@ module Crystime
         m= @month.as( Int)+ 12*a- 3
         @day.as( Int)+ ((153*m+ 2)/5).floor+ 365*y+ (y/4).floor- (y/100).floor+ (y/400).floor- 32045
       else
-        raise "Can't convert non-specific date to Julian Day Number"
+        raise "Can't convert non-materializable date to Julian Day Number"
       end
     end
 
     # Called when year, month, or day are re-set and we need to re-calculate which day_of_week and
-    # Julian Day Number the new date corresponds to. This is only filled if y/m/d is specified.
+    # Julian Day Number the new date corresponds to. This is only filled if Y/m/d is specified.
     # If it is not specified (meaning that the VirtualDate does not refer to a specific date),
     # then they are set to nil.
+    # In the case where the change is caused by a jd that was just set, a 'jd: false' parameter
+    # could be passed not to touch jd again, even though there's no harm even if it is modified.
     def update!(jd = true)
       if @ts[0]&& @ts[1]&& @ts[2]
         #puts "date is: "+ self.inspect
@@ -139,15 +142,19 @@ module Crystime
       true
     end
 
-    # Expand a partial VirtualDate into a materialized/specific date/time.
+    # Expands a partial VirtualDate into a materialized/specific date/time.
     def expand
       [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
     end
+
+    # Quick helpers for interoperability with Time
 
     def >( other : Time) to_time>other end
     def <( other : Time) to_time<other end
     def ==( other : Time) to_time==other end
     def <=>( other : Time) to_time<=>other end
+
+    # Helpers for interoperability with self and Crystime::Span
 
     def <=>( other : self)
       to_time<=>other.to_time
@@ -186,12 +193,12 @@ module Crystime
       )
     end
 
+    # Converts a VD to Time. If VD is non-materializable, the process raises an exception.
     def to_time
       # XXX ability to define default values for nils
       #p "in ticks: "+ @ts.inspect
       if @ts.any?{ |x| x== false}
-        # XXX not comparison but inability to materialize
-        raise Crystime::Errors.virtual_comparison
+        raise Crystime::Errors.cant_materialize(self)
       end
       ms, sec, min, h, d, m, y= @millisecond, @second, @minute, @hour, @day, @month, @year
       ms= ms.nil?   ? 0 : ms.as( Int)
