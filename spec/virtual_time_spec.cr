@@ -213,5 +213,27 @@ describe Crystime::VirtualTime do
       (vd1-vd2).should eq 1
     }
   end
+  it "performs comparison commutatively" do
+    a = Crystime::VirtualTime.new
+    a.year = nil # Remains unspecified, matches everything it is compared with
+    a.month = 3
+    a.day = [1,2]
+    a.hour = (10..20)
+    a.minute = (10..20).step(2)
+    a.second = true
+    a.millisecond = ->( val : Int32) { return true }
+
+    b = Crystime::VirtualTime.new
+    b.year = 1
+    b.month = 3
+    b.day = 2
+    b.hour = 12
+    b.minute = 16
+    b.second = nil
+    b.millisecond = 1
+
+    a.matches?(b).should be_true
+    b.matches?(a).should be_true
+  end
 
 end
