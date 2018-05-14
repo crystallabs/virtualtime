@@ -198,4 +198,20 @@ describe Crystime::VirtualDate do
     vd.day.should eq 2
   end
 
+  it "can subtract materializable VDs" do
+    vd1= Crystime::VirtualDate["2018-04-02"]
+    vd2= Crystime::VirtualDate["2018-04-01"]
+    (vd1-vd2).should eq Crystime::Span.new(1,0,0,0,0)
+  end
+
+  it "cannot subtract non-materializable VDs" do
+    vd1= Crystime::VirtualDate.new
+    vd1.month=3..5
+    vd2= Crystime::VirtualDate.new
+    vd2.month=4..5
+    expect_raises ArgumentError, "" {
+      (vd1-vd2).should eq 1
+    }
+  end
+
 end

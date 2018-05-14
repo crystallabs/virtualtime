@@ -61,7 +61,7 @@ omit_march_20.day = 20
 item.omit<< omit_march_20
 
 # If event falls on an omitted date, try rescheduling it for 2 days later:
-item.omit_shift = Time::Span.new(86400 * 2)
+item.omit_shift = Crystime::Span.new(86400 * 2)
 
 
 # Now we can check when the item is due and when it is not:
@@ -93,7 +93,7 @@ p item.on?( any_mar) # ==> true
 # But item is not due on Mar 20, 2017, because that date is omitted, and the system will give us
 # a span of time (offset) when it can be scheduled. Based on our reschedule settings above, this
 # will be a span for 2 days later.
-p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> 2.00:00:00.000000000
+p item.on?( Crystime::VirtualDate["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
 
 # Asking whether the item is due on the rescheduled date (Mar 22) will tell us no, because currently
 # rescheduled dates are not counted as due/on dates:
@@ -287,7 +287,7 @@ omit_shift - What to do if item falls on an omitted date/time:
            - false: treat it as being "on", but falling on an omitted
              and non-reschedulable date, so effectively it is not "on"
            - true: treat it as "on", regardless of falling on omitted date
-           - Time::Span: attempt shifting (rescheduling) by specified span on
+           - Crystime::Span or Time::Span: attempt shifting (rescheduling) by specified span on
              each attempt. The span to shift can be negative or positive for
              shifting to an earlier or later date.
 
@@ -348,4 +348,4 @@ crystal spec
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 1. Implement a complete task tracking program using Crystime
 1. Write support for exporting items into other calendar apps
-
+1. Materialization should never use default values. If the object does not have all required info, it should throw an Exception, unless a "hints" VD is provided to aid the materialization
