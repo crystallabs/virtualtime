@@ -16,6 +16,7 @@ module Crystime
     @due = [] of VirtualDate
     # List of VirtualDates which should be "omitted", i.e. VirtualDates on which the item can't be "on".
     @omit= [] of VirtualDate
+
     # Action to take if item is due on an omitted date/time. Possible values are:
     # - nil: treat the item as non-applicable/not-scheduled on the specified date/time
     # - false: treat the item as not due because we are unable to (re)schedule it to any other date/time
@@ -26,6 +27,7 @@ module Crystime
     # attempts is reached.
     @omit_shift : Nil | Bool | Crystime::Span
     @omit_shift= false
+
     # List of VirtualDates which item must match, after it was shifted due to omit, to be considered "on".
     @shift= [] of VirtualDate
 
@@ -44,8 +46,6 @@ module Crystime
 
     # TODO: non-interruptible/non-shareable tasks (just a flag)
     # all existing items should be in @omit when checking if term is free
-
-    # TODO Add on? which works with Time objects
 
     # Checks whether the item is "on" on the specified date/time. Item is
     # considered "on" if it matches at least one "due" time and does not
