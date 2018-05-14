@@ -200,7 +200,7 @@ module Crystime
     end
 
     # Converts a VD to Time. If VD is non-materializable, the process raises an exception.
-    def to_time
+    def to_time(kind = Time::Kind::Utc)
       # XXX ability to define default values for nils
       #p "in ticks: "+ @ts.inspect
       if @ts.any?{ |x| x== false}
@@ -215,7 +215,7 @@ module Crystime
       d= d.nil?     ? 1 : d.as( Int)
       m= m.nil?     ? 1 : m.as( Int)
       y= y.nil?     ? 1 : y.as( Int)
-      Time.new( y, m, d, hour: h, minute: min, second: sec, nanosecond: ms* 1_000_000, kind: Time::Kind::Utc)
+      Time.new( y, m, d, hour: h, minute: min, second: sec, nanosecond: ms* 1_000_000, kind: kind)
     end
 
     ## Checks if this VD is in UTC. Responds with fixed value.
