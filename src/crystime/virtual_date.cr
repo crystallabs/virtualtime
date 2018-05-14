@@ -375,23 +375,23 @@ module Crystime
     #end
 
     #def ticks()
-    # raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+    # raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
     #  @span.ticks
     #end
     def total_seconds()
-      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_seconds
     end
     def total_milliseconds()
-      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_milliseconds
     end
     def total_nanoseconds()
-      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_nanoseconds
     end
     def nanoseconds()
-      raise Crystime::Errors.virtual_comparison if @ts.any?{ |x| x== false}
+      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.nanoseconds
     end
 
