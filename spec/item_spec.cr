@@ -339,14 +339,14 @@ describe Crystime::Item do
     item.omit<< vd2
     item.on?(date).should be_false
 
-    item.omit_shift= Crystime::Span.new -1,0,0,0
-    item.on?(date).should eq Crystime::Span.new -1,0,0,0
-    item.omit_shift= Crystime::Span.new 4,0,0,0
-    item.on?(date).should eq Crystime::Span.new 4,0,0,0
+    item.omit_shift= Time::Span.new -1,0,0,0
+    item.on?(date).should eq Time::Span.new -1,0,0,0
+    item.omit_shift= Time::Span.new 4,0,0,0
+    item.on?(date).should eq Time::Span.new 4,0,0,0
 
     item.omit<< vd3
-    item.omit_shift= Crystime::Span.new 1,0,0,0
-    item.on?(date).should eq Crystime::Span.new 2,0,0,0
+    item.omit_shift= Time::Span.new 1,0,0,0
+    item.on?(date).should eq Time::Span.new 2,0,0,0
   end
 
   it "reports false when effective omit larger than allowed boundaries" do
@@ -361,10 +361,10 @@ describe Crystime::Item do
     vd3.month= 3
     vd3.day= 15..16
 
-    limit_1day= Crystime::Span.new 1,0,0,0
+    limit_1day= Time::Span.new 1,0,0,0
 
     item.omit<< vd3
-    item.omit_shift= Crystime::Span.new 1,0,0,0
+    item.omit_shift= Time::Span.new 1,0,0,0
     item.on?(date, limit_1day).should be_false
   end
 
@@ -431,8 +431,8 @@ describe Crystime::Item do
 
     item.on?(date).should be_false
 
-    item.omit_shift= Crystime::Span.new 0,0,-3,0
-    item.on?(date).should eq Crystime::Span.new 0,0,-15,0
+    item.omit_shift= Time::Span.new 0,0,-3,0
+    item.on?(date).should eq Time::Span.new 0,0,-15,0
   end
 
   it "does range comparison properly" do
@@ -523,7 +523,7 @@ describe Crystime::Item do
     date= Crystime::VirtualDate["2017-3-15"]
     omit= Crystime::VirtualDate["2017-3-15"]
     omit2= Crystime::VirtualDate["2017-3-14"]
-    shift= Crystime::Span.new -1,0,0,0
+    shift= Time::Span.new -1,0,0,0
 
     item.due= [due]
     item.on?(date).should be_true
@@ -531,19 +531,19 @@ describe Crystime::Item do
     item.on?(date).should be_false
     item.omit_shift= shift
 
-    item.on?(date).should eq Crystime::Span.new -1,0,0,0
+    item.on?(date).should eq Time::Span.new -1,0,0,0
     item.omit<< omit2
-    item.on?(date).should eq Crystime::Span.new -2,0,0,0
+    item.on?(date).should eq Time::Span.new -2,0,0,0
 
     item= Crystime::Item.new
     due= Crystime::VirtualDate["2017-3-15 01:34:0"]
     date= Crystime::VirtualDate["2017-3-15 01:34:0"]
-    item.omit_shift= Crystime::Span.new 0,0,3,0
+    item.omit_shift= Time::Span.new 0,0,3,0
     omit= Crystime::VirtualDate.new
     omit.hour= 1
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 0,0,27,0
+    item.on?(date).should eq Time::Span.new 0,0,27,0
   end
   it "can shift on complex rules" do
     item= Crystime::Item.new
@@ -551,43 +551,43 @@ describe Crystime::Item do
     due.day= 4
     date= Crystime::VirtualDate.new
     date.day= 4
-    item.omit_shift= Crystime::Span.new 7,10,20,30
+    item.omit_shift= Time::Span.new 7,10,20,30
     omit= Crystime::VirtualDate.new
     omit.day= 4
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 7,10,20,30
+    item.on?(date).should eq Time::Span.new 7,10,20,30
 
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
     due.day= 4
     date= Crystime::VirtualDate.new
     date.day= 4
-    item.omit_shift= Crystime::Span.new 7,10,20,30
+    item.omit_shift= Time::Span.new 7,10,20,30
     omit= Crystime::VirtualDate.new
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 14,20,41,30
+    item.on?(date).should eq Time::Span.new 14,20,41,30
 
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
     due.day= 4..12
     date= Crystime::VirtualDate.new
     date.month= 4
-    item.omit_shift= Crystime::Span.new 7,10,20,30
+    item.omit_shift= Time::Span.new 7,10,20,30
     omit= Crystime::VirtualDate.new
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 14,20,41,30
+    item.on?(date).should eq Time::Span.new 14,20,41,30
   end
 
   it "can check due on dates with ranges" do
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
     due.day= 4..12
-    #item.omit_shift= Crystime::Span.new 7,10,20,30
+    #item.omit_shift= Time::Span.new 7,10,20,30
     omit= Crystime::VirtualDate.new
     omit.day= 12
     item.due= [due]
@@ -613,15 +613,15 @@ describe Crystime::Item do
 
 #    omit= Crystime::VirtualDate["2017-3-15"]
 #    item.on?(date).should be_false
-    #item.on?(date).should eq Crystime::Span.new 0,0,-15,0
+    #item.on?(date).should eq Time::Span.new 0,0,-15,0
 
 #    vd2.day= 15
 #    vd2.year= 2017 # XXX remove this and make sure it works without it too
 #    vd3= Crystime::VirtualDate.new
-#    item.omit_shift= Crystime::Span.new 0,0,-3,0
+#    item.omit_shift= Time::Span.new 0,0,-3,0
 #    vd3.minute= 2..15
 #    item.omit= [vd3]
-#    expect_raises do item.on?(date).should eq Crystime::Span.new 0,0,-15,0 end
+#    expect_raises do item.on?(date).should eq Time::Span.new 0,0,-15,0 end
 #    date.day= nil
 #    date.minute= 14
 #    p "Due: "+ item.due.inspect
@@ -639,11 +639,11 @@ describe Crystime::Item do
     shift.day= 23
     date= Crystime::VirtualDate.new
     date.day= 10
-    item.omit_shift= Crystime::Span.new 1,0,0,0
+    item.omit_shift= Time::Span.new 1,0,0,0
     item.due= [due]
     item.omit= [omit]
     item.shift= [shift]
-    item.on?(date).should eq Crystime::Span.new 13,0,0,0
+    item.on?(date).should eq Time::Span.new 13,0,0,0
   end
 
   it "respects max_shifts" do
@@ -654,13 +654,13 @@ describe Crystime::Item do
     omit.millisecond= 10..12
     date= Crystime::VirtualDate.new
     date.millisecond= 10
-    item.omit_shift= Crystime::Span.new 0,0,0,0,1
+    item.omit_shift= Time::Span.new 0,0,0,0,1_000_000
     item.due= [due]
     item.omit= [omit]
     #puts omit.inspect
     #puts due.inspect
     #puts date.inspect
-    item.on?(date, nil, nil, 30).should eq Crystime::Span.new 0,0,0,0,3
+    item.on?(date, nil, nil, 30).should eq Time::Span.new 0,0,0,0,3_000_000
     shift= Crystime::VirtualDate.new
     shift.millisecond= 500
     #puts shift.inspect

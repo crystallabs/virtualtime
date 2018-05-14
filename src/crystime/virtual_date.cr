@@ -160,12 +160,12 @@ module Crystime
     def ==( other : Time) to_time==other end
     def <=>( other : Time) to_time<=>other end
 
-    # Helpers for interoperability with self and Crystime::Span
+    # Helpers for interoperability with self and Time::Span
 
     def <=>( other : self)
       to_time<=>other.to_time
     end
-    def +( other : Span)
+    def +( other : Time::Span)
       self_time= self.to_time
       t= Time.epoch(0) + Time::Span.new(
         seconds: (self_time.epoch+ other.total_seconds).floor.to_i64,
@@ -181,11 +181,11 @@ module Crystime
       self
     end
     # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
-    def -( other : Span) self+ -other end
+    def -( other : Time::Span) self+ -other end
     def +( other : self)
       self_time= self.to_time
       other_time= other.to_time
-      Span.new(
+      Time::Span.new(
         seconds: (self_time.epoch+ other_time.epoch).floor,
         nanoseconds: (self_time.nanosecond+ other_time.nanosecond).floor
       )
@@ -193,7 +193,7 @@ module Crystime
     def -( other : self)
       self_time= self.to_time
       other_time= other.to_time
-      Span.new(
+      Time::Span.new(
         seconds: (self_time.epoch- other_time.epoch).floor,
         nanoseconds: (self_time.nanosecond- other_time.nanosecond).floor
       )
@@ -327,89 +327,6 @@ module Crystime
       str.scan(MR) do |m| return m[0] end
       nil
     end
-
-  end
-
-  class Span
-    protected getter span
-
-    include Comparable(self)
-
-    def initialize(d,h,m,s,ms)
-      @span= Time::Span.new(d,h,m,s,ms* 1_000_000)
-      #after_initialize
-    end
-    def initialize(d,h,m,s)
-      @span= Time::Span.new(d,h,m,s)
-      #after_initialize
-    end
-    def initialize(h,m,s)
-      @span= Time::Span.new(h,m,s)
-      #fter_initialize
-    end
-    #def initialize(ticks)
-    #  @span= Time::Span.new(ticks)
-    #  #after_initialize
-    #end
-    def initialize( seconds, nanoseconds = 0)
-      @span= Time::Span.new(
-        seconds: seconds,
-        nanoseconds: nanoseconds,
-      )
-      #after_initialize
-    end
-
-    #def after_initialize
-    #  s= @span
-    #  raise "Missing Time::Span!" unless s
-    #  @ticks= s.ticks
-    #end
-
-    def total_seconds()
-      @span.total_seconds
-    end
-    def total_milliseconds()
-      @span.total_milliseconds
-    end
-    def total_nanoseconds()
-      @span.total_nanoseconds
-    end
-    def nanoseconds()
-      @span.nanoseconds
-    end
-
-    # XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
-    def abs() @span.ticks.abs end
-
-    def to_f() @span.to_f end
-
-    # XXX Since on the underlying level we're working with two Time::Spans,
-    # can't we just use their +/- methods? (Assuming we're materialized,
-    # of course)
-    def +( other : self)
-      Crystime::Span.new(
-        seconds: (total_seconds+ other.total_seconds).floor.to_i64,
-        nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
-      )
-    end
-    def -( other : self)
-      Crystime::Span.new(
-        seconds: (total_seconds- other.total_seconds).floor.to_i64,
-        nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
-      )
-    end
-
-    def <=>( other : self)
-      total_nanoseconds<=> other.total_nanoseconds
-    end
-
-    #def days=( v, update?= true)         @days= v;         @ts[0]= v.is_a?( Int) ? true : false; update if update? end
-    #def hours=( v, update?= true)        @hours= v;        @ts[1]= v.is_a?( Int) ? true : false; update if update? end
-    #def seconds=( v, update?= true)      @seconds= v;      @ts[3]= v.is_a?( Int) ? true : false; update if update? end
-    #def minutes=( v, update?= true)      @minutes= v;      @ts[2]= v.is_a?( Int) ? true : false; update if update? end
-    #def milliseconds=( v, update?= true) @millisecond = v; @ts[4]= v.is_a?( Int) ? true : false; update if update? end
-    #def update
-    #end
   end
 
   # A custom to/from YAML converter for VirtualDate.
