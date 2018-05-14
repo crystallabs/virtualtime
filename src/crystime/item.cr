@@ -194,12 +194,12 @@ module Crystime
       a, z= @start, @stop
       return nil if a &&( a> target)
       return nil if z &&( z< target)
-      list= virtual_dates list
+      list= Crystime::Helpers.virtual_dates list
       check_date( target, list, true)
     end
     def due_on_time?( target, list= @due)
       return if !target
-      list= virtual_dates list
+      list= Crystime::Helpers.virtual_dates list
       check_time( target, list, true)
     end
 
@@ -212,27 +212,16 @@ module Crystime
       a, z= @start, @stop
       return nil if a &&( a> target)
       return nil if z &&( z< target)
-      list= virtual_dates @omit
+      list= Crystime::Helpers.virtual_dates @omit
       check_date( target, list, nil) # XXX, @@default_omit
     end
     def omit_on_time?( target)
       return if !target
-      list= virtual_dates @omit
+      list= Crystime::Helpers.virtual_dates @omit
       check_time( target, list, nil)
     end
 
     # Low-level logic functions
-
-    # XXX Move to a class method/helper?
-    private def virtual_dates( list, default_list= [] of VirtualDate)
-      list= force_array list
-      di= list.index( true)
-      if di
-        list= list.dup
-        list[di..di]= default_list
-      end
-      list
-    end
 
     private def check_date( target, list, default= true)
       #puts "checking #{list.inspect} re. #{target.inspect}"
@@ -297,7 +286,7 @@ module Crystime
       #  #  raise Crystime::Errors.unsupported_comparison
       #  #else false
       #end
-      ret= compare( rule, value)
+      ret= Crystime::Helpers.compare( rule, value)
       if fold && !ret && value.is_a?( Int)
         # try once again, folding the test value around the specified point.
         # Careful with e.g. day<7 conditions, need to be translated to 1..7
@@ -305,28 +294,6 @@ module Crystime
       end
       #puts rule.inspect, value.inspect, ret
       ret
-    end
-
-    #def compare( a : Range(Int, Int), b : Range( Int, Int))
-    #  if a.exclusive? || b.exclusive?
-    #    raise Crystime::Errors.exclusive_range_comparison
-    #  end
-    #  (a.includes?( b.begin)&& a.includes?( b.end))
-    #end
-    private def compare( a : Enumerable(Int), b : Enumerable(Int))
-      a_set= a.dup.to_set
-      b.all?{ |i| a_set.includes? i}
-    end
-    private def compare( a : Proc(Int32, Bool), b : Int) a.call(b) end
-    private def compare( a : Enumerable(Int), b : Int) a.dup.includes? b end
-    private def compare( a : Int, b : Int) a== b end
-    private def compare( a : Nil, b) true end
-
-    private def compare( a, b : Nil) true end
-    private def compare( a : Int, b : Enumerable(Int)) compare(b, a) end
-
-    private def compare( a, b)
-      raise Crystime::Errors.no_comparator(a, b)
     end
 
     # Helpers below
@@ -353,13 +320,5 @@ module Crystime
 #        else nil
 #      end
 #    end
-
-    private def force_array( arg)
-      if !arg.is_a? Array
-        return [arg]
-      else
-        return arg
-      end
-    end
   end
 end
