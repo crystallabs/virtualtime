@@ -568,7 +568,7 @@ describe Crystime::Item do
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 14,20,41,0
+    item.on?(date).should eq Crystime::Span.new 14,20,41,30
 
     item= Crystime::Item.new
     due= Crystime::VirtualDate.new
@@ -580,7 +580,7 @@ describe Crystime::Item do
     omit.day= 3..14
     item.due= [due]
     item.omit= [omit]
-    item.on?(date).should eq Crystime::Span.new 14,20,41,0
+    item.on?(date).should eq Crystime::Span.new 14,20,41,30
   end
 
   it "can check due on dates with ranges" do

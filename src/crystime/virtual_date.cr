@@ -171,13 +171,13 @@ module Crystime
         seconds: (self_time.epoch+ other.total_seconds).floor.to_i64,
         nanoseconds: (self_time.nanosecond+ other.nanoseconds).floor.to_i32,
       )
-      if (t.year        != 0)                     ; self.year= t.year               end
-      if (t.month       != 0)                     ; self.month= t.month             end
-      if (t.day         != 0) || !other.ts[0].nil?; self.day= t.day                 end
-      if (t.hour        != 0) || !other.ts[1].nil?; self.hour= t.hour               end
-      if (t.minute      != 0) || !other.ts[2].nil?; self.minute= t.minute           end
-      if (t.second      != 0) || !other.ts[3].nil?; self.second= t.second           end
-      if (t.millisecond != 0) || !other.ts[4].nil?; self.millisecond= t.millisecond end
+      if (t.year        != 0); self.year= t.year               end
+      if (t.month       != 0); self.month= t.month             end
+      if (t.day         != 0); self.day= t.day                 end
+      if (t.hour        != 0); self.hour= t.hour               end
+      if (t.minute      != 0); self.minute= t.minute           end
+      if (t.second      != 0); self.second= t.second           end
+      if (t.millisecond != 0); self.millisecond= t.millisecond end
       self
     end
     # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
@@ -332,27 +332,19 @@ module Crystime
 
   class Span
     protected getter span
-    getter ts
-
-    #      0   1   2   3   4
-    #      d   h   m   s   ms
-    @ts= [ nil,nil,nil,nil,nil] of Bool?
 
     include Comparable(self)
 
     def initialize(d,h,m,s,ms)
       @span= Time::Span.new(d,h,m,s,ms* 1_000_000)
-      @ts[0..4]= [true,true,true,true,true]
       #after_initialize
     end
     def initialize(d,h,m,s)
       @span= Time::Span.new(d,h,m,s)
-      @ts[0..3]= [true,true,true,true]
       #after_initialize
     end
     def initialize(h,m,s)
       @span= Time::Span.new(h,m,s)
-      @ts[1..3]= [true,true,true]
       #fter_initialize
     end
     #def initialize(ticks)
@@ -364,7 +356,6 @@ module Crystime
         seconds: seconds,
         nanoseconds: nanoseconds,
       )
-      @ts[3,4]= [true,true]
       #after_initialize
     end
 
@@ -374,24 +365,16 @@ module Crystime
     #  @ticks= s.ticks
     #end
 
-    #def ticks()
-    # raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
-    #  @span.ticks
-    #end
     def total_seconds()
-      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_seconds
     end
     def total_milliseconds()
-      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_milliseconds
     end
     def total_nanoseconds()
-      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.total_nanoseconds
     end
     def nanoseconds()
-      raise Crystime::Errors.cant_materialize if @ts.any?{ |x| x== false}
       @span.nanoseconds
     end
 
@@ -417,8 +400,6 @@ module Crystime
     end
 
     def <=>( other : self)
-      # TODO this code prevents two perfectly simple/comparable VDs from being compared (at least for literal ==)
-      #return {@year, @month, @day, @day_of_week, @jd, @hour, @minute, @second, @millisecond} <=> {other.year, other.month, other.day, other.day_of_week, other.jd, other.hour, other.minute, other.second, other.millisecond}
       total_nanoseconds<=> other.total_nanoseconds
     end
 
