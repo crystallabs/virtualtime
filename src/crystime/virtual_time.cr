@@ -56,6 +56,11 @@ module Crystime
     def initialize(@year, @month, @day, @hour = nil, @minute = nil, @second = nil)
     end
 
+    def self.now
+      t= Time.now
+      from_array [t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond]
+    end
+
     def self.from_array( arg)
       r= new
       r.year, r.month, r.day, r.hour, r.minute, r.second, r.millisecond= arg[0..6]
@@ -330,6 +335,14 @@ module Crystime
       end
       raise Crystime::Errors.incorrect_input unless ret
       r
+    end
+
+    # Checks if any element in list matches self.
+    def matches?( list : Array, default= true)
+      Crystime::Helpers.matches?( self, list, default)
+    end
+    def matches?( t : Crystime::VirtualTime | Time, default= true)
+      Crystime::Helpers.matches?( self, [t], default)
     end
 
   end
