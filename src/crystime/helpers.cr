@@ -1,6 +1,8 @@
 module Crystime
+  # Collection of helpers independent of VirtualDate or Item,
+  # and which work solely based on their input parameters.
   module Helpers
-		# Wraps object in an Array if it is not an Array already.
+    # Wraps object in an Array if it is not an Array already.
     def self.force_array( arg)
       if !arg.is_a? Array
         return [arg]
@@ -9,7 +11,7 @@ module Crystime
       end
     end
 
-		# Replaces any values of 'true' with a list of VDs. By default, the list is emtpy.
+    # Replaces any values of 'true' with a list of VDs. By default, the list is emtpy.
     def self.virtual_dates( list, default_list= [] of VirtualDate)
       list= force_array list
       di= list.index( true)
@@ -20,7 +22,7 @@ module Crystime
       list
     end
 
-		# Compares all 7 types of accepted values for a VD against each other.
+    # Compares all 7 types of accepted values for a VD against each other.
     def self.compare( a : Enumerable(Int), b : Enumerable(Int))
       a_set= a.dup.to_set
       b.all?{ |i| a_set.includes? i}
@@ -37,28 +39,28 @@ module Crystime
 
     # Checks if rule matches value, i.e. if value satisfies rule.
     # Matching rules:
-    # nil=>matches all,
-    # number=>only that one,
-    # block=>block is called to return true/false
-    # enumerable(incl. range): includes?
-    # true=> use default value(s)
-    # XXX too many things here are limited to a specific type
-    # XXX throw Undeterminable if one asks for day match on date with no
-    # year, so days_in_month can't be calcd.
-    #             "DUE" "DATE"
+    # 1. Nil matches all it is compared with
+    # 1. Number matches that number
+    # 1. Block matches if it returns true when executed
+    # 1. Enumerable (including Range) matches if rule.includes?(value) is true
+    # XXX throw Undeterminable if one asks for day match on date with no year, so days_in_month can't be calcd.
+    #                 "DUE", "DATE"
     def self.matches?( rule, value, fold= nil)
       # Fold is the starting value for negative numbers
       ret= compare( rule, value)
-      if fold && !ret && value.is_a?( Int)
-        # try once again, folding the test value around the specified point.
-        # Careful with e.g. day<7 conditions, need to be translated to 1..7
-        ret= matches? rule, value-fold, nil
-      end
+
+      # XXX This code should be re-enabled and then tests written for it.
+      #if fold && !ret && value.is_a?( Int)
+      #  # try once again, folding the test value around the specified point.
+      #  # Careful with e.g. day<7 conditions, need to be translated to 1..7
+      #  ret= matches? rule, value-fold, nil
+      #end
+
       #puts rule.inspect, value.inspect, ret
       ret
     end
 
-		# Checks if the date part matches of `target` matches any items in `list`.
+    # Checks if the date part of `target` matches any items in `list`.
     def self.check_date( target, list, default= true)
       #puts "checking #{list.inspect} re. #{target.inspect}"
       return default if !list || (list.size==0)
@@ -80,7 +82,7 @@ module Crystime
       end
       nil
     end
-		# Checks if the time part matches of `target` matches any items in `list`.
+    # Checks if the time part of `target` matches any items in `list`.
     def self.check_time(  target, list, default= true)
       return default if !list || (list.size==0)
       list.each do |e|
