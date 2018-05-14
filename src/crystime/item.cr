@@ -101,6 +101,7 @@ module Crystime
               else
                 od+= span.span
               end
+              #STDERR.puts od.inspect
               #p "AFTER +: "+ od.inspect
               if (max_before&& ((od-d).total_milliseconds.abs> max_before.total_milliseconds)) ||
                (max_after&& ((od-d).total_milliseconds.abs> max_after.total_milliseconds)) ||
