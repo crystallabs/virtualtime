@@ -127,15 +127,7 @@ module Crystime
             #puts ret.inspect
             #puts od.class
             #puts d.class
-            #puts od.ticks
-            #puts d.ticks
-            #puts od.ticks- d.ticks
             #puts od.inspect
-            #puts od.ticks
-            #a= Time.new( od.ticks)
-            #b= Time.new( d.ticks)
-            #puts a.inspect
-            #puts b.inspect
             return ret ? (od-d) : ret
           end
         end
@@ -210,7 +202,7 @@ module Crystime
     def due_on_time?( target, list= @due)
       return if !target
       list= virtual_dates list
-      check_time( list, target, true)
+      check_time( target, list, true)
     end
 
     def omit_on?( target)
@@ -228,7 +220,7 @@ module Crystime
     def omit_on_time?( target)
       return if !target
       list= virtual_dates @omit
-      check_time( list, target, nil)
+      check_time( target, list, nil)
     end
 
     # Low-level logic functions
@@ -260,7 +252,7 @@ module Crystime
       end
       nil
     end
-    private def check_time( list, target, default= true)
+    private def check_time(  target, list, default= true)
       return default if !list || (list.size==0)
       list.each do |e|
         return true if matches?( e.hour, target.hour) &&
