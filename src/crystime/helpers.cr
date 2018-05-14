@@ -66,13 +66,13 @@ module Crystime
     # XXX throw Undeterminable if one asks for day match on date with no year, so days_in_month can't be calcd.
     # Fold is the starting value for negative numbers. You set it to days_in_month + 1. (E.g. if you want to wrap around 31st, you pass 32 as fold value.)
     #                 "DUE", "DATE"
-    def self.matches?( rule, value, fold= nil)
+    def self.check( rule, value, fold= nil)
       ret= compare( rule, value)
 
       if !ret && fold && value.is_a?( Int)
         # try once again, folding the test value around the specified point.
         # Careful with e.g. day<7 conditions, need to be translated to 1..7
-        ret= matches? rule, value-fold, nil
+        ret= check rule, value-fold, nil
       end
 
       #puts rule.inspect, value.inspect, ret
@@ -80,7 +80,7 @@ module Crystime
     end
 
     # Checks if the date part of `target` matches any items in `list`.
-    def self.check_date( target, list, default= true)
+    def self.matches_date?( target, list, default= true)
       #puts "checking #{list.inspect} re. #{target.inspect}"
       return default if !list || (list.size==0)
       y, m= target.year, target.month
@@ -89,28 +89,33 @@ module Crystime
       end
       list.each do |e|
         #puts :IN, e.inspect, target.inspect
-        return true if matches?( e.year, target.year) &&
-          matches?( e.month, target.month) &&
-          matches?( e.day, target.day, dayfold) &&
-          matches?( e.day_of_week, target.day_of_week) #&&
+        return true if check( e.year, target.year) &&
+          check( e.month, target.month) &&
+          check( e.day, target.day, dayfold) &&
+          check( e.day_of_week, target.day_of_week) #&&
           # Remove checking of #jd for now. First, this check is redundant
           # since in the current code jd can't get out of sync with Ymd.
           # Second, because removing this makes it possible to pass Time
           # objects through this method.
-          #matches?( e.jd, target.jd)
+          #check( e.jd, target.jd)
       end
       nil
     end
     # Checks if the time part of `target` matches any items in `list`.
-    def self.check_time(  target, list, default= true)
+    def self.matches_time?( target, list, default= true)
       return default if !list || (list.size==0)
       list.each do |e|
-        return true if matches?( e.hour, target.hour) &&
-          matches?( e.minute, target.minute) &&
-          matches?( e.second, target.second) &&
-          matches?( e.millisecond, target.millisecond)
+        return true if check( e.hour, target.hour) &&
+          check( e.minute, target.minute) &&
+          check( e.second, target.second) &&
+          check( e.millisecond, target.millisecond)
       end
       nil
+    end
+    # Checks if VT matches the target date/time
+    def self.matches?( target, list, default= true)
+      matches_date?(target, list, default= true) &&
+      matches_time?(target, list, default= true)
     end
   end
 end
