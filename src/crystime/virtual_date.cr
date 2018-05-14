@@ -180,20 +180,21 @@ module Crystime
     end
     # XXX add tests for @ts=[...] looking correct after VirtualDate+ Span
     def -( other : Span | Time::Span) self+ -other end
+
     def +( other : self)
       self_time= self.to_time
       other_time= other.to_time
       Span.new(
-        seconds: (self_time.epoch+ other_time.epoch).floor,
-        nanoseconds: (self_time.nanosecond+ other_time.nanosecond).floor
+        seconds: (self_time.epoch+ other_time.epoch),
+        nanoseconds: (self_time.nanosecond+ other_time.nanosecond),
       )
     end
     def -( other : self)
       self_time= self.to_time
       other_time= other.to_time
       Span.new(
-        seconds: (self_time.epoch- other_time.epoch).floor,
-        nanoseconds: (self_time.nanosecond- other_time.nanosecond).floor
+        seconds: (self_time.epoch- other_time.epoch),
+        nanoseconds: (self_time.nanosecond- other_time.nanosecond),
       )
     end
 
