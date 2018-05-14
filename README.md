@@ -247,7 +247,8 @@ fields are not materializable, then the VD is not either, and an Exception is th
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not.
+any other specification are not. This will be greatly improved in the future so that with
+the user-supplied materialization hints, all types can be materialized.
 
 For convenience, the VD's ability to materialize each of its individual fields using their
 current values can be checked through a getter named `ts`:
@@ -338,11 +339,9 @@ crystal spec
 # TODO
 
 1. Add fully working serialization to/from JSON and YAML. Currently YAML serialization works fine, but serializes the object field by field (i.e. year, month, day, etc.) instead of serializing the whole content into an efficient string like "Y/m/d". This makes it inconvenient to serialize Items, as their lists of potentially many serialized VDs would be unwieldy to edit or look into by hand
-1. Add reminder functions. Previously remind features were implemented using their
-own code/approach. But maybe reminders should be just regular Items whose exact
-due date/time is certain offset from the original Item's date/time.
+1. Add reminder functions. Previously remind features were implemented using their own code/approach. But maybe reminders should be just regular Items whose exact due date/time is certain offset from the original Item's date/time.
 1. Currently, there is good code for inserting default values is field's value is "true", but there is no ways for users to fill in those defaults
-1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number)
+1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number). This should work with the help of user-supplied VD as argument, which will provide hints how to materialize objects in case of ambiguities or multiple choices.
 1. Extend the configuration options for specifying how VDs will be materialized, when materialization is requested or implicitly done
 1. Add more features suitable to be used in a reimplementation of cron using this module
 1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
