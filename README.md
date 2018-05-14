@@ -247,12 +247,7 @@ fields are not materializable, then the VD is not either, and an Exception is th
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not. (This is one of the areas where some improvements
-could be made to support more of all possible cases without throwing an Exception.
-Also, materialization rules could be added so that a person could choose what the
-default values are. For example, to materialize unset hours and minutes to 12:00
-instead of to 00:00. Both of these tasks are mentioned in the TODO at the bottom
-of the README.)
+any other specification are not.
 
 For convenience, the VD's ability to materialize each of its individual fields using their
 current values can be checked through a getter named `ts`:
@@ -346,7 +341,6 @@ crystal spec
 1. Add reminder functions. Previously remind features were implemented using their
 own code/approach. But maybe reminders should be just regular Items whose exact
 due date/time is certain offset from the original Item's date/time.
-1. Add more compatibility for using Time in place of VirtualDate
 1. Currently, there is good code for inserting default values is field's value is "true", but there is no ways for users to fill in those defaults
 1. Add more cases in which a VirtualDate is materializable (currently it is not if any of its values are anything else other than unset or a number)
 1. Extend the configuration options for specifying how VDs will be materialized, when materialization is requested or implicitly done
