@@ -18,8 +18,8 @@ module Crystime
     include Comparable(self)
 
     #property :relative
-    protected getter :time
-    property :ts
+    protected getter time
+    property ts
 
     # XXX need to move to model where user input is separate from actual values.
     # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
@@ -141,8 +141,12 @@ module Crystime
       [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualDate.from_array v}
     end
 
+    def >( other : Time) to_time>other end
+    def <( other : Time) to_time<other end
+    def ==( other : Time) to_time==other end
+    def <=>( other : Time) to_time<=>other end
+
     def <=>( other : self)
-      #p "<=>"
       to_time<=>other.to_time
     end
     def +( other : Span)
@@ -321,7 +325,8 @@ module Crystime
   end
 
   class Span
-    getter :ts
+    protected getter span
+    getter ts
 
     #      0   1   2   3   4
     #      d   h   m   s   ms

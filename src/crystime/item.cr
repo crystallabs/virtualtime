@@ -81,7 +81,9 @@ module Crystime
             #puts "Some shift from #{d}"
             # +1=>search into the future, -1=>search into the past
             od= d.dup
-            od.ts= d.ts.dup
+            if d.is_a? Crystime::VirtualDate
+              od.ts= d.ts.dup
+            end
             #puts od.class
             #return true
             return if !od
@@ -94,7 +96,11 @@ module Crystime
               shifts+= 1
               #p od.inspect
               #p span.inspect
-              od+= span
+              if od.is_a? Crystime::VirtualDate
+                od+= span
+              else
+                od+= span.span
+              end
               #p "AFTER +: "+ od.inspect
               if (max_before&& ((od-d).total_milliseconds.abs> max_before.total_milliseconds)) ||
                (max_after&& ((od-d).total_milliseconds.abs> max_after.total_milliseconds)) ||
