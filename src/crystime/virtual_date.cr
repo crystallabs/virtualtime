@@ -8,14 +8,6 @@ require "yaml"
 module Crystime
   class VirtualDate
 
-    W2I= { "SUN" => 0, "MON" => 1, "TUE" => 2, "WED" => 3, "THU" => 4, "FRI" => 5, "SAT" => 6}
-    I2W= W2I.invert
-    WR = Regex.new "\\b("+ W2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
-
-    M2I= { "JAN" => 1, "FEB" => 2, "MAR" => 3, "APR" => 4, "MAY" => 5, "JUN" => 6, "JUL" => 7, "AUG" => 8, "SEP" => 9, "OCT" => 10, "NOV" => 11, "DEC" => 12}
-    I2M= M2I.invert
-    MR = Regex.new "\\b("+ M2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
-
     include Comparable(self)
 
     # XXX need to move to model where user input is separate from actual values.
@@ -241,6 +233,8 @@ module Crystime
     #def utc?() true end
 
     def materialized?
+      # XXX do we consider materialized dates those with all values true, or we need
+      # to split materialized? into materialized_date? and materialized_time?
       #@ts[0..2]= [true,true,true]
       @ts.all?{ |x| x== true}
     end
@@ -325,8 +319,8 @@ module Crystime
 
       date= date.upcase
       if date=~ /\b(\d{4})\b/;  r.year= $1.to_i; r.update! end
-      if v= find_day_of_week( date); (r.day_of_week= W2I[v]?) &&( ret= true) end
-      if v= find_month( date);     (r.month= M2I[v]?) &&( ret= true); r.update! end
+      if v= Helpers.find_day_of_week( date); (r.day_of_week= Helpers::W2I[v]?) &&( ret= true) end
+      if v= Helpers.find_month( date);       (r.month= Helpers::M2I[v]?) &&( ret= true); r.update! end
       unless ret
         if m= date.match /(?<day>\-?\d{1,2})/
           r.day= m["day"].to_i
@@ -336,15 +330,6 @@ module Crystime
       end
       raise Crystime::Errors.incorrect_input unless ret
       r
-    end
-
-    private def self.find_day_of_week( str)
-      str.scan(WR) do |m| return m[0] end
-      nil
-    end
-    private def self.find_month( str)
-      str.scan(MR) do |m| return m[0] end
-      nil
     end
 
   end
