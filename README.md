@@ -249,10 +249,12 @@ if materialization is attempted.
 Currently, unset values and specific integers are materializable, while fields containing
 any other specification are not.
 
-In a call to `materialize!`, one can specify a "hint" argument, whose values will aid the
-materialization process, e.g. to default times to 12:00 instead of to 00:00. Currently,
-the implementation is simple, and hint's values are used verbatim in place of `nil`s in
-the original VT.
+In a call to `materialize!`, one can specify a "hint" argument, whose values will be used
+to aid the materialization process. E.g. to default times to 12:00 instead of to 00:00, or
+to default to materializing ranges to the end of the range, instead of the beginning.
+
+Currently, the implementation is simple, and hint's values are used verbatim in place of
+`nil`s in the original VT, so they are expected to be simple integers.
 
 For example:
 
