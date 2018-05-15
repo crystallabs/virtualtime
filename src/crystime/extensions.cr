@@ -14,3 +14,15 @@ class Array
     }
   end
 end
+
+struct Time
+  def >( other : Crystime::VirtualTime)
+    other< self
+  end
+  def <( other : Crystime::VirtualTime)
+    (other> self)
+  end
+  def <=>( other : Crystime::VirtualTime)
+    (other <=> self) * -1
+  end
+end

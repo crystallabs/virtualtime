@@ -394,14 +394,14 @@ describe Crystime::Item do
 
     vd5= Crystime::VirtualTime["12:13:14"]
     raise "missing vd5!" unless vd5
-    item.due= [vd5]
+    item.due= [vd5] of Crystime::VTType
     #puts date.inspect
     #puts vd5.inspect
     item.due_on?(date).should be_true
 
     vd6= Crystime::VirtualTime["12:13:15"]
     raise "missing vd6!" unless vd6
-    item.due= [vd6]
+    item.due= [vd6] of Crystime::VTType
     item.due_on?(date).should be_nil
 
     date= Crystime::VirtualTime["2017-3-15 1:2:3"]
@@ -409,11 +409,11 @@ describe Crystime::Item do
     raise "missing vd7!" unless vd7
     item.due_on?(date).should be_nil
     item.due_on_date?(date).should be_true
-    item.due=[vd7]
+    item.due=[vd7] of Crystime::VTType
     item.due_on_date?(date).should be_nil
-    item.due=[vd6]
+    item.due=[vd6] of Crystime::VTType
     item.due_on_time?(date).should be_nil
-    item.due=[vd7]
+    item.due=[vd7] of Crystime::VTType
     item.due_on_time?(date).should be_true
   end
 
@@ -500,7 +500,7 @@ describe Crystime::Item do
 
     vd2= Crystime::VirtualTime.new
     vd2.month= 3
-    item.due=[vd2]
+    item.due=[vd2] of Crystime::VTType
     date= Crystime::VirtualTime.new
     date.day= 13..18
     item.due_on_date?(date).should be_true
@@ -525,9 +525,9 @@ describe Crystime::Item do
     omit2= Crystime::VirtualTime["2017-3-14"]
     shift= Crystime::Span.new -1,0,0,0
 
-    item.due= [due]
+    item.due= [due] of Crystime::VTType
     item.on?(date).should be_true
-    item.omit= [omit]
+    item.omit= [omit] of Crystime::VTType
     item.on?(date).should be_false
     item.omit_shift= shift
 
@@ -541,8 +541,8 @@ describe Crystime::Item do
     item.omit_shift= Crystime::Span.new 0,0,3,0
     omit= Crystime::VirtualTime.new
     omit.hour= 1
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
     item.on?(date).should eq Crystime::Span.new 0,0,27,0
   end
   it "can shift on complex rules" do
@@ -554,8 +554,8 @@ describe Crystime::Item do
     item.omit_shift= Crystime::Span.new 7,10,20,30
     omit= Crystime::VirtualTime.new
     omit.day= 4
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
     item.on?(date).should eq Crystime::Span.new 7,10,20,30
 
     item= Crystime::Item.new
@@ -566,8 +566,8 @@ describe Crystime::Item do
     item.omit_shift= Crystime::Span.new 7,10,20,30
     omit= Crystime::VirtualTime.new
     omit.day= 3..14
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
     item.on?(date).should eq Crystime::Span.new 14,20,41,0
 
     item= Crystime::Item.new
@@ -578,8 +578,8 @@ describe Crystime::Item do
     item.omit_shift= Crystime::Span.new 7,10,20,30
     omit= Crystime::VirtualTime.new
     omit.day= 3..14
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
     item.on?(date).should eq Crystime::Span.new 14,20,41,0
   end
 
@@ -590,8 +590,8 @@ describe Crystime::Item do
     #item.omit_shift= Crystime::Span.new 7,10,20,30
     omit= Crystime::VirtualTime.new
     omit.day= 12
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
 
     date= Crystime::VirtualTime.new
     date.day= 8..11
@@ -640,9 +640,9 @@ describe Crystime::Item do
     date= Crystime::VirtualTime.new
     date.day= 10
     item.omit_shift= Crystime::Span.new 1,0,0,0
-    item.due= [due]
-    item.omit= [omit]
-    item.shift= [shift]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
+    item.shift= [shift] of Crystime::VTType
     item.on?(date).should eq Crystime::Span.new 13,0,0,0
   end
 
@@ -655,8 +655,8 @@ describe Crystime::Item do
     date= Crystime::VirtualTime.new
     date.millisecond= 10
     item.omit_shift= Crystime::Span.new 0,0,0,0,1_000_000
-    item.due= [due]
-    item.omit= [omit]
+    item.due= [due] of Crystime::VTType
+    item.omit= [omit] of Crystime::VTType
     #puts omit.inspect
     #puts due.inspect
     #puts date.inspect
@@ -664,7 +664,7 @@ describe Crystime::Item do
     shift= Crystime::VirtualTime.new
     shift.millisecond= 500
     #puts shift.inspect
-    item.shift= [shift]
+    item.shift= [shift] of Crystime::VTType
     item.on?(date, nil, nil, 30).should eq false
   end
 

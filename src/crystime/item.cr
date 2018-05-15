@@ -1,17 +1,17 @@
 module Crystime
   class Item
-    property :start, :stop, :due, :omit, :omit_shift, :shift #, :remind, :omit_remind
+    property start, stop, due, omit, omit_shift, shift #, remind, omit_remind
 
     # Absolute start date/time. Item is never "on" before this date.
-    @start : Nil | VirtualTime
+    @start : Nil | VTType
     # Absolute stop date/time. Item is never "on" after this date.
-    @stop  : Nil | VirtualTime
+    @stop  : Nil | VTType
     #@time_ssm= 0.0 # XXX set to nil or something
 
     # List of VirtualTimes on which the item is "on".
-    @due = [] of VirtualTime
+    @due = [] of VTType
     # List of VirtualTimes which should be "omitted", i.e. VirtualTimes on which the item can't be "on".
-    @omit= [] of VirtualTime
+    @omit= [] of VTType
 
     # Action to take if item is due on an omitted date/time. Possible values are:
     # - nil: treat the item as non-applicable/not-scheduled on the specified date/time
@@ -25,7 +25,7 @@ module Crystime
     @omit_shift= false
 
     # List of VirtualTimes which item must match, after it was shifted due to omit, to be considered "on".
-    @shift= [] of VirtualTime
+    @shift= [] of VTType
 
     #@remind = [] of Nil | Wrap::Date | Wrap::Time | Wrap::DateTime | Time
     #@omit_remind
