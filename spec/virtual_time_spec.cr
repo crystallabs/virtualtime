@@ -236,4 +236,11 @@ describe Crystime::VirtualTime do
     b.matches?(a).should be_true
   end
 
+  it "can materialize using a hint" do
+    vt= Crystime::VirtualTime.new
+    vt.day= 15
+    hint= Crystime::VirtualTime.new 1,2,3,4,5,6,7
+    vt.materialize!(hint).to_array.should eq [1,2,15,4,5,6,7]
+  end
+
 end
