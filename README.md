@@ -247,8 +247,25 @@ fields are not materializable, then the VT is not either, and an Exception is th
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not. This will be further improved in the future so that with
-the user-supplied materialization hints, all types can be materialized.
+any other specification are not.
+
+In a call to `materialize!`, one can specify a "hint" argument, whose values will be used
+in place of `nil`s in the original VT.
+
+For example:
+
+```crystal
+vt= Crystime::VirtualTime.new
+
+# These fields will be used as-is:
+vt.year= 2018
+vt.day= 15
+
+# While others (nils) will be taken from "hint":
+hint= Crystime::VirtualTime.new 1,2,3,4,5,6,7
+
+vt.materialize!(hint).to_array # ==> [2018,2,15,4,5,6,7]
+```
 
 For convenience, the VT's ability to materialize each of its individual fields using their
 current values can be checked through a getter named `ts`:
