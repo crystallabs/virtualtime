@@ -22,4 +22,9 @@ struct Time
   def <=>( other : Crystime::VirtualTime)
     (other <=> self) * -1
   end
+
+  # Overriden to remove its "protected" state that exists in struct Time.
+  def total_seconds
+    @seconds
+  end
 end
