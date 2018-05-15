@@ -692,6 +692,20 @@ describe Crystime::Item do
     item.on?( Crystime::VirtualTime.new(2018,5,31)).should be_nil
   end
 
+  it "uses negative numbers to count from end of month" do
+    i= Crystime::Item.new
+    due= Crystime::VirtualTime.new
+    due.year= 2017
+    due.month= 2
+    due.day= -1
+    i.due<< due
+    date= Crystime::VirtualTime.new
+    date.year= 2017
+    date.month= 2
+    date.day= 28
+    i.due_on?( date).should eq true
+  end
+
 #  it "can remind" do
 #   date= Crystime::VirtualTime["2017,3,15,  12,13,14)
 #

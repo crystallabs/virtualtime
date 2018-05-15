@@ -96,6 +96,9 @@ module Crystime
       @day_of_week= v
       true
     end
+
+    # Julian Day-related methods:
+
     # Julian Day Number does affect actual date, but is not used in calculations.
     def jd=( v)
       from_jd! if @jd= v
@@ -132,7 +135,7 @@ module Crystime
       {gy, gm, gd}
     end
     # Creates Julian Day Number from VirtualTime, when possible. Raises otherwise.
-    def to_jd!
+    def to_jd
       if @ts[0]&& @ts[1]&& @ts[2]
         a= ((14-@month.as( Int))/12).floor
         y= @year.as( Int)+ 4800- a
@@ -149,12 +152,27 @@ module Crystime
     # then they are set to nil.
     # In the case where the change is caused by a jd that was just set, a 'jd: false' parameter
     # could be passed not to touch jd again, even though there's no harm even if it is modified.
+    # XXX check whether update! is properly called (and/or code works correctly) when VTs are summed
+    # or subtracted.
     def update!(jd = true)
       if @ts[0]&& @ts[1]&& @ts[2]
         #puts "date is: "+ self.inspect
-        t= Time.new(@year.as( Int), @month.as( Int), @day.as( Int), kind: Time::Kind::Utc)
+
+        # XXX this code seems like generic functionality, not something to put into update!
+        m= @month.as Int
+        if m< 0
+          m= 13+ m
+        end
+
+        # XXX this code seems like generic functionality, not something to put into update!
+        d= @day.as Int
+        if d< 0
+          d= Time.days_in_month(@year.as(Int), m)+ 1+ d
+        end
+
+        t= Time.new(@year.as( Int), m, d, kind: Time::Kind::Utc)
         @day_of_week= t.day_of_week.to_i
-        @jd= to_jd! if jd
+        @jd= to_jd if jd
       else
         @day_of_week= @jd= nil
       end
@@ -239,6 +257,7 @@ module Crystime
 
       obj= self
       unless @ts.all?{ |x| x== true}
+        # XXX Call materialize! here with a 'hint' argument passed from user configuration
         obj= obj.dup.materialize!
       end
 
@@ -280,7 +299,9 @@ module Crystime
       # detail. (Like, to materialize 3..9 to be either 3, or 9, or middle (6)
       # and so on.)
     end
-    # Replace with macro and fix logic
+
+    # Merges a VT or Time into self. Uses rule of left precedent (if self already has a value for a particular field, it is not overwritten).
+    # XXX possibly replace with macro? Possibly change logic?
     def merge( other : self)
       self.year        ||= other.year
       self.month       ||= other.month
@@ -410,10 +431,9 @@ module Crystime
       @span.nanoseconds
     end
 
-    # XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
-    def abs() @span.ticks.abs end
-
-    def to_f() @span.to_f end
+    ## XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
+    #def abs() @span.ticks.abs end
+    #def to_f() @span.to_f end
 
     # XXX Since on the underlying level we're working with two Time::Spans,
     # can't we just use their +/- methods? (Assuming we're materialized,
