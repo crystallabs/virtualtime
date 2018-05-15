@@ -17,7 +17,7 @@ can either remain unspecified, or be a number, or contain a more complex specifi
 (list, range, range with step, boolean, or proc).
 
 For example, you could construct a VirtualTime with a month of "March" and a day range
-of 10..20 with step 2. This would represent a "virtual date" that matches any Time or
+of 10..20 with step 2. This would represent a "virtual time" that matches any Time or
 another VirtualTime which falls on, or contains, the dates of March 10, 12, 14, 16, 18, or 20.
 
 ## Item
