@@ -4,7 +4,7 @@ require "./spec_helper"
 
 describe "Crystime::VirtualTime and Times" do
 
-  it "can match Crystal's Time structs" do
+  it "can match Crystal's Times" do
     vt= Crystime::VirtualTime.new
 
     Crystime::Helpers.matches?( vt, [Time.now]).should be_true
@@ -23,4 +23,22 @@ describe "Crystime::VirtualTime and Times" do
     Crystime::VirtualTime["2018-03-10"].matches?(vt).should be_true
     Crystime::VirtualTime["2018-03-11"].matches?(vt).should be_nil
   end
+
+  it "can do math with Times" do
+    vt= Crystime::VirtualTime.new
+    vt.day= 4
+    t= Time.parse("2018-04-04", "%F")
+
+    r= (vt+t)
+    r.days.should eq 736790
+    r.hours.should eq 0
+    r.seconds.should eq 0
+
+    r= (t- vt)
+    r.days.should eq 736784
+    r.hours.should eq 0
+    r.seconds.should eq 0
+  end
+
+  # XXX Add tests for working with Time::Spans
 end

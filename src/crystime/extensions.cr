@@ -27,4 +27,7 @@ struct Time
   def total_seconds
     @seconds
   end
+
+  def +( other : Crystime::VirtualTime) self+ other.to_time end
+  def -( other : Crystime::VirtualTime) self- other.to_time end
 end
