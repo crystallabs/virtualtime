@@ -1,9 +1,5 @@
 module Crystime
   class Item
-
-    #@@default_omit= [] of VirtualTime
-    #@@default_time= 43200 # Noon of given day
-
     property :start, :stop, :due, :omit, :omit_shift, :shift #, :remind, :omit_remind
 
     # Absolute start date/time. Item is never "on" before this date.
@@ -34,29 +30,15 @@ module Crystime
     #@remind = [] of Nil | Wrap::Date | Wrap::Time | Wrap::DateTime | Time
     #@omit_remind
 
-    # Custom getters / setters
-
-    #def ssm() @time_ssm || @default_time end
-    #def time( date= Time.now) Time.new(date)+ ssm end
-    #def hour() Int32.new(ssm/ 3600) end
-    #def minute() Int32.new((ssm% 3600)/ 60) end
-    #def second() ssm% 60 end
-
-    # Main functions intended for public use
-
-    # TODO: non-interruptible/non-shareable tasks (just a flag)
-    # all existing items should be in @omit when checking if term is free
-
     # Checks whether the item is "on" on the specified date/time. Item is
     # considered "on" if it matches at least one "due" time and does not
     # match any "omit" time. If it matches an omit time, then depending on
     # the value of omit_shift it may still be "on", or attempted to be
-    # rescheduled.
-    # Return values are:
+    # rescheduled. Return values are:
     # nil - item is not "on" / not "due"
     # true - item is "on" (it is "due" and not on "omit" list)
     # false - item is due, but that date is omitted, and no reschedule was requested or possible, so effectively it is not "on"
-    # Time::Span - span which is to be added to asked date to reach the closes time when item is "on"
+    # Time::Span - span which is to be added to asked date to reach the earliestclosest time when item is "on"
     def on?( date= VirtualTime.now, max_before= nil, max_after= max_before, max_shifts= 1000)
       d= date
       return unless d
@@ -131,6 +113,48 @@ module Crystime
       end
     end
 
+    # Checks if item is due on any of its date and time specifications.
+    def due_on?( target, list= @due)
+      due_on_date?( target, list) &&
+      due_on_time?( target, list)
+    end
+    # Checks if item is due on any of its date specifications (without times).
+    def due_on_date?( target, list= @due)
+      return if !target
+      a, z= @start, @stop
+      return nil if a &&( a> target)
+      return nil if z &&( z< target)
+      list= Crystime::Helpers.virtual_dates list
+      Helpers.matches_date?( target, list, true)
+    end
+    # Checks if item is due on any of its time specifications (without dates).
+    def due_on_time?( target, list= @due)
+      return if !target
+      list= Crystime::Helpers.virtual_dates list
+      Helpers.matches_time?( target, list, true)
+    end
+
+    # Checks if item is omitted on any of its date and time specifications.
+    def omit_on?( target)
+      omit_on_date?( target) &&
+      omit_on_time?( target)
+    end
+    # Checks if item is omitted on any of its date specifications (without times).
+    def omit_on_date?( target)
+      return if !target
+      a, z= @start, @stop
+      return nil if a &&( a> target)
+      return nil if z &&( z< target)
+      list= Crystime::Helpers.virtual_dates @omit
+      Helpers.matches_date?( target, list, nil)
+    end
+    # Checks if item is omitted on any of its time specifications (without dates).
+    def omit_on_time?( target)
+      return if !target
+      list= Crystime::Helpers.virtual_dates @omit
+      Helpers.matches_time?( target, list, nil)
+    end
+
 #   def remind_on?( date= Time.now)
 #     d= date
 #     # separate reminders in absolute and relative
@@ -164,85 +188,9 @@ module Crystime
 #     rel.compact!
 #     abs+rel
 #   end
-
-    # Lower-level date/time testers
-
-    # ```
-    # it "uses negative numbers to count from end of month" do
-    #   i= Crystime::Item.new
-    #   due= Crystime::VirtualTime.new
-    #   due.year= 2017
-    #   due.month= 2
-    #   due.day= -1
-    #   i.due<< due
-    #   date= Crystime::VirtualTime.new
-    #   date.year= 2017
-    #   date.month= 2
-    #   date.day= 28
-    #   i.due_on?( date).should eq true
-    # end
-    # ```
-
-    def due_on?( target, list= @due)
-      due_on_date?( target, list) &&
-      due_on_time?( target, list)
-    end
-    def due_on_date?( target, list= @due)
-      #puts "DD: "+ target.inspect, "\nLIST"+ list.inspect
-      return if !target
-      a, z= @start, @stop
-      return nil if a &&( a> target)
-      return nil if z &&( z< target)
-      list= Crystime::Helpers.virtual_dates list
-      Helpers.matches_date?( target, list, true)
-    end
-    def due_on_time?( target, list= @due)
-      return if !target
-      list= Crystime::Helpers.virtual_dates list
-      Helpers.matches_time?( target, list, true)
-    end
-
-    def omit_on?( target)
-      omit_on_date?( target) &&
-      omit_on_time?( target)
-    end
-    def omit_on_date?( target)
-      return if !target
-      a, z= @start, @stop
-      return nil if a &&( a> target)
-      return nil if z &&( z< target)
-      list= Crystime::Helpers.virtual_dates @omit
-      Helpers.matches_date?( target, list, nil) # XXX, @@default_omit
-    end
-    def omit_on_time?( target)
-      return if !target
-      list= Crystime::Helpers.virtual_dates @omit
-      Helpers.matches_time?( target, list, nil)
-    end
-
-    # Helpers below
-
-#   def parse_timeunit( str)
-#     s= str.upcase
-#     case s
-#     when "S" then 0
-#     when "M" then 60
-#     when "H" then 3600
-#     when "D" then 3600*24
-#     when "W" then 3600*24*7
-#     else raise ArgumentError.new "Unknown time unit: #{s}"
-#     end
-#   end
-#
-#   def time=( time)
-#      @time_ssm= nil
-#      case time
-#        when Array
-#          time[0]* 3600+ time[1]* 60+ time[2]
-#        when Time
-#          time.hour* 3600+ time.minute* 60+ time.second
-#        else nil
-#      end
-#    end
   end
 end
+
+# NOTE: non-interruptible/non-shareable tasks (just a flag)
+# NOTE: all existing items should be in @omit when checking if term is free
+

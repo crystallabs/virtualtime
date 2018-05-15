@@ -82,7 +82,7 @@ describe Crystime::VirtualTime do
     vd.year= 2017
     vd.month= 6
     vd.day= 28
-    vd.to_jd!.should eq 2457933
+    vd.to_jd.should eq 2457933
   end
 
   it "can materialize!" do

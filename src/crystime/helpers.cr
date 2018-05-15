@@ -42,6 +42,29 @@ module Crystime
       nil
     end
 
+#   def parse_timeunit( str)
+#     s= str.upcase
+#     case s
+#     when "S" then 0
+#     when "M" then 60
+#     when "H" then 3600
+#     when "D" then 3600*24
+#     when "W" then 3600*24*7
+#     else raise ArgumentError.new "Unknown time unit: #{s}"
+#     end
+#   end
+#
+#   def time=( time)
+#      @time_ssm= nil
+#      case time
+#        when Array
+#          time[0]* 3600+ time[1]* 60+ time[2]
+#        when Time
+#          time.hour* 3600+ time.minute* 60+ time.second
+#        else nil
+#      end
+#    end
+
     # Compares all 7 types of accepted values for a VT against each other.
     def self.compare( a : Enumerable(Int), b : Enumerable(Int))
       a_set= a.dup.to_set
@@ -80,16 +103,14 @@ module Crystime
       ret
     end
 
-    # Checks if the date part of `target` matches any items in `list`.
+    # Checks if any item in `list` matches the date part of `target`
     def self.matches_date?( target, list, default= true)
-      #puts "checking #{list.inspect} re. #{target.inspect}"
       return default if !list || (list.size==0)
       y, m= target.year, target.month
       if y.is_a? Int && m.is_a? Int
         dayfold= Time.days_in_month( y, m)+ 1
       end
       list.each do |e|
-        #puts :IN, e.inspect, target.inspect
         return true if check( e.year, target.year) &&
           check( e.month, target.month) &&
           check( e.day, target.day, dayfold) &&
@@ -102,7 +123,7 @@ module Crystime
       end
       nil
     end
-    # Checks if the time part of `target` matches any items in `list`.
+    # Checks if any item in `list` matches the time part of `target`
     def self.matches_time?( target, list, default= true)
       return default if !list || (list.size==0)
       list.each do |e|
@@ -113,7 +134,7 @@ module Crystime
       end
       nil
     end
-    # Checks if VT matches the target date/time
+    # Checks if any item in `list` matches `target`
     def self.matches?( target, list, default= true)
       matches_date?(target, list, default= true) &&
       matches_time?(target, list, default= true)
