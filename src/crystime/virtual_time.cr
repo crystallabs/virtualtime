@@ -374,36 +374,21 @@ module Crystime
 
     def initialize(d,h,m,s,ns)
       @span= Time::Span.new(d,h,m,s,ns)
-      #after_initialize
     end
     def initialize(d,h,m,s)
       @span= Time::Span.new(d,h,m,s)
-      #after_initialize
     end
     def initialize(h,m,s)
       @span= Time::Span.new(h,m,s)
-      #fter_initialize
     end
     def initialize( seconds, nanoseconds = 0)
       @span= Time::Span.new(
         seconds: seconds,
         nanoseconds: nanoseconds,
       )
-      #after_initialize
     end
 
-    def total_seconds()
-      @span.total_seconds
-    end
-    def total_milliseconds()
-      @span.total_milliseconds
-    end
-    def total_nanoseconds()
-      @span.total_nanoseconds
-    end
-    def nanoseconds()
-      @span.nanoseconds
-    end
+    forward_missing_to @span
 
     # XXX Since on the underlying level we're working with two Time::Spans,
     # can't we just use their +/- methods? (Assuming we're materialized,
