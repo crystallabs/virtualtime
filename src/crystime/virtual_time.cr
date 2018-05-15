@@ -11,29 +11,19 @@ module Crystime
     include Comparable(self)
     include Comparable(Time)
 
-    # XXX need to move to model where user input is separate from actual values.
-    # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
-    # And until we know year and month, we can't fill in day_of_week/jd, nor evaluate that -1.
-    # But while treated as object or in yaml, it needs to be -1, not actual value.
-    # Weekday, jd and date -X require dates to be materialized...
-
     # XXX Use Int instead of Int32 when it becomes possible in Crystal
     alias Virtual = Nil | Int32 | Bool | Range(Int32, Int32) | Enumerable(Int32) | Proc(Int32, Bool)
 
-    #property :relative
-    protected getter time
-    property ts : Array(Bool?)
-
-    #@relative: Nil | Bool
-
-    # "ts" is a variable which keeps track of which fields were actually specified in VirtualTime.
-    # E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
-    # This is important for matching VirtualTimes, because if one VirtualTime has ts[5] set to nil (not specified), and
-    # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
-    #      0    1     2     3     4     5     6
-    #      year month day   hour  min   sec   ms
-    @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
-
+    #getter month, year, day, day_of_week, jd, hour, minute, second, millisecond
+    #@month :       Virtual?
+    #@year :        Virtual?
+    #@day :         Virtual?
+    #@day_of_week : Virtual?
+    #@jd :          Virtual?
+    #@hour :        Virtual?
+    #@minute :      Virtual?
+    #@second :      Virtual?
+    #@millisecond : Virtual?
     YAML.mapping({
       # Date-related properties
       month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
@@ -48,12 +38,27 @@ module Crystime
       millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
     })
 
+    #property :relative
+    #@relative: Nil | Bool
+
+    property ts
+    # "ts" is a variable which keeps track of which fields were actually specified in VirtualTime.
+    # E.g., if a user specifically sets seconds value (even if 0), then field 5 will be true. Otherwise, it will be false.
+    # This is important for matching VirtualTimes, because if one VirtualTime has ts[5] set to nil (not specified), and
+    # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
+    #      0    1     2     3     4     5     6
+    #      year month day   hour  min   sec   ms
+    @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
+
+    #protected getter time
+
     # Empty constructor. Must be here since when fields are defined, the
     # default empty constructor is not created.
     def initialize
     end
 
-    # Similar to Time constructor
+    # Similar to Time constructor.
+    # Fields are set via properties to trigger corresponding methods.
     def initialize(year, month, day, hour= nil, minute= nil, second= nil, millisecond= nil)
       self.year= year
       self.month= month
@@ -164,8 +169,6 @@ module Crystime
         if m< 0
           m= 13+ m
         end
-
-        # XXX this code seems like generic functionality, not something to put into update!
         d= @day.as Int
         if d< 0
           d= Time.days_in_month(@year.as(Int), m)+ 1+ d
@@ -398,10 +401,6 @@ module Crystime
       @span= Time::Span.new(h,m,s)
       #fter_initialize
     end
-    #def initialize(ticks)
-    #  @span= Time::Span.new(ticks)
-    #  #after_initialize
-    #end
     def initialize( seconds, nanoseconds = 0)
       @span= Time::Span.new(
         seconds: seconds,
@@ -409,12 +408,6 @@ module Crystime
       )
       #after_initialize
     end
-
-    #def after_initialize
-    #  s= @span
-    #  raise "Missing Time::Span!" unless s
-    #  @ticks= s.ticks
-    #end
 
     def total_seconds()
       @span.total_seconds
@@ -429,23 +422,19 @@ module Crystime
       @span.nanoseconds
     end
 
-    ## XXX ticks doesn't work >= crystal 0.24.1 and this needs fixing?
-    #def abs() @span.ticks.abs end
-    #def to_f() @span.to_f end
-
     # XXX Since on the underlying level we're working with two Time::Spans,
     # can't we just use their +/- methods? (Assuming we're materialized,
     # of course)
     def +( other : self)
       Crystime::Span.new(
-        seconds: (total_seconds+ other.total_seconds).floor.to_i64,
-        nanoseconds: (nanoseconds+ other.nanoseconds).floor.to_i32,
+        seconds: span.to_i + other.span.to_i,
+        nanoseconds: span.nanoseconds + other.span.nanoseconds,
       )
     end
     def -( other : self)
       Crystime::Span.new(
-        seconds: (total_seconds- other.total_seconds).floor.to_i64,
-        nanoseconds: (nanoseconds- other.nanoseconds).floor.to_i32,
+        seconds: span.to_i - other.span.to_i,
+        nanoseconds: span.nanoseconds - other.span.nanoseconds,
       )
     end
 

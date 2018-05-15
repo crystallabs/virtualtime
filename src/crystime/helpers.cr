@@ -33,39 +33,18 @@ module Crystime
     I2M= M2I.invert
     MR = Regex.new "\\b("+ M2I.keys.map(&->Regex.escape(String)).join('|')+ ")\\b"
 
+    # Scans for day of week name mentioned in string, and if found, returns that name.
     def self.find_day_of_week( str)
       str.scan(WR) do |m| return m[0] end
       nil
     end
+    # Scans for month name mentioned in string, and if found, returns that name.
     def self.find_month( str)
       str.scan(MR) do |m| return m[0] end
       nil
     end
 
-#   def parse_timeunit( str)
-#     s= str.upcase
-#     case s
-#     when "S" then 0
-#     when "M" then 60
-#     when "H" then 3600
-#     when "D" then 3600*24
-#     when "W" then 3600*24*7
-#     else raise ArgumentError.new "Unknown time unit: #{s}"
-#     end
-#   end
-#
-#   def time=( time)
-#      @time_ssm= nil
-#      case time
-#        when Array
-#          time[0]* 3600+ time[1]* 60+ time[2]
-#        when Time
-#          time.hour* 3600+ time.minute* 60+ time.second
-#        else nil
-#      end
-#    end
-
-    # Compares all 7 types of accepted values for a VT against each other.
+    # Compares all types of accepted values for T and/or VT against each other.
     def self.compare( a : Enumerable(Int), b : Enumerable(Int))
       a_set= a.dup.to_set
       b.all?{ |i| a_set.includes? i}
