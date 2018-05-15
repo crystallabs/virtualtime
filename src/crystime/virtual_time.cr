@@ -9,6 +9,7 @@ module Crystime
   class VirtualTime
 
     include Comparable(self)
+    include Comparable(Time)
 
     # XXX need to move to model where user input is separate from actual values.
     # E.g. day should be able to be -1, but for calcs it needs to be last day in month.
@@ -186,9 +187,6 @@ module Crystime
 
     # Quick helpers for interoperability with Time
 
-    def >( other : Time) to_time>other end
-    def <( other : Time) to_time<other end
-    def ==( other : Time) to_time==other end
     def <=>( other : Time) to_time<=>other end
     # Btw, this is not supported with Time struct. (I.e. you can do Time-Time, but not Time+Time)
     def +( other : Time)
