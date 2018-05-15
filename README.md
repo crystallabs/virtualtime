@@ -247,7 +247,7 @@ fields are not materializable, then the VT is not either, and an Exception is th
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not. This will be greatly improved in the future so that with
+any other specification are not. This will be further improved in the future so that with
 the user-supplied materialization hints, all types can be materialized.
 
 For convenience, the VT's ability to materialize each of its individual fields using their
@@ -344,10 +344,9 @@ In addition to that, also check the examples in the folder `examples/`.
 1. Add reminder functions. Previously remind features were implemented using their own code/approach. But maybe reminders should be just regular Items whose exact due date/time is certain offset from the original Item's date/time.
 1. Currently, there is good code for inserting default values is field's value is "true", but there is no ways for users to fill in those defaults
 1. Add more cases in which a VirtualTime is materializable (currently it is not if any of its values are anything else other than unset or a number). This should work with the help of user-supplied VT as argument, which will provide hints how to materialize objects in case of ambiguities or multiple choices.
-1. Extend the configuration options for specifying how VTs will be materialized, when materialization is requested or implicitly done
 1. Add more features suitable to be used in a reimplementation of cron using this module
 1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 1. Implement a complete task tracking program using Crystime
 1. Write support for exporting items into other calendar apps
-1. Materialization should never use default values. If the object does not have all required info, it should throw an Exception, unless a "hints" VT is provided to aid the materialization
+1. Proc in VT values should be able to accept all value types that a VD field can accept

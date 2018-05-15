@@ -53,7 +53,14 @@ module Crystime
     end
 
     # Similar to Time constructor
-    def initialize(@year, @month, @day, @hour = nil, @minute = nil, @second = nil)
+    def initialize(year, month, day, hour= nil, minute= nil, second= nil, millisecond= nil)
+      self.year= year
+      self.month= month
+      self.day= day
+      self.hour= hour
+      self.minute= minute
+      self.second= second
+      self.millisecond= millisecond
     end
 
     def self.now
@@ -65,6 +72,15 @@ module Crystime
       r= new
       r.year, r.month, r.day, r.hour, r.minute, r.second, r.millisecond= arg[0..6]
       r
+    end
+    def to_array
+      [self.year, self.month, self.day, self.hour, self.minute, self.second, self.millisecond]
+    end
+
+    def dup
+      self2= super
+      self2.ts= self.ts.dup
+      self2
     end
 
     # XXX should boolean value be treated as materializable and have ts=true?
@@ -217,21 +233,25 @@ module Crystime
 
     # Converts a VT to Time. If VT is non-materializable, the process raises an exception.
     def to_time(kind = Time::Kind::Utc)
-      # XXX ability to define default values for nils
-      #p "in ticks: "+ @ts.inspect
       if @ts.any?{ |x| x== false}
         raise Crystime::Errors.cant_materialize
       end
-      # XXX When more types become materializable, make changes here
-      ms, sec, min, h, d, m, y= @millisecond, @second, @minute, @hour, @day, @month, @year
-      ms= ms.nil?   ? 0 : ms.as( Int)
-      sec= sec.nil? ? 0 : sec.as( Int)
-      min= min.nil? ? 0 : min.as( Int)
-      h= h.nil?     ? 0 : h.as( Int)
-      d= d.nil?     ? 1 : d.as( Int)
-      m= m.nil?     ? 1 : m.as( Int)
-      y= y.nil?     ? 1 : y.as( Int)
-      Time.new( y, m, d, hour: h, minute: min, second: sec, nanosecond: ms* 1_000_000, kind: kind)
+
+      obj= self
+      unless @ts.all?{ |x| x== true}
+        obj= obj.dup.materialize!
+      end
+
+      Time.new(
+        obj.year.as(Int),
+        obj.month.as(Int),
+        obj.day.as(Int),
+        hour: obj.hour.as(Int),
+        minute: obj.minute.as(Int),
+        second: obj.second.as(Int),
+        nanosecond: obj.millisecond.as(Int)* 1_000_000,
+        kind: kind
+      )
     end
 
     ## Checks if this VT is in UTC. Responds with fixed value.
@@ -243,38 +263,33 @@ module Crystime
       #@ts[0..2]= [true,true,true]
       @ts.all?{ |x| x== true}
     end
-    def materialize!
-    # XXX this should work with the help of "other" date; if one
-    # is not specified default time is used.
+    def materialize!( hint= VirtualTime.new(1,1,1,0,0,0,0))
       #t= Time.now
       # XXX modify so that if value is proc, we call it;
-      # if value is range, we take range.begin,
-      # if value is 
+      # if value is range, we take range.begin, etc.
       # It's OK to use these values here because if a person does not
       # want to materialize to these probably-not-useful values,
-      # they simply need to provide 'other' as argument.
+      # they simply need to provide 'hint' as argument.
       # XXX but do solve the case of field== false. Right now we override
       # those with these default values, which is incorrect. (E.g. a 
       # range needs to materialize to range.begin, not to 1 or 0).
-      self.year        ||= 1
-      self.month       ||= 1
-      self.day         ||= 1
-      # XXX use some configurable defaults?
-      self.hour        ||= 0
-      self.minute      ||= 0
-      self.second      ||= 0
-      self.millisecond ||= 0
+      merge hint
+      # XXX But work is not done here. This function needs to actually be
+      # rewritten so that each field is individually materialized, and that
+      # via a hint we can specify how the process should work even in more
+      # detail. (Like, to materialize 3..9 to be either 3, or 9, or middle (6)
+      # and so on.)
     end
     # Replace with macro and fix logic
     def merge( other : self)
       self.year        ||= other.year
       self.month       ||= other.month
       self.day         ||= other.day
-      # XXX ditto
       self.hour        ||= other.hour
       self.minute      ||= other.minute
       self.second      ||= other.second
       self.millisecond ||= other.millisecond
+      self
     end
 
     def to_tuple
