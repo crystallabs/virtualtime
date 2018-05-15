@@ -77,9 +77,7 @@ module Crystime
     def self.compare( a : Nil, b) true end
     def self.compare( a, b : Nil) true end
     def self.compare( a : Int, b : Enumerable(Int)) compare(b, a) end
-    def self.compare( a, b)
-      raise Crystime::Errors.no_comparator(a, b)
-    end
+    def self.compare( a, b) a== b end
 
     # Checks if rule matches value, i.e. if value satisfies rule.
     # Matching rules:
