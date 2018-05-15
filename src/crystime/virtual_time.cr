@@ -188,22 +188,28 @@ module Crystime
       [@year, @month, @day, @hour, @minute, @second, @millisecond].expand.map{ |v| Crystime::VirtualTime.from_array v}
     end
 
-    # Quick helpers for interoperability with Time
+    # Helpers for interoperability with self
+
+    def <=>( other : self) to_time<=>other.to_time end
+    def +( other : self) self+ other.to_time end
+    def -( other : self) self- other.to_time end
+
+    # Helpers for interoperability with Time
 
     def <=>( other : Time) to_time<=>other end
     # Btw, this is not supported with Time struct. (I.e. you can do Time-Time, but not Time+Time)
     def +( other : Time)
       self_time= self.to_time
       Span.new(
-        seconds: (self_time.epoch+ other.epoch),
-        nanoseconds: (self_time.nanosecond+ other.nanosecond),
+        seconds: self_time.total_seconds + other.total_seconds,
+        nanoseconds: self_time.nanosecond + other.nanosecond,
       )
     end
     def -( other : Time)
       self_time= self.to_time
       Span.new(
-        seconds: (self_time.epoch- other.epoch),
-        nanoseconds: (self_time.nanosecond- other.nanosecond),
+        seconds: self_time.total_seconds - other.total_seconds,
+        nanoseconds: self_time.nanosecond - other.nanosecond,
       )
     end
 
@@ -224,29 +230,6 @@ module Crystime
     end
     # XXX add tests for @ts=[...] looking correct after VirtualTime+ Span
     def -( other : Span | Time::Span) self+ -other end
-
-    # Helpers for interoperability with self
-
-    def <=>( other : self)
-      to_time<=>other.to_time
-    end
-    # Btw, this is not supported with Time struct. (I.e. you can do Time-Time, but not Time+Time)
-    def +( other : self)
-      self_time= self.to_time
-      other_time= other.to_time
-      Span.new(
-        seconds: (self_time.epoch+ other_time.epoch),
-        nanoseconds: (self_time.nanosecond+ other_time.nanosecond),
-      )
-    end
-    def -( other : self)
-      self_time= self.to_time
-      other_time= other.to_time
-      Span.new(
-        seconds: (self_time.epoch- other_time.epoch),
-        nanoseconds: (self_time.nanosecond- other_time.nanosecond),
-      )
-    end
 
     # End of helpers
 
