@@ -2,7 +2,7 @@ Crystime is an advanced time, calendar, scheduling, and reminding library for Cr
 
 ## VirtualTime
 
-First, the basis of the low-level functionality is class "VirtualTime". Think of it as of
+The basis of the low-level functionality is class "VirtualTime". Think of it as of
 a normal "Time" struct, but much more flexible.
 
 With regular Time, all fields (year, month, day, hour, minute, second, millisecond) must
@@ -22,7 +22,7 @@ another VirtualTime which falls on, or contains, the dates of March 10, 12, 14, 
 
 ## Item
 
-Second, the basis of the high-level user functionality is class "Item". This is intentionally
+The basis of the high-level user functionality is class "Item". This is intentionally
 called an "item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
