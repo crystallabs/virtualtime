@@ -39,7 +39,7 @@ describe Crystime::VirtualTime do
     a.hour.should eq 1
     a.minute.should eq 2
     a.second.should eq 3
-    a.millisecond.should eq 40000
+    a.millisecond.should eq 40_000
   end
   it "can parse day_of_week names" do
     a= Crystime::VirtualTime["Mon"]
@@ -62,7 +62,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { return true }
   end
   it "has getter for @ts (materialization ability)" do
     a = Crystime::VirtualTime.new
@@ -72,7 +72,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { return true }
 
     a.ts.should eq [nil, true, false, false, false, false, false]
   end
@@ -82,13 +82,13 @@ describe Crystime::VirtualTime do
     vd.year= 2017
     vd.month= 6
     vd.day= 28
-    vd.to_jd.should eq 2457933
+    vd.to_jd.should eq 2_457_933
   end
 
   it "can materialize!" do
     vd= Crystime::VirtualTime.new
     vd.materialize!
-    vd.to_tuple.should eq( {1,1,1,1,1721426,0,0,0,0})
+    vd.to_tuple.should eq( {1,1,1,1,1_721_426,0,0,0,0})
   end
 
   it "resets day_of_week/jd after de-materializing" do
@@ -96,7 +96,7 @@ describe Crystime::VirtualTime do
     v.year= 2017
     v.month= 12
     v.day= 1
-    v.jd.should eq 2458089
+    v.jd.should eq 2_458_089
     v.day_of_week.should eq 5
     v.day= nil
     v.jd.should eq nil
@@ -145,7 +145,7 @@ describe Crystime::VirtualTime do
   it "does set Ymd from jd" do
     vd= Crystime::VirtualTime.new
     vd.day_of_week.should eq nil
-    vd.jd= 2457828
+    vd.jd= 2_457_828
     vd.year.should eq 2017
     vd.month.should eq 3
     vd.day.should eq 15
@@ -158,7 +158,7 @@ describe Crystime::VirtualTime do
     vd.month= 3
     vd.day= 17
 
-    vd.jd.should eq 2457830
+    vd.jd.should eq 2_457_830
     vd.day_of_week.should eq 5
   end
 
@@ -221,7 +221,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { return true }
 
     b = Crystime::VirtualTime.new
     b.year = 1

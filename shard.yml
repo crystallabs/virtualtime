@@ -11,3 +11,5 @@ license: GPL-3.0
 development_dependencies:
   specreporter-spec:
     github: docelic/specreporter-spec
+  ameba:
+    github: veelenga/ameba

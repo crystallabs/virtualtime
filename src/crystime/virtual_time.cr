@@ -130,8 +130,8 @@ module Crystime
       end
       # https://en.wikipedia.org/wiki/Julian_day
       y= 4716; j= 1401; m= 2; n= 12; r= 4; p= 1461;
-      v= 3; u= 5; s= 153; w= 2; b= 274277; c= -38;
-      f = jd + j + (((4 * jd + b) / 146097) * 3) / 4 + c
+      v= 3; u= 5; s= 153; w= 2; b= 274_277; c= -38;
+      f = jd + j + (((4 * jd + b) / 146_097) * 3) / 4 + c
       e = r * f + v
       g = (e % p) / r
       h = u * g + w
@@ -274,7 +274,7 @@ module Crystime
       # want to materialize to these probably-not-useful values,
       # they simply need to provide 'hint' as argument.
       # XXX but do solve the case of field== false. Right now we override
-      # those with these default values, which is incorrect. (E.g. a 
+      # those with these default values, which is incorrect. (E.g. a
       # range needs to materialize to range.begin, not to 1 or 0).
       merge hint
       # XXX But work is not done here. This function needs to actually be
@@ -472,7 +472,7 @@ module Crystime
         false
       # XXX The next one is here just to satisfy return type. It doesn't really work.
       when /^->/
-        ->( v : Int32){ true}
+        ->( _v : Int32){ true}
       else
         raise Crystime::Errors.invalid_yaml_input
       end

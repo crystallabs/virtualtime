@@ -30,12 +30,12 @@ describe "Crystime::VirtualTime and Times" do
     t= Time.parse("2018-04-04", "%F")
 
     r= (vt+t)
-    r.days.should eq 736790
+    r.days.should eq 736_790
     r.hours.should eq 0
     r.seconds.should eq 0
 
     r= (t- vt)
-    r.days.should eq 736784
+    r.days.should eq 736_784
     r.hours.should eq 0
     r.seconds.should eq 0
   end

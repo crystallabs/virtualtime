@@ -112,8 +112,8 @@ module Crystime
     end
     # Checks if any item in `list` matches `target`
     def self.matches?( target, list, default= true)
-      matches_date?(target, list, default= true) &&
-      matches_time?(target, list, default= true)
+      matches_date?(target, list, default) &&
+      matches_time?(target, list, default)
     end
   end
 end

@@ -113,11 +113,11 @@ describe Crystime::Item do
 
     vd.day_of_week= nil
     item.due_on?(date).should be_true
-    vd.jd= 2457827
+    vd.jd= 2_457_827
     item.due_on?(date).should be_nil
-    vd.jd= 2457829
+    vd.jd= 2_457_829
     item.due_on?(date).should be_nil
-    vd.jd= 2457828
+    vd.jd= 2_457_828
     item.due_on?(date).should be_true
 
     # Test with more than one due date:
@@ -223,11 +223,11 @@ describe Crystime::Item do
 
     vd.day_of_week= nil
     item.omit_on?(date).should be_true
-    vd.jd= 2457827
+    vd.jd= 2_457_827
     item.omit_on?(date).should be_nil
-    vd.jd= 2457829
+    vd.jd= 2_457_829
     item.omit_on?(date).should be_nil
-    vd.jd= 2457828
+    vd.jd= 2_457_828
     item.omit_on?(date).should be_true
 
     # Test with more than one omit date:
@@ -287,9 +287,9 @@ describe Crystime::Item do
 
     item.due_on?(date).should be_true
 
-    vd.day= ->(val : Int32){true}
+    vd.day= ->(_val : Int32){true}
     item.due_on?(date).should be_true
-    vd.day= ->(val : Int32){false}
+    vd.day= ->(_val : Int32){false}
     item.due_on?(date).should be_nil
   end
 
@@ -436,7 +436,6 @@ describe Crystime::Item do
   end
 
   it "does range comparison properly" do
-    item= Crystime::Item.new
     a= 6..10
     b= 2..4
     c= 4..6
