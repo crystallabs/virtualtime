@@ -1,6 +1,5 @@
 [![Build Status](https://travis-ci.com/docelic/crystime.svg?branch=master)](https://travis-ci.com/docelic/crystime)
 [![Version](https://img.shields.io/github/tag/docelic/crystime.svg?maxAge=360)](https://github.com/docelic/crystime/releases/latest)
-[![Dependencies](https://shards.rocks/badge/github/docelic/crystime/status.svg)](https://shards.rocks/github/docelic/crystime)
 [![License](https://img.shields.io/github/license/docelic/crystime.svg)](https://github.com/docelic/crystime/blob/master/LICENSE)
 
 Crystime is an advanced time, calendar, scheduling, and reminding library for Crystal.
