@@ -1,5 +1,7 @@
 Crystime is an advanced time, calendar, scheduling, and reminding library for Crystal.
 
+It provides two classes: VirtualTime and Item.
+
 ## VirtualTime
 
 The basis of the low-level functionality is class "VirtualTime". Think of it as of
