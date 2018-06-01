@@ -16,7 +16,7 @@ second, millisecond, day of week, and [julian day](https://en.wikipedia.org/wiki
 can either remain unspecified, or be a number, or contain a more complex specification
 (list, range, range with step, boolean, or proc).
 
-For example, you could construct a VirtualTime with a month of "March" and a day range
+For example, you could construct a VirtualTime with a month of March and a day range
 of 10..20 with step 2. This would represent a "virtual time" that matches any Time or
 another VirtualTime which falls on, or contains, the dates of March 10, 12, 14, 16, 18, or 20.
 
@@ -98,6 +98,10 @@ p item.on?( Crystime::VirtualTime["2017-03-20"]) # ==> #<Crystime::Span @span=2.
 # Asking whether the item is due on the rescheduled date (Mar 22) will tell us no, because currently
 # rescheduled dates are not counted as due/on dates:
 p item.on?( Crystime::VirtualTime["2017-03-22"]) # ==> nil
+
+# We can also chech whether the item is due using regular Time struct,
+# it does not have to be VirtualTime:
+p item.on?( Time.new 2018, 3, 16) # ==> true
 ```
 
 # VirtualTime in Detail
@@ -178,24 +182,24 @@ and check dates, so really arbitrary rules can be expressed.
 There are two ways to create a VirtualTime and both have been implicitly shown
 in use above.
 
-One is by invoking e.g. `vd = VirtualTime.new` and then setting the individual
-fields on `vd`.
+One is by invoking e.g. `vt = VirtualTime.new` and then setting the individual
+fields on `vt`.
 
 For example:
 
 ```crystal
-vd = Crystime::VirtualTime.new
+vt = Crystime::VirtualTime.new
 
-vd.year = nil # Remains unspecified, matches everything it is compared with
-vd.month = 3
-vd.day = [1,2]
-vd.hour = (10..20)
-vd.minute = (10..20).step(2)
-vd.second = true
-vd.millisecond = ->( val : Int32) { true }
+vt.year = nil # Remains unspecified, matches everything it is compared with
+vt.month = 3
+vt.day = [1,2]
+vt.hour = (10..20)
+vt.minute = (10..20).step(2)
+vt.second = true
+vt.millisecond = ->( val : Int32) { true }
 ```
 
-Another is creating a VirtualTime from a string, using notation `vd = VirtualTime["... string ..."]`.
+Another is creating a VirtualTime from a string, using notation `vt = VirtualTime["... string ..."]`.
 This parser should eventually support everything supported by Ruby's `Time.parse`, `Date.parse`,
 `DateTime.parse`, etc., but for now it supports the following strings and their combinations:
 
@@ -224,14 +228,14 @@ MON, Tue, ...
 For example:
 
 ```
-vd = VirtualTime["JAN 2018"]
-p vd.month == 1 # ==> true
+vt = VirtualTime["JAN 2018"]
+p vt.month == 1 # ==> true
 
-vd = VirtualTime["2018 sun"]
-p vd.day_of_week == 0 # ==> true
+vt = VirtualTime["2018 sun"]
+p vt.day_of_week == 0 # ==> true
 
-vd = VirtualTime["2018 wed 12:00:00"]
-p vd.day_of_week == 3 # ==> true
+vt = VirtualTime["2018 wed 12:00:00"]
+p vt.day_of_week == 3 # ==> true
 ```
 
 ## VirtualTime Materialization
@@ -276,18 +280,18 @@ For convenience, the VT's ability to materialize each of its individual fields u
 current values can be checked through a getter named `ts`:
 
 ```crystal
-vd = Crystime::VirtualTime.new
+vt = Crystime::VirtualTime.new
 
-vd.year = nil
-vd.month = 3
-vd.day = [1,2]
-vd.hour = (10..20)
-vd.minute = (10..20).step(2)
-vd.second = true
-vd.millisecond = ->( val : Int32) { true }
+vt.year = nil
+vt.month = 3
+vt.day = [1,2]
+vt.hour = (10..20)
+vt.minute = (10..20).step(2)
+vt.second = true
+vt.millisecond = ->( val : Int32) { true }
 
 # Fields containing nil or true are materializable; fields containing false are not:
-vd.ts # ==> [nil, true, false, false, false, false, false]
+vt.ts # ==> [nil, true, false, false, false, false, false]
 ```
 
 # Item in Detail
@@ -371,4 +375,4 @@ In addition to that, also check the examples in the folder `examples/`.
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 1. Implement a complete task tracking program using Crystime
 1. Write support for exporting items into other calendar apps
-1. Proc in VT values should be able to accept all value types that a VD field can accept
+1. Proc in VT values should be able to accept all value types that a VT field can accept

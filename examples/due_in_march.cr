@@ -39,3 +39,4 @@ any_mar = Crystime::VirtualTime.new
 any_mar.month = 3
 p item.on?( any_mar)
 
+p item.on?( Time.new 2018, 3, 16)
