@@ -102,7 +102,7 @@ p item.on?( Crystime::VirtualTime["2017-03-20"]) # ==> #<Crystime::Span @span=2.
 # rescheduled dates are not counted as due/on dates:
 p item.on?( Crystime::VirtualTime["2017-03-22"]) # ==> nil
 
-# We can also chech whether the item is due using regular Time struct,
+# We can also check whether the item is due using regular Time struct,
 # it does not have to be VirtualTime:
 p item.on?( Time.new 2018, 3, 16) # ==> true
 ```
