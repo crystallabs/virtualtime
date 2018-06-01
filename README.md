@@ -232,13 +232,13 @@ For example:
 
 ```
 vt = VirtualTime["JAN 2018"]
-p vt.month == 1 # ==> true
+p vt.month # ==> 1
 
 vt = VirtualTime["2018 sun"]
-p vt.day_of_week == 0 # ==> true
+p vt.day_of_week # ==> 0
 
 vt = VirtualTime["2018 wed 12:00:00"]
-p vt.day_of_week == 3 # ==> true
+p vt.day_of_week # ==> 3
 ```
 
 ## VirtualTime Materialization
