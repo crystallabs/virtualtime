@@ -2,7 +2,7 @@
 [![Version](https://img.shields.io/github/tag/crystallabs/crystime.svg?maxAge=360)](https://github.com/crystallabs/crystime/releases/latest)
 [![License](https://img.shields.io/github/license/crystallabs/crystime.svg)](https://github.com/crystallabs/crystime/blob/master/LICENSE)
 
-**Project status**: `[ ] Being developed  [X] Usable  [ ] Complete`
+**Project status**: `[X] Being developed  [X] Usable  [ ] Complete`
 
 Crystime is an advanced time, calendar, scheduling, and reminding library for Crystal.
 
