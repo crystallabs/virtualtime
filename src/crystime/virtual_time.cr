@@ -12,6 +12,7 @@ module Crystime
     include Comparable(Time)
 
     # XXX Use Int instead of Int32 when it becomes possible in Crystal
+    #alias Virtual = Array(String) | Bool | Int32 | Proc(Int32, Bool) | Range(Int32, Int32) | Enumerable(Int32) | Nil
     alias Virtual = Nil | Int32 | Bool | Range(Int32, Int32) | Enumerable(Int32) | Proc(Int32, Bool)
 
     #getter month, year, day, day_of_week, jd, hour, minute, second, millisecond
@@ -423,7 +424,7 @@ module Crystime
   class VirtualTimeConverter
     # Converts VirtualTime object to YAML.
     # XXX this has to be changed so that the whole object is serialized into yyyy/mm/dd/day_of_week hh:mm:ss.ms, not each field individually.
-    def self.to_yaml(value : Crystime::VirtualTime::Virtual, yaml : YAML::Builder)
+    def self.to_yaml(value : Crystime::VirtualTime::Virtual, yaml : YAML::Nodes::Builder)
       case value
       #when Nil
       #  yaml.scalar "nil"
@@ -447,13 +448,13 @@ module Crystime
           yaml.scalar value.join ","
         end
       else
-        raise "Unknown type #{value.class}"
+        raise "Cannot convert #{value.class} to YAML"
       end
     end
     # Converts YAML to VirtualTime object.
-   def self.from_yaml(value : YAML::PullParser) : Crystime::VirtualTime::Virtual
-      v= value.read_scalar
-      case v
+    def self.from_yaml(value : String | IO) : Crystime::VirtualTime::Virtual
+      #v= value.read_scalar
+      case value
       when "nil"
         nil
       when /^\d+$/
@@ -475,6 +476,38 @@ module Crystime
         ->( _v : Int32){ true}
       else
         raise Crystime::Errors.invalid_yaml_input
+      end
+    end
+    # Converts YAML to VirtualTime object.
+    def self.from_yaml(value : YAML::ParseContext, node : YAML::Nodes::Node) : Crystime::VirtualTime::Virtual
+      unless node.is_a?(YAML::Nodes::Scalar)
+        node.raise "Expected scalar, not #{node.class}"
+      end
+
+      case node.value
+      when "nil"
+        nil
+      when /^\d+$/
+        node.value.to_i
+      when /^(\d+,?)+$/
+        node.value.split(",").map &.to_i
+      when /^(\d+)\.\.\.(\d+)(?:\/(\d+))$/
+        ( $1.to_i...$2.to_i).step( $3.to_i)
+      when /^(\d+)\.\.\.(\d+)$/
+        $1.to_i...$2.to_i
+      when /^(\d+)\.\.(\d+)(?:\/(\d+))$/
+        ( $1.to_i..$2.to_i).step( $3.to_i)
+      when /^(\d+)\.\.(\d+)$/
+        $1.to_i..$2.to_i
+      when "true"
+        true
+      when "false"
+        false
+      # XXX The next one is here just to satisfy return type. It doesn't really work.
+      when /^->/
+        ->( _v : Int32){ true}
+      else
+        raise Crystime::Errors.invalid_yaml_input node.value
       end
     end
   end

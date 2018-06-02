@@ -373,7 +373,6 @@ In addition to that, also check the examples in the folder `examples/`.
 
 # TODO
 
-1. Add fully working serialization to/from JSON and YAML. Currently YAML serialization works fine, but serializes the object field by field (i.e. year, month, day, etc.) instead of serializing the whole content into an efficient string like "Y/m/d". This makes it inconvenient to serialize Items, as their lists of potentially many serialized VTs would be unwieldy to edit or look into by hand
 1. Add reminder functions. Previously remind features were implemented using their own code/approach. But maybe reminders should be just regular Items whose exact due date/time is certain offset from the original Item's date/time.
 1. Currently, there is good code for inserting default values if field's value is "true", but there is no ways for users to fill in those defaults
 1. Add more cases in which a VirtualTime is materializable (currently it is not if any of its values are anything else other than unset or a number). This should work with the help of user-supplied VT as argument, which will provide hints how to materialize objects in case of ambiguities or multiple choices.
