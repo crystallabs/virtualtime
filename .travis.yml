@@ -2,7 +2,7 @@ language: crystal
 crystal:
   - latest
 install:
-  - crystal deps
+  - shards
 script:
   - crystal spec
   - bin/ameba
