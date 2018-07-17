@@ -14,11 +14,11 @@ describe "Crystime::VirtualTime and Times" do
     vt.month= 3
     vt.day = (10..20).step(2)
 
-    Crystime::Helpers.matches?( vt, [Time.parse("2018-03-10", "%F")]).should be_true
-    Crystime::Helpers.matches?( vt, [Time.parse("2018-03-11", "%F")]).should be_nil
+    Crystime::Helpers.matches?( vt, [Time.parse("2018-03-10", "%F", Time::Location::UTC)]).should be_true
+    Crystime::Helpers.matches?( vt, [Time.parse("2018-03-11", "%F", Time::Location::UTC)]).should be_nil
     # Same thing as above but in alternate notation:
-    vt.matches?( [Time.parse("2018-03-10", "%F")]).should be_true
-    vt.matches?( [Time.parse("2018-03-11", "%F")]).should be_nil
+    vt.matches?( [Time.parse("2018-03-10", "%F", Time::Location::UTC)]).should be_true
+    vt.matches?( [Time.parse("2018-03-11", "%F", Time::Location::UTC)]).should be_nil
     # Same thing as above but in alternate notation:
     Crystime::VirtualTime["2018-03-10"].matches?(vt).should be_true
     Crystime::VirtualTime["2018-03-11"].matches?(vt).should be_nil
@@ -27,7 +27,7 @@ describe "Crystime::VirtualTime and Times" do
   it "can do math with Times" do
     vt= Crystime::VirtualTime.new
     vt.day= 4
-    t= Time.parse("2018-04-04", "%F")
+    t= Time.parse("2018-04-04", "%F", Time::Location::UTC)
 
     r= (vt+t)
     r.days.should eq 736_790

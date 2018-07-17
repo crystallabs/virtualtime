@@ -175,7 +175,7 @@ module Crystime
           d= Time.days_in_month(@year.as(Int), m)+ 1+ d
         end
 
-        t= Time.new(@year.as( Int), m, d, kind: Time::Kind::Utc)
+        t= Time.utc(@year.as( Int), m, d)
         @day_of_week= t.day_of_week.to_i
         @jd= to_jd if jd
       else
@@ -235,7 +235,7 @@ module Crystime
     # End of helpers
 
     # Converts a VT to Time. If VT is non-materializable, the process raises an exception.
-    def to_time(kind = Time::Kind::Utc)
+    def to_time
       if @ts.any?{ |x| x== false}
         raise Crystime::Errors.cant_materialize
       end
@@ -246,7 +246,7 @@ module Crystime
         obj= obj.dup.materialize!
       end
 
-      Time.new(
+      Time.utc(
         obj.year.as(Int),
         obj.month.as(Int),
         obj.day.as(Int),
@@ -254,7 +254,6 @@ module Crystime
         minute: obj.minute.as(Int),
         second: obj.second.as(Int),
         nanosecond: obj.millisecond.as(Int)* 1_000_000,
-        kind: kind
       )
     end
 
