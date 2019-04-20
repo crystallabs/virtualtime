@@ -186,7 +186,7 @@ describe Crystime::VirtualTime do
   it "changes day_of_week according to Ymd" do
     vd= Crystime::VirtualTime["2017-07-02"]
     #puts vd.inspect
-    vd.day_of_week.should eq 0
+    vd.day_of_week.should eq 7
     vd.day= 1
     vd.day_of_week.should eq 6
   end
