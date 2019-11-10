@@ -70,8 +70,8 @@ module Crystime
       self.millisecond= millisecond
     end
 
-    def self.now
-      t= Time.now
+    def self.local
+      t= Time.local
       from_array [t.year, t.month, t.day, t.hour, t.minute, t.second, t.millisecond]
     end
 
@@ -132,22 +132,22 @@ module Crystime
       # https://en.wikipedia.org/wiki/Julian_day
       y= 4716; j= 1401; m= 2; n= 12; r= 4; p= 1461;
       v= 3; u= 5; s= 153; w= 2; b= 274_277; c= -38;
-      f = jd + j + (((4 * jd + b) / 146_097) * 3) / 4 + c
+      f = jd + j + (((4 * jd + b) // 146_097) * 3) // 4 + c
       e = r * f + v
-      g = (e % p) / r
+      g = (e % p) // r
       h = u * g + w
-      gd = (h % s) / u + 1
-      gm = ((h / s + m) % n) + 1
-      gy = (e / p) - y + (n + m - gm) / n
+      gd = (h % s) // u + 1
+      gm = ((h // s + m) % n) + 1
+      gy = (e // p) - y + (n + m - gm) // n
       {gy, gm, gd}
     end
     # Creates Julian Day Number from VirtualTime, when possible. Raises otherwise.
     def to_jd
       if @ts[0]&& @ts[1]&& @ts[2]
-        a= ((14-@month.as( Int))/12).floor
+        a= ((14-@month.as( Int))/12).floor.to_i32
         y= @year.as( Int)+ 4800- a
         m= @month.as( Int)+ 12*a- 3
-        @day.as( Int)+ ((153*m+ 2)/5).floor+ 365*y+ (y/4).floor- (y/100).floor+ (y/400).floor- 32045
+        @day.as( Int)+ ((153*m+ 2)/5).floor.to_i32+ 365*y+ (y/4).floor.to_i32- (y/100).floor.to_i32+ (y/400).floor.to_i32- 32045
       else
         raise "Can't convert non-materializable date to Julian Day Number"
       end
@@ -267,7 +267,7 @@ module Crystime
       @ts.all?{ |x| x== true}
     end
     def materialize!( hint= VirtualTime.new(1,1,1,0,0,0,0))
-      #t= Time.now
+      #t= Time.local
       # XXX modify so that if value is proc, we call it;
       # if value is range, we take range.begin, etc.
       # It's OK to use these values here because if a person does not
@@ -645,7 +645,7 @@ end
 #    d1 += 1.to_r/2/86400
 #    d2 = DateTime.parse('2004-03-13T22:46:00')
 #    assert_equal(d2, d1)
-#    n = DateTime.now
+#    n = DateTime.local
 #
 #    d = DateTime.parse('073')
 #    assert_equal([n.year, 73, 0, 0, 0], [d.year, d.yday, d.hour, d.min, d.sec])

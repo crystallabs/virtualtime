@@ -674,9 +674,9 @@ describe Crystime::Item do
     due.day = 1..15
     item.due<< due
 
-    item.on?( Time.new(2018,5,5)).should be_true
-    item.on?( Time.new(2018,5,15)).should be_true
-    item.on?( Time.new(2018,5,16)).should be_nil
+    item.on?( Time.local(2018,5,5)).should be_true
+    item.on?( Time.local(2018,5,15)).should be_true
+    item.on?( Time.local(2018,5,16)).should be_nil
   end
 
   it "works correctly with fold (negative values counting from the end)" do
@@ -685,8 +685,8 @@ describe Crystime::Item do
     due.month = 5
     due.day = -2
     item.due<< due
-    item.on?( Time.new(2018,5,30)).should be_true
-    item.on?( Time.new(2018,5,31)).should be_nil
+    item.on?( Time.local(2018,5,30)).should be_true
+    item.on?( Time.local(2018,5,31)).should be_nil
     item.on?( Crystime::VirtualTime.new(2018,5,30)).should be_true
     item.on?( Crystime::VirtualTime.new(2018,5,31)).should be_nil
   end

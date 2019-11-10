@@ -39,7 +39,7 @@ module Crystime
     # true - item is "on" (it is "due" and not on "omit" list)
     # false - item is due, but that date is omitted, and no reschedule was requested or possible, so effectively it is not "on"
     # Time::Span - span which is to be added to asked date to reach the earliestclosest time when item is "on"
-    def on?( date= VirtualTime.now, max_before= nil, max_after= max_before, max_shifts= 1000)
+    def on?( date= VirtualTime.local, max_before= nil, max_after= max_before, max_shifts= 1000)
       d= date
       return unless d
 
@@ -150,7 +150,7 @@ module Crystime
       Helpers.matches_time?( target, list, nil)
     end
 
-#   def remind_on?( date= Time.now)
+#   def remind_on?( date= Time.local)
 #     d= date
 #     # separate reminders in absolute and relative
 #     abs= @remind.select{|x| x.is_a? Wrap::Date | Wrap::Time | Wrap::DateTime | Time}

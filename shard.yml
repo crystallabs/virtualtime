@@ -1,16 +1,14 @@
 name: crystime
-version: 0.3.0
+version: 0.4.0
 
 authors:
   - Davor Ocelic <docelic@crystallabs.io>
 
-crystal: 0.25.0
+crystal: 0.31.1
 
 license: GPL-3.0
 
 development_dependencies:
-  specreporter-spec:
-    github: docelic/specreporter-spec
   ameba:
     github: veelenga/ameba
 

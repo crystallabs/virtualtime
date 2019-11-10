@@ -7,9 +7,9 @@ describe "Crystime::VirtualTime and Times" do
   it "can match Crystal's Times" do
     vt= Crystime::VirtualTime.new
 
-    Crystime::Helpers.matches?( vt, [Time.now]).should be_true
-    vt.matches?( [Time.now]).should be_true
-    Crystime::VirtualTime.now.matches?(vt).should be_true
+    Crystime::Helpers.matches?( vt, [Time.local]).should be_true
+    vt.matches?( [Time.local]).should be_true
+    Crystime::VirtualTime.local.matches?(vt).should be_true
 
     vt.month= 3
     vt.day = (10..20).step(2)
