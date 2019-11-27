@@ -62,7 +62,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( _val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { true }
   end
   it "has getter for @ts (materialization ability)" do
     a = Crystime::VirtualTime.new
@@ -72,7 +72,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( _val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { true }
 
     a.ts.should eq [nil, true, false, false, false, false, false]
   end
@@ -221,7 +221,7 @@ describe Crystime::VirtualTime do
     a.hour = (10..20)
     a.minute = (10..20).step(2)
     a.second = true
-    a.millisecond = ->( _val : Int32) { return true }
+    a.millisecond = ->( _val : Int32) { true }
 
     b = Crystime::VirtualTime.new
     b.year = 1
