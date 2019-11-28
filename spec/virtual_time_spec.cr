@@ -75,6 +75,7 @@ describe Crystime::VirtualTime do
     a.millisecond = ->( _val : Int32) { true }
 
     a.ts.should eq [nil, true, false, false, false, false, false]
+    a.materializable?.should eq false
   end
 
   it "knows Julian Day Number" do

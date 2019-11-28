@@ -260,6 +260,9 @@ module Crystime
     ## Checks if this VT is in UTC. Responds with fixed value.
     #def utc?() true end
 
+    def materializable?
+      @ts.select{ |i| i == false }.empty?
+    end
     def materialized?
       # XXX do we consider materialized dates those with all values true, or we need
       # to split materialized? into materialized_date? and materialized_time?
