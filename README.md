@@ -377,10 +377,10 @@ In addition to that, also check the examples in the folder `examples/`.
 # TODO
 
 1. Add reminder functions. Previously remind features were implemented using their own code/approach. But maybe reminders should be just regular Items whose exact due date/time is certain offset from the original Item's date/time.
-1. Currently, there is good code for inserting default values if field's value is "true", but there is no ways for users to fill in those defaults
+1. Currently, there exists working code for inserting default values if field's value is "true", but there is no way for users to specify those defaults
 1. Add more cases in which a VirtualTime is materializable (currently it is not if any of its values are anything else other than unset or a number). This should work with the help of user-supplied VT as argument, which will provide hints how to materialize objects in case of ambiguities or multiple choices.
 1. Add more features suitable to be used in a reimplementation of cron using this module
-1. Add a rbtree or something, sorting the items in order of most recent to most distant due date
+1. Add a rbtree or similar, sorting the items in order of most recent to most distant due date
 1. Possibly add some support for triggering actions on exact due dates of items/reminders
 1. Implement a complete task tracking program using Crystime
 1. Write support for exporting items into other calendar apps
