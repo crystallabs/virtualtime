@@ -12,7 +12,7 @@ module Crystime
     end
 
     # Replaces any values of 'true' with a list of VTs. By default, the list is emtpy.
-    def self.virtual_dates( list, default_list= [] of Crystime::VTType)
+    def self.virtual_dates( list, default_list= [] of Crystime::VirtualTimeOrTime)
       list= force_array list
       di= list.index( true)
       if di

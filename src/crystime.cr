@@ -1,5 +1,5 @@
 require "./crystime/*"
 
 module Crystime
-  alias VTType = Crystime::VirtualTime | ::Time
+  alias VirtualTimeOrTime = Crystime::VirtualTime | ::Time
 end
