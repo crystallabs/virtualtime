@@ -8,16 +8,16 @@ It provides two classes: VirtualTime and Item.
 
 ## VirtualTime
 
-The basis of the low-level functionality is class "VirtualTime". Think of it as of
-a normal "Time" struct, but much more flexible.
+VirtualTime is the basis of Crystime's low-level functionality. Think of it as of
+a normal Time struct, but much more flexible.
 
-With regular Time, all fields (year, month, day, hour, minute, second, millisecond) must
+With regular struct Time, all fields (year, month, day, hour, minute, second, millisecond) must
 have a value, and that value must be a specific number. Even if some of Time's fields don't
 require you to set a value (such as hour or minute values), they still default to 0
 internally. As such, Time objects always represent specific dates ("materialized"
 dates in Crystime terminology).
 
-With Crystime's VirtualTime, each field (year, month, day, hour, minute,
+With Crystime's class VirtualTime, each field (year, month, day, hour, minute,
 second, millisecond, day of week, and [julian day](https://en.wikipedia.org/wiki/Julian_day))
 can either remain unspecified, or be a number, or contain a more complex specification
 (list, range, range with step, boolean, or proc).
@@ -28,14 +28,14 @@ another VirtualTime which falls on, or contains, the dates of March 10, 12, 14, 
 
 ## Item
 
-The basis of the high-level user functionality is class "Item". This is intentionally
-called an "item" not to imply any particular type or purpose (e.g. a task, event,
+Item is the basis of Crystime's high-level user functionality. It is intentionally
+called an "Item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
 An item has an absolute start and end VirtualTime, a list of VirtualTimes on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualTimes on which it is specifically
-"omitted" (i.e. "not on", like on weekends, individual holidays dates, certain times of
-day, etc.),
+"omitted" (i.e. "not on", like on weekends, individual holidays dates, or certain times of
+day),
 and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
 it can still be "on", or ignored, or re-scheduled to some time before, or some time after.
 
