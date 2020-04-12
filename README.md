@@ -4,18 +4,20 @@
 
 Crystime is an advanced time, calendar, scheduling, and reminding library for Crystal.
 
-== Installation
+# Installation
 
 Add the following to your application's "shard.yml":
 
+```
  dependencies:
    crystime:
      github: crystallabs/crystime
      version 0.5.1
+```
 
 And run "shards install".
 
-== Usage
+# Usage
 
 Crystime provides two classes: VirtualTime and Item.
 
