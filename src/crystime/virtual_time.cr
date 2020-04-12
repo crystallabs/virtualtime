@@ -376,13 +376,13 @@ module Crystime
     include Comparable(self)
 
     def initialize(d,h,m,s,ns)
-      @span= Time::Span.new(d,h,m,s,ns)
+      @span= Time::Span.new(days: d,hours: h,minutes: m,seconds: s,nanoseconds: ns)
     end
     def initialize(d,h,m,s)
-      @span= Time::Span.new(d,h,m,s)
+      @span= Time::Span.new(days: d, hours: h, minutes: m, seconds: s)
     end
     def initialize(h,m,s)
-      @span= Time::Span.new(h,m,s)
+      @span= Time::Span.new(hours: h, minutes: m, seconds: s)
     end
     def initialize( seconds, nanoseconds = 0)
       @span= Time::Span.new(
