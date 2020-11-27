@@ -26,7 +26,7 @@ Crystime provides two classes: VirtualTime and Item.
 VirtualTime is the basis of Crystime's low-level functionality. Think of it as of
 a normal Time struct, but much more flexible.
 
-With regular struct Time, all fields (year, month, day, hour, minute, second, millisecond) must
+With Crystal's struct Time, all fields (year, month, day, hour, minute, second, millisecond) must
 have a value, and that value must be a specific number. Even if some of Time's fields don't
 require you to set a value (such as hour or minute values), they still default to 0
 internally. As such, Time objects always represent specific dates ("materialized"
@@ -47,7 +47,7 @@ Item is the basis of Crystime's high-level user functionality. It is intentional
 called an "Item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
-An item has an absolute start and end VirtualTime, a list of VirtualTimes on which it is considered
+An Item has: an absolute start and end VirtualTime, a list of VirtualTimes on which it is considered
 "on" (i.e. active, due, scheduled), a list of VirtualTimes on which it is specifically
 "omitted" (i.e. "not on", like on weekends, individual holidays dates, or certain times of
 day),
@@ -269,7 +269,7 @@ fields set.
 
 For that purpose, each VirtualTime keeps track of which of its 7 fields (Y, m, d, H, M, S, and
 millisecond) are set, and which of them are materializable. If any of the individual
-fields are not materializable, then the VT is not either, and an Exception is thrown
+fields are not materializable, then the VT isn't either, and an Exception is thrown
 if materialization is attempted.
 
 Currently, unset values and specific integers are materializable, while fields containing
