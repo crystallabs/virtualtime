@@ -10,6 +10,7 @@ module Crystime
 
     include Comparable(self)
     include Comparable(Time)
+    include YAML::Serializable
 
     # XXX Use Int instead of Int32 when it becomes possible in Crystal
     #alias Virtual = Array(String) | Bool | Int32 | Proc(Int32, Bool) | Range(Int32, Int32) | Enumerable(Int32) | Nil
@@ -25,19 +26,27 @@ module Crystime
     #@minute :      Virtual?
     #@second :      Virtual?
     #@millisecond : Virtual?
-    YAML.mapping({
-      # Date-related properties
-      month:       { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      year:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      day:         { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      day_of_week: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      jd:          { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      # Time-related properties
-      hour:        { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      minute:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      second:      { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-      millisecond: { type: Virtual, nilable: true, setter: false, converter: Crystime::VirtualTimeConverter},
-    })
+
+    # Date-related properties
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter month       : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter year        : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter day         : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter day_of_week : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter jd          : Virtual?
+    # Time-related properties
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter hour        : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter minute      : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter second      : Virtual?
+    @[YAML::Field(converter: ::Crystime::VirtualTimeConverter)]
+    getter millisecond : Virtual?
 
     #property :relative
     #@relative: Nil | Bool
@@ -49,6 +58,7 @@ module Crystime
     # the other has ts[5] set to true, that will be considered a match. (An unspecified value matches all possible values.)
     #      0    1     2     3     4     5     6
     #      year month day   hour  min   sec   ms
+    @[YAML::Field(ignore: true)]
     @ts= [ nil, nil,  nil,  nil,  nil,  nil,  nil] of Bool?
 
     #protected getter time
