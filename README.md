@@ -12,7 +12,7 @@ Add the following to your application's "shard.yml":
  dependencies:
    crystime:
      github: crystallabs/crystime
-     version 0.5.1
+     version 0.5.2
 ```
 
 And run "shards install".

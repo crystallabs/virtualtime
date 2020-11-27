@@ -1,10 +1,10 @@
 name: crystime
-version: 0.5.1
+version: 0.5.2
 
 authors:
   - Davor Ocelic <docelic@crystallabs.io>
 
-crystal: 0.34.0
+crystal: 0.35.1
 
 license: GPL-3.0
 
