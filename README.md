@@ -47,17 +47,16 @@ Item is the basis of Crystime's high-level user functionality. It is intentional
 called an "Item" not to imply any particular type or purpose (e.g. a task, event,
 recurring appointment, reminder, etc.)
 
-An Item has: an absolute start and end VirtualTime, a list of VirtualTimes on which it is considered
-"on" (i.e. active, due, scheduled), a list of VirtualTimes on which it is specifically
-"omitted" (i.e. "not on", like on weekends, individual holidays dates, or certain times of
-day),
-and a rule which specifies what to do if an event falls on an omitted date or time &mdash;
-it can still be "on", or ignored, or re-scheduled to some time before, or some time after.
+An Item has:
+- An absolute start VirtualTime
+- An absolute end VirtualTime
+- A list of VirtualTimes on which it is considered "on" (i.e. active, due, scheduled)
+- A list of VirtualTimes on which it is specifically "omitted" (i.e. "not on", like on weekends, individual holidays dates, or certain times of day),
+- And a rule which specifies what to do if an event falls on an omitted date or time &mdash; it can still be "on", or ignored, or re-scheduled to some time before, or some time after.
 
 If the item's list of due dates is empty, it is considered as always "on".
 If the item's list of omit dates is empty, it is considered as never omitted.
-If there are multiple VirtualTimes set for a field, the matches are logically OR-ed,
-i.e. one match is enough for the field to match.
+If there are multiple VirtualTimes set for a field, the matches are logically OR-ed, i.e. one match is enough for the field to match.
 
 Here is a simple example from the examples/ folder to begin with, with comments:
 
