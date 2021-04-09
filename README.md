@@ -399,3 +399,9 @@ In addition to that, also check the examples in the folder `examples/`.
 1. Implement a complete task tracking program using Crystime
 1. Write support for exporting items into other calendar apps
 1. Proc in VT values should be able to accept all value types that a VT field can accept
+
+# Other Projects
+
+List of interesting or similar projects in no particular order:
+
+- https://dianne.skoll.ca/projects/remind/ - a sophisticated calendar and alarm program
