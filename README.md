@@ -287,11 +287,11 @@ For example:
 ```crystal
 vt= Crystime::VirtualTime.new
 
-# These fields will be used as-is:
+# These fields will be used as-is since they have a value:
 vt.year= 2018
 vt.day= 15
 
-# While others (nils) will be taken from "hint":
+# While others (which are nil) will have their value inserted from the "hint" object:
 hint= Crystime::VirtualTime.new 1,2,3,4,5,6,7
 
 vt.materialize!(hint).to_array # ==> [2018,2,15,4,5,6,7]
