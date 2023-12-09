@@ -18,31 +18,31 @@ class VirtualTime
   alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
 
   # Date-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property year : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property month : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property day : Virtual # 1
 
   # Higher-level date-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property week : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property day_of_week : Virtual # 1 - Monday
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property day_of_year : Virtual # 1
 
   # Time-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property hour : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property minute : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property second : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property millisecond : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
   property nanosecond : Virtual # 0
 
   # Location/timezone in which to perform matching, if any
@@ -383,7 +383,7 @@ class VirtualTime
   end
 
   # A custom to/from YAML converter for VirtualTime.
-  class VirtualConverter
+  class VirtualTimeConverter
     def self.to_yaml(value : VirtualTime::Virtual, yaml : YAML::Nodes::Builder)
       case value
       # when Nil

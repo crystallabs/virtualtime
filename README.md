@@ -152,7 +152,7 @@ Run `crystal spec` or just `crystal s`.
 
 # API Documentation
 
-Run `crystal docs` or just `crystal do`.
+Run `crystal docs` or `crystal do; firefox ./docs/index.html`.
 
 # Other Projects
 
