@@ -54,27 +54,27 @@ On the other hand, `VirtualTime`s do not have to represent any specific points i
 be set or converted so that they do); they are instead intended for conveniently matching broader sets of
 values. VirtualTime instances contain the following properties:
 
-1. Year (0..9999)
-1. Month (1..12)
-1. Day (1..31)
-1. Week number of year (0..53)
-1. Day of week (1..7, Monday == 1)
-1. Day of year (1..366)
-1. Hour (0..23)
-1. Minute (0..59)
-1. Second (0..59)
-1. Millisecond (0..999)
-1. Nanosecond (0..999_999_999)
+1. **Year** (0..9999)
+1. **Month** (1..12)
+1. **Day** (1..31)
+1. **Week number of year** (0..53)
+1. **Day of week** (1..7, Monday == 1)
+1. **Day of year** (1..366)
+1. **Hour** (0..23)
+1. **Minute** (0..59)
+1. **Second** (0..59)
+1. **Millisecond** (0..999)
+1. **Nanosecond** (0..999_999_999)
 
 And each of these properties can have a value of the following types:
 
-1. Nil (no setting), to always match as a default value
-1. A boolean, to always specifically match (`true`) or fail (`false`)
-1. An Int32, to match a specific value such as 5, 12, 2023, -1, or -5
-1. An array of Int32s, such as [1,2,10,-1] to match any value in list
-1. A range of Int32..Int32, such as `10..20` to match any value in range
-1. A range with step, e.g. `day: (10..20).step(2)`, to match all even days between 10th and 20th
-1. A proc, to match a value if the return value from calling a proc is `true`
+1. **Nil** (no setting), to always match as a default value
+1. **Boolean**, to always specifically match (`true`) or fail (`false`)
+1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
+1. **Array of Int32s**, such as [1,2,10,-1] to match any value in list
+1. **Range of Int32..Int32**, such as `10..20` to match any value in range
+1. **Range with step**, e.g. `day: (10..20).step(2)`, to match all even days between 10th and 20th
+1. **Proc**, to match a value if the return value from calling a proc is `true`
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
 
