@@ -1,8 +1,0 @@
-language: crystal
-crystal:
-  - latest
-install:
-  - shards
-script:
-  - crystal spec
-  - bin/ameba
