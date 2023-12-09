@@ -1,8 +1,30 @@
-**Build status**: [![Build Status](https://travis-ci.com/crystallabs/crystime.svg?branch=master)](https://travis-ci.com/crystallabs/crystime)
-[![Version](https://img.shields.io/github/tag/crystallabs/crystime.svg?maxAge=360)](https://github.com/crystallabs/crystime/releases/latest)
-[![License](https://img.shields.io/github/license/crystallabs/crystime.svg)](https://github.com/crystallabs/crystime/blob/master/LICENSE)
+[![Linux CI](https://github.com/crystallabs/virtualtime/workflows/Linux%20CI/badge.svg)](https://github.com/crystallabs/virtualtime/actions?query=workflow%3A%22Linux+CI%22+event%3Apush+branch%3Amaster)
+[![Version](https://img.shields.io/github/tag/crystallabs/virtualtime.svg?maxAge=360)](https://github.com/crystallabs/virtualtime/releases/latest)
+[![License](https://img.shields.io/github/license/crystallabs/virtualtime.svg)](https://github.com/crystallabs/virtualtime/blob/master/LICENSE)
 
-Crystime is an advanced time, calendar, scheduling, and reminding library for Crystal.
+VirtualTime is a time matching class for Crystal.
+It is used for complex and flexible matching of dates and times, primarily for calendar, scheduling, and reminding purposes.
+
+For example:
+
+```cr
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
+vt.hour = 12..16
+
+time = Time.local
+
+vt.matches?
+```
+
+This `VirtualTime` instance will match any `Time` that is:
+
+- Between years 2020 and 2030, inclusively
+- In the last 7 days of each/any month (day = -8..-1; negative values count from the end)
+- Falling on Saturday or Sunday (day_of_week = 6 or 7)
+- And between hours noon and 4PM (hour = 12..16)
 
 # Installation
 
@@ -10,395 +32,128 @@ Add the following to your application's "shard.yml":
 
 ```
  dependencies:
-   crystime:
-     github: crystallabs/crystime
-     version 0.5.2
+   virtualtime:
+     github: crystallabs/virtualtime
+     version ~> 1.0
 ```
 
-And run "shards install".
+And run `shards install` or just `shards`.
 
-# Usage
+# Introduction
 
-Crystime provides two classes: VirtualTime and Item.
+Think of class `VirtualTime` as of a very flexible time specification that can be used to
+match against Crystal's `Time` instances.
 
-## VirtualTime
+Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
+to a specific numeric value. Even if some of its fields aren't required in the constructor,
+internally they still get initialized to 0, 1, or other suitable value.
 
-VirtualTime is the basis of Crystime's low-level functionality. Think of it as of
-a normal Time struct, but much more flexible.
+As such, `Time` instances always represent specific dates and times ("materialized" dates and times).
 
-With Crystal's struct Time, all fields (year, month, day, hour, minute, second, millisecond) must
-have a value, and that value must be a specific number. Even if some of Time's fields don't
-require you to set a value (such as hour or minute values), they still default to 0
-internally. As such, Time objects always represent specific dates ("materialized"
-dates in Crystime terminology).
+On the other hand, `VirtualTime`s do not have to represent any specific points in time (although they can
+be set or converted to that they do); they are instead intended for conveniently matching broader sets of
+values. VirtualTime instances contain the following properties:
 
-With Crystime's class VirtualTime, each field (year, month, day, hour, minute,
-second, millisecond, day of week, and [julian day](https://en.wikipedia.org/wiki/Julian_day))
-can either remain unspecified, or be a number, or contain a more complex specification
-(list, range, range with step, boolean, or proc).
+- Year (0..9999)
+- Month (1..12)
+- Day (1..31)
+- Week number of year (0..53)
+- Day of week (1..7, Monday == 1)
+- Day of year (1..366)
+- Hour (0..23)
+- Minute (0..59)
+- Second (0..59)
+- Millisecond (0..999)
+- Nanosecond (0..999_999_999)
 
-For example, you could construct a VirtualTime with a month of March and a day range
-of 10..20 with step 2. This would represent a "virtual time" that matches any Time or
-another VirtualTime which falls on, or contains, any one date of March 10, 12, 14, 16, 18, or 20.
+And each of these properties can have a value of the following types:
 
-## Item
+- Nil (no setting), to always match
+- A boolean, to always match (`true`) or fail (`false`)
+- An Int32, to match a specific value such as 5, 12, 2023, -1, or -5
+- An array of Int32s, such as [1,2,10] to match any value in list
+- A range of Int32..Int32, such as `10..20` to match any value in range
+- A range with step, e.g. `day: (10..20).step(2)`, to match all even days between 10th and 20th
+- A proc, to match a value if the return value from calling a proc is `true`
 
-Item is the basis of Crystime's high-level user functionality. It is intentionally
-called an "Item" not to imply any particular type or purpose (e.g. a task, event,
-recurring appointment, reminder, etc.)
+All properties (that are specified, i.e. not nil) must match for the match to succeed.
 
-An Item has:
-- An absolute start VirtualTime
-- An absolute end VirtualTime
-- A list of VirtualTimes on which it is considered "on" (i.e. active, due, scheduled)
-- A list of VirtualTimes on which it is specifically "omitted" (i.e. "not on", like on weekends, individual holidays dates, or certain times of day)
-- And a rule which specifies what to do if an event falls on an omitted date or time &mdash; it can still be "on", or ignored, or re-scheduled to some time before, or some time after
+This `VirtualTime` object can then be used for matching arbitrary `Time`s against it, to check if
+they match.
 
-If the item's list of due dates is empty, it is considered as always "on".
-If the item's list of omit dates is empty, it is considered as never omitted.
-If there are multiple VirtualTimes set for a field, the matches are logically OR-ed, i.e. one match is enough for the field to match.
+Negative values count from the end of the range. Typical end values are 7, 12, 30/31, 365/366,
+23, 59, and 999, and virtualtime implicitly knows which one to apply in every case. For example,
+a day of `-1` would always match the last day of the month, be that 28th, 29th, 30th, or 31st in a
+particular case.
 
-Here is a simple example from the examples/ folder to begin with, with comments:
+An interesting case is week number, which is calculated as number of Mondays in the year.
+The first Monday in a year starts week number 1, but not every year starts on Monday so up to
+the first 3 days of new year can still technically belong to the last week of the previous year.
+That means it
+is possible for this field to have values between 0 and 53. Value 53 indicates a week that has
+started in one year (53rd Monday seen in a year), but up to 3 of its days will overflow into
+the new year. Similarly, a value 0 matches up to 3 first days (which inevitably must be
+Friday, Saturday, and/or Sunday) of the new year that belong to the week started in the
+previous year.
 
-```crystal
-# Create an item:
-item = Crystime::Item.new
-
-# Create a VirtualTime that matches every other day from Mar 10 to Mar 20:
-due_march = Crystime::VirtualTime.new
-due_march.month = 3
-due_march.day = (10..20).step 2
-
-# Add this VirtualTime as due date to item:
-item.due<< due_march
-
-# Create a VirtualTime that matches Mar 20 specifically. We will use this to actually omit
-# the event on that day:
-omit_march_20 = Crystime::VirtualTime.new
-omit_march_20.month = 3
-omit_march_20.day = 20
-
-# Add this VirtualTime as omit date to item:
-item.omit<< omit_march_20
-
-# If event falls on an omitted date, try rescheduling it for 2 days later:
-item.omit_shift = Crystime::Span.new(86400 * 2)
-
-
-# Now we can check when the item is due and when it is not:
-
-# Item is not due on Feb 15, 2017 because that's not in March:
-p item.on?( Crystime::VirtualTime["2017-02-15"]) # ==> false
-
-# Item is not due on Mar 15, 2017 because that's not a day of
-# March 10, 12, 14, 16, 18, or 20:
-p item.on?( Crystime::VirtualTime["2017-03-15"]) # ==> false
-
-# Item is due on Mar 16, 2017:
-p item.on?( Crystime::VirtualTime["2017-03-16"]) # ==> true
-
-# Item is due on Mar 18, 2017:
-p item.on?( Crystime::VirtualTime["2017-03-18"]) # ==> true
-
-# And it is due on any Mar 18, doesn't need to be in 2017:
-any_mar_18 = Crystime::VirtualTime.new
-any_mar_18.month = 3
-any_mar_18.day = 18
-p item.on?( any_mar_18 ) # ==> true
-
-# We can check whether this event is due at any point in March:
-any_mar = Crystime::VirtualTime.new
-any_mar.month = 3
-p item.on?( any_mar) # ==> true
-
-# But item is not due on Mar 20, 2017, because that date is omitted, and the system will give us
-# a span of time (offset) when it can be scheduled. Based on our reschedule settings above, this
-# will be a span for 2 days later.
-p item.on?( Crystime::VirtualTime["2017-03-20"]) # ==> #<Crystime::Span @span=2.00:00:00>
-
-# Asking whether the item is due on the rescheduled date (Mar 22) will tell us no, because currently
-# rescheduled dates are not counted as due/on dates:
-p item.on?( Crystime::VirtualTime["2017-03-22"]) # ==> nil
-
-# We can also check whether the item is due using regular Time struct,
-# it does not have to be VirtualTime:
-p item.on?( Time.new 2018, 3, 16) # ==> true
-```
-
-# VirtualTime in Detail
-
-All date/time objects in Crystime (due dates, omit dates, start/stop dates, dates to check etc.)
-are based on VirtualTime. That is because VirtualTime can do everything that Time does (except maybe
-lacking some convenience functions), so it is simpler and more powerful to use it everywhere.
-
-(If you are missing any particular convenience/compatibility functions from Time, please report
-them or submit a PR.)
-
-A VirtualTime has the following fields that can be set in an initializer or after object creation:
-
-```
-year        - Year value
-month       - Month value (1-12)
-day         - Day value (1-31)
-
-day_of_week - Day of week (Sunday = 0, Saturday = 6)
-jd          - Julian Day Number
-
-hour        - Hour value (0-23)
-minute      - Minute value (0-59)
-second      - Second value (0-59)
-millisecond - Millisecond value (0-999)
-```
-
-Each of the above listed fields can have the following values:
-
-1. Nil / undefined (matches everything it is compared with)
-1. A number that is native/accepted for a particular field, e.g. 1 or -2 (negative values count from the end)
-1. A list of numbers native/accepted for a particular field, e.g. [1, 2] or [1, -2] (negative values count from the end)
-1. A range, e.g. 1..6
-1. A range with a step, e.g. (1..6).step(2)
-1. True (inserts default values in place of 'true')
-1. A proc (accepts Int32 as arg, and returns Bool) (not tested extensively)
-
-## Weekday (Day of Week) and Julian Day Number
-
-The day of week and [Julian Day Number](https://en.wikipedia.org/wiki/Julian_day) fields are in relation with the
-Y/m/d values. One can't change one without triggering an automatic change in the other. Specifically:
-
-As long as VirtualTime is materialized (i.e. has specific Y/m/d values), then changing
-any of those values will update `day_of_week` and `jd` automatically. Similarly, setting
-Julian Day Number will automatically update Y/m/d (and implicitly also day of week) and cause the
-date to become materialized.
-
-Please note that in the current behavior, setting `day_of_week` will not affect Y/m/d or jd.
-In essence, if Y/m/d is set and day of week is later changed
-from its existing/auto-computed value, it will probably no longer match any date,
-because the date and day of week will be out of sync. This behavior
-may be useful in rare circumstances (most probably generated by some
-automated script) where you want to match a fixed date, but only if
-that date also happens to fall on a specified day of week.
-
-Please also note that in the current behavior, de-materializing a VirtualTime
-resets both `day_of_week` and `jd` to nil.
-
-The current behavior was choosen based on the assumption that it would
-be the most intuitive / most useful. It could be changed if
-some other behavior is deemed more appropriate.
-
-Altogether, the described syntax allows for specifying simple but functionally intricate
+The described syntax allows for specifying simple but functionally intricate
 rules, of which just some of them are:
 
-```
+```txt
 day=-1                     -- matches last day in month
 day_of_week=6, day=24..31  -- matches last Saturday in month
 day_of_week=1..5, day=-1   -- matches last day of month if it is a workday
 ```
 
-Please note that these are individual VirtualTime rules. Complete Items
-(described below) can have multiple VirtualTimes set as their due, omit,
-and check dates, so arbitrary rules can be expressed.
+Another example:
 
-## VirtualTime from String
+```cr
+vt = VirtualTime.new
 
-There are two ways to create a VirtualTime and both have been implicitly shown
-in use above.
-
-One is by invoking e.g. `vt = VirtualTime.new` and then setting the individual
-fields on `vt`.
-
-For example:
-
-```crystal
-vt = Crystime::VirtualTime.new
-
-vt.year = nil # Remains unspecified, matches everything it is compared with
-vt.month = 3
-vt.day = [1,2]
+vt.year = nil      # Remains unspecified, matches everything it is compared with
+vt.month = 3       # Month of March
+vt.day = [1,-1]    # First and last day of every month
 vt.hour = (10..20)
-vt.minute = (10..20).step(2)
-vt.second = true
-vt.millisecond = ->( val : Int32) { true }
+vt.minute = (0..59).step(2) # Every other (even) minute in an hour
+vt.second = true   # Unconditional match
+vt.millisecond = ->( val : Int32) { true } # Will match any value; block returns true
 ```
 
-Another is creating a VirtualTime from a string, using notation `vt = VirtualTime["... string ..."]`.
-This parser should eventually support everything supported by Ruby's `Time.parse`, `Date.parse`,
-`DateTime.parse`, etc., but for now it supports the following strings and their combinations:
+# Materialization
 
-```
-# Year-Month-Day
-yyyy-mm?-dd?
-yyyy.mm?.dd?
-yyyy/mm?/dd?
-
-# Hour-Minute-Second-Millisecond
-hh?:mm?:ss?
-hh?:mm?:ss?:mss?
-hh?:mm?:ss?.mss?
-
-# Year
-yyyy
-
-# Month abbreviations
-JAN, Feb, mar, apr, may, jun, jul, aug, sep, oct, nov, dec
-
-# Day names
-MON, Tue, wed, thu, fri, sat, sun
-
-```
-
-For example:
-
-```
-vt = VirtualTime["JAN 2018"]
-p vt.month # ==> 1
-
-vt = VirtualTime["2018 sun"]
-p vt.day_of_week # ==> 0
-
-vt = VirtualTime["2018 wed 12:00:00"]
-p vt.day_of_week # ==> 3
-```
-
-## VirtualTime Materialization
-
-VirtualTimes sometimes need to be fully materialized for
+VirtualTimes sometimes need to be "materialized" for
 the purpose of display, calculation, comparison, or conversion. An obvious such case
-is when `to_time()` is invoked on a VT, because a Time object must have all of its
-fields set.
+which happens implicitly is when `to_time()` is invoked on a VT, because a Time object
+must have all of its fields set.
 
-For that purpose, each VirtualTime keeps track of which of its 7 fields (Y, m, d, H, M, S, and
-millisecond) are set, and which of them are materializable. If any of the individual
-fields are not materializable, then the VT isn't either, and an Exception is thrown
-if materialization is attempted.
-
-Currently, unset values and specific integers are materializable, while fields containing
-any other specification are not.
-
-In a call to `materialize!`, one can specify a "hint" argument, whose values will be used
-to aid the materialization process. E.g. to default dates to current date, to default
-times to 12:00 instead of to 00:00, to materialize ranges to something other than their
-beginning, or to run procs which will return values produced in a custom way.
-
-Currently, the implementation is simple, and hint's values are used verbatim in place of
-`nil`s in the original VT, so they are expected to be simple integers.
+Because VirtualTimes can be very broadly defined, often times there are many equal
+choices to which VTs can be materialized. To avoid this problem, materialization takes
+as argument a time hint, and the materialized time will be as close as possible to that
+time.
 
 For example:
 
 ```crystal
-vt= Crystime::VirtualTime.new
+vt= VirtualTime.new
 
 # These fields will be used as-is since they have a value:
 vt.year= 2018
 vt.day= 15
+vt.hour= 0
 
 # While others (which are nil) will have their value inserted from the "hint" object:
-hint= Crystime::VirtualTime.new 1,2,3,4,5,6,7
+hint= Time.local # 2023-12-09 23:23:26.837441132 +01:00 Local
 
-vt.materialize!(hint).to_array # ==> [2018,2,15,4,5,6,7]
+vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 12, 54, nil, 837441132, nil}
 ```
 
-For convenience, the VT's ability to materialize each of its individual fields using their
-current values can be checked through a getter named `ts` or `#materializable?`:
+# Tests
 
-```crystal
-vt = Crystime::VirtualTime.new
+Run `crystal spec` or just `crystal s`.
 
-vt.year = nil
-vt.month = 3
-vt.day = [1,2]
-vt.hour = (10..20)
-vt.minute = (10..20).step(2)
-vt.second = true
-vt.millisecond = ->( val : Int32) { true }
+# API Documentation
 
-# Fields containing nil or true are materializable; fields containing false are not:
-vt.ts # ==> [nil, true, false, false, false, false, false]
-
-# There is also a convenience function `#materializable?` available:
-vt.materializable? # ==> false
-```
-
-# Item in Detail
-
-As mentioned, Item is the toplevel object representing a task/event/etc.
-
-It does not contain any task/event-specific properties, it only concerns itself with
-the scheduling aspect and has the following fields:
-
-```
-start      - Start VirtualTime (item is never "on" before this date)
-stop       - End VirtualTime (item is never "on" after this date)
-
-due        - List of due/on VirtualTimes
-omit       - List of omit/not-on VirtualTimes
-
-omit_shift - What to do if item falls on an omitted date/time:
-           - nil: treat it as not being "on"
-           - false: treat it as being "on", but falling on an omitted
-             and non-reschedulable date, so effectively it is not "on"
-           - true: treat it as "on", regardless of falling on omitted date
-           - Crystime::Span or Time::Span: attempt shifting (rescheduling) by specified span on
-             each attempt. The span to shift can be negative or positive for
-             shifting to an earlier or later date.
-
-shift      - List of VirtualTimes which the new proposed item time (produced by
-             shifting the date by omit_shift span in an attempt to reschedule it)
-             must match for the item to be considered "on"
-
-# (Reminder capabilities were previously in, but now they are
-# waiting for a rewrite and essentially aren't available.)
-```
-
-Here's an example of an item that's due every other day in March, but if it falls
-on a weekend it is ignored. (This is also one from the examples/ folder.)
-
-```crystal
-# Create an item:
-item = Crystime::Item.new
-
-# Create a VirtualTime that matches every other day in March:
-due_march = Crystime::VirtualTime.new
-due_march.month = 3
-due_march.day = (2..31).step 2
-# Add this VirtualTime as due date to item:
-item.due<< due_march
-
-# But on weekends it should not be scheduled:
-not_due_weekend = Crystime::VirtualTime.new
-not_due_weekend.day_of_week = [0,6]
-# Add this VirtualTime as omit date to item:
-item.omit<< not_due_weekend
-
-item.omit_shift = nil
-
-# Now let's check when it is due and when not:
-(1..31).each do |d|
-  p "2017-03-#{d} = #{item.on?( Crystime::VirtualTime["2017-03-#{d}"])}"
-end
-```
-
-# Additional Info
-
-All of the features are covered by specs, please see spec/* for more ideas
-and actual, working examples. To run specs, run the usual command:
-
-```
-crystal spec
-```
-
-In addition to that, also check the examples in the folder `examples/`.
-
-# TODO
-
-1. Add reminder functions. Previously remind features were implemented using their own code/approach. But maybe reminders should be just regular Items whose exact due date/time is certain offset from the original Item's date/time.
-1. Currently, there exists working code for inserting default values if field's value is "true", but there is no way for users to specify those defaults
-1. Add more cases in which a VirtualTime is materializable (currently it is not if any of its values are anything else other than unset or a number). This should work with the help of user-supplied VT as argument, which will provide hints how to materialize objects in case of ambiguities or multiple choices.
-1. Add more features suitable to be used in a reimplementation of cron using this module
-1. Add a rbtree or similar, sorting the items in order of most recent to most distant due date
-1. Possibly add some support for triggering actions on exact due dates of items/reminders
-1. Implement a complete task tracking program using Crystime
-1. Write support for exporting items into other calendar apps
-1. Proc in VT values should be able to accept all value types that a VT field can accept
+Run `crystal docs` or just `crystal do`.
 
 # Other Projects
 
