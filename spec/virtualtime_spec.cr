@@ -71,7 +71,7 @@ describe VirtualTime do
     vt = VirtualTime.new
     vt.hour = 16..20
 
-    t = Time.local 2023,10,10, hour: 0, location: Time::Location.load("Europe/Berlin")
+    t = Time.local 2023, 10, 10, hour: 0, location: Time::Location.load("Europe/Berlin")
     vt.matches?(t).should be_nil
 
     vt.location = Time::Location.load("America/New_York")
