@@ -141,9 +141,9 @@ vt.day= 15
 vt.hour= 0
 
 # While others (which are nil) will have their value inserted from the "hint" object:
-hint= Time.local # 2023-12-09 23:23:26.837441132 +01:00 Local
+hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 
-vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 12, 54, nil, 837441132, nil}
+vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
 
 # Tests
