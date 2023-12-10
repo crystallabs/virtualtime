@@ -154,6 +154,17 @@ However, `VirtualTime` has property `#location` which, if set and different than
 object's `#location`, will cause the object to be duplicated and have its time converted to
 `VirtualTime`'s location before matching.
 
+```cr
+vt = VirtualTime.new
+vt.hour = 16..20
+
+t = Time.local 2023, 10, 10, hour: 0, location: Time::Location.load("Europe/Berlin")
+vt.matches?(t) # ==> nil, because 00 hours is not between 16 and 20
+
+vt.location = Time::Location.load("America/New_York")
+vt.matches?(t) # ==> true, because time instant converted to NY time is 18
+```
+
 # Tests
 
 Run `crystal spec` or just `crystal s`.
