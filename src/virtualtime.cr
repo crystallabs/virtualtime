@@ -460,7 +460,10 @@ class VirtualTime
   # A custom to/from YAML converter for Time::Location.
   class TimeLocationConverter
     def self.to_yaml(value : Time::Location, yaml : YAML::Nodes::Builder)
-      value.name
+      case value
+      when Time::Location
+        yaml.scalar value.name
+      end
     end
 
     def self.from_yaml(value : String | IO) : Time::Location

@@ -1,4 +1,5 @@
-require "./spec_helper"
+require "spec"
+require "../src/virtualtime"
 
 describe VirtualTime do
   it "can be initialized" do
@@ -9,6 +10,7 @@ describe VirtualTime do
     a.day_of_week.should eq nil
     a.location.should eq nil
   end
+
   it "supports all 7 documented types of values" do
     a = VirtualTime.new
     a.year = nil # Remains unspecified, matches everything it is compared with
@@ -65,6 +67,17 @@ describe VirtualTime do
     vt.matches?(Time.parse("2018-03-11", "%F", Time::Location::UTC)).should be_nil
   end
 
+  it "can match Crystal's Times in different locations" do
+    vt = VirtualTime.new
+    vt.hour = 16..20
+
+    t = Time.local 2023,10,10, hour: 0, location: Time::Location.load("Europe/Berlin")
+    vt.matches?(t).should be_nil
+
+    vt.location = Time::Location.load("America/New_York")
+    vt.matches?(t).should be_true
+  end
+
   it "can #to_yaml and #from_yaml" do
     date = VirtualTime.new
     date.year = 2017
@@ -90,13 +103,15 @@ describe VirtualTime do
     vt.hour = (10..20)
     vt.minute = (10..20).step 2
     vt.second = true
+    vt.location = Time::Location.load("Europe/Berlin")
     # vt.millisecond = ->( val : Int32) { true }
-    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\n"
+    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
   end
   it "converts from YAML" do
-    vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\n"
+    vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
     vt.month.should eq 3
     vt.day.should eq [1, 2]
     vt.hour.should eq 10..20
+    vt.location.should eq Time::Location.load("Europe/Berlin")
   end
 end

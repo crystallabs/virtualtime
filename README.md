@@ -146,13 +146,21 @@ hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
 
+# Time Zones
+
+`VirtualTime` is timezone-agnostic. Values are compared against `VirtualTime` values directly.
+
+However, `VirtualTime` has property `#location` which, if set and different than the other
+object's `#location`, will cause the object to be duplicated and have its time converted to
+`VirtualTime`'s location before matching.
+
 # Tests
 
 Run `crystal spec` or just `crystal s`.
 
 # API Documentation
 
-Run `crystal docs` or `crystal do; firefox ./docs/index.html`.
+Run `crystal docs` or `crystal do` and `firefox ./docs/index.html`.
 
 # Other Projects
 
