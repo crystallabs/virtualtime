@@ -34,15 +34,15 @@ Add the following to your application's "shard.yml":
  dependencies:
    virtualtime:
      github: crystallabs/virtualtime
-     version ~> 1.0
+     version: ~> 1.0
 ```
 
 And run `shards install` or just `shards`.
 
 # Introduction
 
-Think of class `VirtualTime` as of a very flexible time specification that can be used to
-match against Crystal's `Time` instances.
+Think of class `VirtualTime` as of a very flexible time specification against which
+Crystal's `Time` instances can be matched.
 
 Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
 to a specific numeric value. Even if some of its fields aren't required in the constructor,
@@ -51,7 +51,7 @@ internally they still get initialized to 0, 1, or other suitable value.
 As such, `Time` instances always represent specific dates and times ("materialized" dates and times).
 
 On the other hand, `VirtualTime`s do not have to represent any specific points in time (although they can
-be set or converted so that they do); they are instead intended for conveniently matching broader sets of
+be set or converted so that they do); they are primarily intended for conveniently matching broader sets of
 values. VirtualTime instances contain the following properties:
 
 1. **Year** (0..9999)
