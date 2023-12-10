@@ -162,7 +162,7 @@ t = Time.local 2023, 10, 10, hour: 0, location: Time::Location.load("Europe/Berl
 vt.matches?(t) # ==> nil, because 00 hours is not between 16 and 20
 
 vt.location = Time::Location.load("America/New_York")
-vt.matches?(t) # ==> true, because time instant converted to NY time is 18
+vt.matches?(t) # ==> true, because time instant 0 hours converted to NY time (-6) is 18 hours
 ```
 
 # Tests
