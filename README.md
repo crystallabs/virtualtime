@@ -13,6 +13,7 @@ vt.year = 2020..2030
 vt.day = -8..-1
 vt.day_of_week = [6,7]
 vt.hour = 12..16
+vt.minute = ->( val : Int32) { true }
 
 time = Time.local
 
@@ -24,7 +25,8 @@ That `VirtualTime` instance will match any `Time` that is:
 - Between years 2020 and 2030, inclusively
 - In the last 7 days of each/any month (day = -8..-1; negative values count from the end)
 - Falling on Saturday or Sunday (day_of_week = 6 or 7)
-- And between hours noon and 4PM (hour = 12..16)
+- Between hours noon and 4PM (hour = 12..16)
+- And any minute (since example block always returns true)
 
 # Installation
 
