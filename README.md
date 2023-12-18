@@ -28,19 +28,8 @@ That `VirtualTime` instance will match any `Time` that is:
 - Between hours noon and 4PM (hour = 12..16)
 - And any minute (since example block always returns true)
 
-It is also possible to match VirtualTimes themselves:
-
-
-```cr
-vt = VirtualTime.new
-vt.month = 3
-vt.day = 15
-
-vt2 = VirtualTime.new
-vt2.month = 2..4
-
-vt.matches?(vt2) # ==> True, because March is in the Feb..April range
-```
+As a more advanced feature, it is also possible to match `VirtualTime`s with other
+`VirtualTime`s. That is documented further below.
 
 # Installation
 
@@ -159,7 +148,7 @@ vt.matches?(vt2) # ==> true
 ```
 
 When matching `VirtualTime`s to `VirtualTime`s, comparisons between fields' values
-which are both `Proc`s is not supported and will throw `ArgumentError` in runtime.
+which are both a `Proc` is not supported and will throw `ArgumentError` in runtime.
 
 # Field Values
 
