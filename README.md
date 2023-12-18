@@ -73,8 +73,8 @@ values. VirtualTime instances contain the following properties:
 
 And each of these properties can have a value of the following types:
 
-1. **Nil** (no setting), to always match as a default value
-1. **Boolean**, to always specifically match (`true`) or fail (`false`)
+1. **Nil** (no setting), to always match anything it is compared with
+1. **Boolean**, to always match (`true`) or fail (`false`)
 1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
 1. **Array of Int32s**, such as [1,2,10,-1] to match any value in list
 1. **Range of Int32..Int32**, such as `10..20` to match any value in range
@@ -83,14 +83,11 @@ And each of these properties can have a value of the following types:
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
 
-This `VirtualTime` object can then be used for matching arbitrary `Time`s against it, to check if
-they match.
-
-# Matching Times
+# Matching `Time`s
 
 Once `VirtualTime` is created, it can be used for matching `Time` objects.
 
-An example showing use of different values was given in the introduction:
+Here is again the example from the introduction section, showing use of different value types:
 
 ```cr
 vt = VirtualTime.new
@@ -105,7 +102,15 @@ time = Time.local
 vt.matches? time
 ```
 
-The syntax allows for specifying simple but functionally intricate rules, of which just some of them are:
+As mentioned, this example will match if the time matched is:
+
+- Between years 2020 and 2030, inclusively
+- In the last 7 days of each/any month (day = -8..-1; negative values count from the end)
+- Falling on Saturday or Sunday (day_of_week = 6 or 7)
+- Between hours noon and 4PM (hour = 12..16)
+- And any minute (since example block always returns true)
+
+The overall syntax allows for specifying simple but flexible rules, such as:
 
 ```txt
 day=-1                     -- matches last day of month (28th, 29th, 30th, or 31st of particular month)
@@ -124,11 +129,16 @@ vt.hour = (10..20)
 vt.minute = (0..59).step(2) # Every other (even) minute in an hour
 vt.second = true   # Unconditional match
 vt.millisecond = ->( val : Int32) { true } # Will match any value as block returns true
+vt.location = Time::Location.load("Europe/Amsterdam")
+
+time = Time.local
+
+vt.matches?(time) # ==> Depends on current time
 ```
 
-# Matching other VirtualTimes
+# Matching `VirtualTime`s
 
-In addition to matching `Time` structs, VirtualTimes can match other VirtualTimes.
+In addition to matching `Time` structs, `VirtualTime`s can match other `VirtualTime`s.
 
 For example, if you had a `VirtualTime` that matches every March 15:
 
