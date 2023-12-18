@@ -36,10 +36,10 @@ As a more advanced feature, it is also possible to match `VirtualTime`s with oth
 Add the following to your application's "shard.yml":
 
 ```
- dependencies:
-   virtualtime:
-     github: crystallabs/virtualtime
-     version: ~> 1.0
+dependencies:
+  virtualtime:
+    github: crystallabs/virtualtime
+    version: ~> 1.0
 ```
 
 And run `shards install` or just `shards`.
