@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 1
-  VERSION_REVISION = 2
+  VERSION_REVISION = 3
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(self)
@@ -56,6 +56,9 @@ class VirtualTime
   # Location/timezone in which to perform matching, if any
   @[YAML::Field(converter: VirtualTime::TimeLocationConverter)]
   property location : Time::Location?
+
+  # Default match result if one of field values matched is `nil`
+  class_property? default_match : Bool = true
 
   def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil)
   end
@@ -108,13 +111,15 @@ class VirtualTime
       self.class.matches?(nanosecond, time.nanosecond, 999_999_999)
   end
 
-  # Performs matching between VirtualTime type and any other type, usually Ints coming from Time
+  # Performs matching between VirtualTime and other supported types
   def self.matches?(a : Nil, b, max = nil)
-    true
+    return false if b == false
+    default_match?
   end
 
   # :ditto:
   def self.matches?(a : Bool, b, max = nil)
+    return false if b == false
     a
   end
 
