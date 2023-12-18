@@ -3,23 +3,23 @@ require "../src/virtualtime"
 
 describe VirtualTime do
   it "can be initialized" do
-    a = VirtualTime.new
-    a.year.should eq nil
-    a.month.should eq nil
-    a.day.should eq nil
-    a.day_of_week.should eq nil
-    a.location.should eq nil
+    vt = VirtualTime.new
+    vt.year.should eq nil
+    vt.month.should eq nil
+    vt.day.should eq nil
+    vt.day_of_week.should eq nil
+    vt.location.should eq nil
   end
 
-  it "supports all 7 documented types of values" do
-    a = VirtualTime.new
-    a.year = nil # Remains unspecified, matches everything it is compared with
-    a.month = 3
-    a.day = [1, 2]
-    a.hour = (10..20)
-    a.minute = (10..20).step(2)
-    a.second = true
-    a.millisecond = ->(_val : Int32) { true }
+  it "supports all documented types of values" do
+    vt = VirtualTime.new
+    vt.year = nil # Remains unspecified, matches everything it is compared with
+    vt.month = 3
+    vt.week = true
+    vt.day = [1, 2]
+    vt.hour = (10..20)
+    vt.minute = (10..20).step(2)
+    vt.millisecond = ->(_val : Int32) { true }
   end
 
   it "can materialize" do
@@ -67,6 +67,30 @@ describe VirtualTime do
     vt.matches?(Time.parse("2018-03-11", "%F", Time::Location::UTC)).should be_nil
   end
 
+  it "can match other VirtualTimes" do
+    vt = VirtualTime.new
+    vt.year = 2017
+    vt.month = 1..3
+    vt.hour = [10, 11, 12]
+    vt.minute = (10..30).step(3)
+    vt.second = ->(_val : Int32) { true }
+    vt.millisecond = 1
+
+    vt2 = VirtualTime.new
+    vt2.year = nil
+    vt2.month = [2, 3]
+    vt2.day = ->(_val : Int32) { true }
+    vt2.hour = 11..12
+    vt2.minute = 20..25
+    vt2.second = 10
+    vt2.millisecond = (10..30).step(3)
+
+    vt.matches?(vt2).should be_nil
+
+    vt.millisecond = 16
+    vt.matches?(vt2).should be_true
+  end
+
   it "can match Crystal's Times in different locations" do
     vt = VirtualTime.new
     vt.hour = 16..20
@@ -82,7 +106,6 @@ describe VirtualTime do
     date = VirtualTime.new
     date.year = 2017
     date.month = 4..6
-    date.day = true
     date.hour = (2..8).step 3
 
     y = date.to_yaml
@@ -112,6 +135,7 @@ describe VirtualTime do
     vt.month.should eq 3
     vt.day.should eq [1, 2]
     vt.hour.should eq 10..20
+    vt.second.should eq true
     vt.location.should eq Time::Location.load("Europe/Berlin")
   end
 end

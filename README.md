@@ -28,6 +28,20 @@ That `VirtualTime` instance will match any `Time` that is:
 - Between hours noon and 4PM (hour = 12..16)
 - And any minute (since example block always returns true)
 
+It is also possible to match VirtualTimes themselves:
+
+
+```cr
+vt = VirtualTime.new
+vt.month = 3
+vt.day = 15
+
+vt2 = VirtualTime.new
+vt2.month = 2..4
+
+vt.matches?(vt2) # ==> True, because March is in the Feb..April range
+```
+
 # Installation
 
 Add the following to your application's "shard.yml":
@@ -83,29 +97,32 @@ All properties (that are specified, i.e. not nil) must match for the match to su
 This `VirtualTime` object can then be used for matching arbitrary `Time`s against it, to check if
 they match.
 
-The described syntax allows for specifying simple but functionally intricate
-rules, of which just some of them are:
+# Matching Times
+
+Once `VirtualTime` is created, it can be used for matching `Time` objects.
+
+An example showing use of different values was given in the introduction:
+
+```cr
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
+vt.hour = 12..16
+vt.minute = ->( val : Int32) { true }
+
+time = Time.local
+
+vt.matches? time
+```
+
+The syntax allows for specifying simple but functionally intricate rules, of which just some of them are:
 
 ```txt
-day=-1                     -- matches last day in month
+day=-1                     -- matches last day of month (28th, 29th, 30th, or 31st of particular month)
 day_of_week=6, day=24..31  -- matches last Saturday in month
 day_of_week=1..5, day=-1   -- matches last day of month if it is a workday
 ```
-
-Negative values count from the end of the range. Typical end values are 7, 12, 30/31, 365/366,
-23, 59, and 999, and virtualtime implicitly knows which one to apply in every case. For example,
-a day of `-1` would always match the last day of the month, be that 28th, 29th, 30th, or 31st in a
-particular case.
-
-An interesting case is week number, which is calculated as number of Mondays in the year.
-The first Monday in a year starts week number 1, but not every year starts on Monday so up to
-the first 3 days of new year can still technically belong to the last week of the previous year.
-That means it
-is possible for this field to have values between 0 and 53. Value 53 indicates a week that has
-started in one year (53rd Monday seen in a year), but up to 3 of its days will overflow into
-the new year. Similarly, a value 0 matches up to the first 3 days (which inevitably must be
-Friday, Saturday, and/or Sunday) of the new year that belong to the week started in the
-previous year.
 
 Another example:
 
@@ -119,6 +136,81 @@ vt.minute = (0..59).step(2) # Every other (even) minute in an hour
 vt.second = true   # Unconditional match
 vt.millisecond = ->( val : Int32) { true } # Will match any value as block returns true
 ```
+
+# Matching other VirtualTimes
+
+In addition to matching `Time` structs, VirtualTimes can match other VirtualTimes.
+
+For example, if you had a `VirtualTime` that matches every March 15:
+
+```cr
+vt = VirtualTime.new month: 3, day: 15
+```
+
+And you wanted to check whether this was scheduled on any day in the first 6 months of
+the year, you could do:
+
+```cr
+vt = VirtualTime.new month: 3, day: 15
+
+vt2 = VirtualTime.new month: 1..6
+
+vt.matches?(vt2) # ==> true
+```
+
+When matching `VirtualTime`s to `VirtualTime`s, comparisons between fields' values
+which are both `Proc`s is not supported and will throw `ArgumentError` in runtime.
+
+# Field Values
+
+As can be seen above, fields can have some interesting values, such as negative numbers.
+
+Here is a list of all non-obvious values that are supported:
+
+1. Negative integer values
+
+Negative integer values count from the end of the range, if the max / wrap-around value is
+specified. Typical end values are 7, 12, 30/31, 365/366, 23, 59, and 999, and virtualtime
+implicitly knows which one to apply in every case.
+For example, a day of `-1` would always match the last day of the month, be that 28th, 29th,
+30th, or 31st in a particular case.
+
+If the wrap-around value is not specified, negative values are not converted to positive
+and they enter matching as-is.
+
+2. Week numbers
+
+Another interesting case is week number, which is calculated as number of Mondays in the year.
+The first Monday in a year starts week number 1, but not every year starts on Monday so up to
+the first 3 days of new year can still technically belong to the last week of the previous year.
+
+That means it is possible for this field to have values between 0 and 53.
+Value 53 indicates a week that has started in one year (53rd Monday seen in a year),
+but up to 3 of its days will overflow into the new year.
+
+Similarly, a value 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
+and/or Sunday) of the new year that belong to the week started in the previous year.
+
+3. Range values
+
+Crystal allows one to define `Range`s that have `end` value smaller than `begin`.
+Such objects will simply not contain any elements.
+
+Because creating such ranges *is* allowed, VirtualTime detects such cases and creates
+copies of objects with values converted to positive and in the correct order.
+
+In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
+match every other day from 10th to a day 7 days before the end of the month.
+
+4. Days in month and year
+
+When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_month` and
+`days_in_year` return `nil`. As a consequence, matching is performed without converting
+negative values to positive ones.
+
+This choice was made because it is only possible to know the exact values if/when `year`
+and `month` happen to be integers. If they are a value of any other type (e.g. a range,
+`2023..2030`), it is ambiguous or indeterminable what the value should be.
 
 # Materialization
 
@@ -166,6 +258,40 @@ vt.matches?(t) # ==> nil, because 00 hours is not between 16 and 20
 vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # ==> true, because time instant 0 hours converted to NY time (-6) is 18 hours
 ```
+
+When comparing `VirtualTime`s to `VirtualTime`s, comparisons between objects with different
+`location` values are not supported and will throw `ArgumentError` in runtime.
+
+# Considerations
+
+Alias `Virtual` is defined as:
+
+```cr
+alias Virtual = Nil | Bool | Int32 |
+  Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) |
+  VirtualProc
+```
+
+`Array`, `Range`, and `Steppable::StepIterator` are mentioned explicitly instead of just
+being replaced with `Enumerable(Int32)` due to a bug in Crystal
+(https://github.com/crystal-lang/crystal/issues/14047).
+
+Another, related consideration is related to matching fields that contain these enumerable
+types.
+
+Some enumerables change internal state when they are used, so in the matching function accepting
+`Enumerable` data types they are `#dup`-ed before use, to make sure the original objects
+remain intact.
+
+An alternative approach, to avoid duplicating objects in every case, would be to define more
+specific function overloads for matching `Array`s, `Range`s, and `StepIterator`s, and only have
+the `Enumerable` function overload as a fallback, unless a more specific match is found.
+
+Currently the first option for doing all matching via `Enumerable`s is used because it
+results is a smaller amount of active code to maintain. But the code for other types exists;
+it is just disabled.
+
+Please open an issue on the project to discuss if you would advise differently.
 
 # Tests
 

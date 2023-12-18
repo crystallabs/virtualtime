@@ -1,5 +1,9 @@
 require "yaml"
 
+class Steppable::StepIterator(T, L, B)
+  getter current, limit, step, exclusive
+end
+
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 0
@@ -12,37 +16,41 @@ class VirtualTime
 
   # TODO Use Int instead of Int32 when it becomes possible in unions in Crystal
   # Separately, XXX, https://github.com/crystal-lang/crystal/issues/14047, when it gets solved, add Enumerable(Int32) and remove Array/Steppable
-  alias Virtual = Nil | Int32 | Bool | Range(Int32, Int32) | Proc(Int32, Bool) | Array(Int32) | Steppable::StepIterator(Int32, Int32, Int32)
+  # alias Virtual = Nil | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32)
+  alias Virtual = Nil | Bool | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
+  alias VirtualProc = Proc(Int32, Bool)
+
+  alias TimeOrVirtualTime = Time | self
 
   # VirtualTime Tuple alias
   alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
 
   # Date-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property year : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property month : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day : Virtual # 1
 
   # Higher-level date-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property week : Virtual # 1
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day_of_week : Virtual # 1 - Monday
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day_of_year : Virtual # 1
 
   # Time-related properties
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property hour : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property minute : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property second : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property millisecond : Virtual # 0
-  @[YAML::Field(converter: VirtualTime::VirtualTimeConverter)]
+  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property nanosecond : Virtual # 0
 
   # Location/timezone in which to perform matching, if any
@@ -62,30 +70,36 @@ class VirtualTime
 
   # :nodoc:
   macro adjust_location
-    if (l = location) && (time.location != l)
-      time = time.in l
+    if time.is_a? Time
+      if (l = location) && (time.location != l)
+        time = time.in l
+      end
+    else
+      if location != time.location
+        raise ArgumentError.new "Comparing VirtualTimes with different locations/timezones not supported (yet?)"
+      end
     end
   end
 
   # Returns whether `VirtualTime` matches the specified time
-  def matches?(time = Time.local)
+  def matches?(time : TimeOrVirtualTime = Time.local)
     adjust_location
     matches_date?(time) && matches_time?(time)
   end
 
   # Returns whether `VirtualTime` matches the date part of specified time
-  def matches_date?(time = Time.local)
+  def matches_date?(time : TimeOrVirtualTime = Time.local)
     adjust_location
     self.class.matches?(year, time.year, 9999) &&
       self.class.matches?(month, time.month, 12) &&
       self.class.matches?(day, time.day, TimeHelper.days_in_month(time)) &&
-      self.class.matches?(week, time.calendar_week[1].to_i, TimeHelper.weeks_in_year(time)) &&
-      self.class.matches?(day_of_week, time.day_of_week.to_i, 7) &&
-      self.class.matches?(day_of_year, time.day_of_year, TimeHelper.days_in_year(time))
+      self.class.matches?(week, TimeHelper.week(time), TimeHelper.weeks_in_year(time)) &&
+      self.class.matches?(day_of_week, TimeHelper.day_of_week(time), 7) &&
+      self.class.matches?(day_of_year, TimeHelper.day_of_year(time), TimeHelper.days_in_year(time))
   end
 
   # Returns whether `VirtualTime` matches the time part of specified time
-  def matches_time?(time = Time.local)
+  def matches_time?(time : TimeOrVirtualTime = Time.local)
     adjust_location
     self.class.matches?(hour, time.hour, 23) &&
       self.class.matches?(minute, time.minute, 59) &&
@@ -106,34 +120,155 @@ class VirtualTime
 
   # :ditto:
   def self.matches?(a : Int, b : Int, max = nil)
-    a = max + a + 1 if max && (a < 0)
+    if max
+      a = max + a + 1 if a < 0
+      b = max + b + 1 if b < 0
+    end
     (a == b) || nil
   end
 
+  # # ###### Possibly enable
+  # # :ditto:
+  # def self.matches?(a : Array(Int), b : Int, max = nil)
+  #   a.each do |aa|
+  #     return true if matches? aa, b, max
+  #   end
+  #   nil
+  # end
+
+  # # :ditto:
+  # def self.matches?(a : Range(Int, Int), b : Int, max = nil)
+  #   if max && (a.begin < 0 || a.end < 0)
+  #     ab = a.begin < 0 ? max + a.begin + 1 : a.begin
+  #     ae = a.end < 0 ? max + a.end + 1 : a.end
+  #     a = ab..ae
+  #   end
+  #   a.each do |aa|
+  #     return true if matches? aa, b, max
+  #   end
+  #   nil
+  # end
+
+  # # :ditto:
+  # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Int, max = nil)
+  #   if max && (a.current < 0 || a.limit < 0)
+  #     ab = a.current < 0 ? max + a.current + 1 : a.current
+  #     ae = a.limit < 0 ? max + a.limit + 1 : a.limit
+  #     a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
+  #   else
+  #     a = a.dup
+  #   end
+  #   a.each do |aa|
+  #     return true if matches? aa, b, max
+  #   end
+  #   nil
+  # end
+
+  # # ###### Possibly enable
+
   # :ditto:
-  def self.matches?(a : Range(Int, Int), b, max = nil)
-    if max && (a.begin < 0 || a.end < 0)
-      ab = a.begin < 0 ? max + a.begin + 1 : a.begin
-      ae = a.end < 0 ? max + a.end + 1 : a.end
-      a = ab..ae
+  def self.matches?(a : Enumerable(Int), b : Int, max = nil)
+    a.dup.each do |aa|
+      return true if matches? aa, b, max
     end
-    a.includes?(b) || nil
+    nil
+  end
+
+  # # ###### Possibly enable
+  # # :ditto:
+  # def self.matches?(a : Array(Int), b : Array(Int), max = nil)
+  #   a.each do |aa|
+  #     b.each do |bb|
+  #       return true if matches? aa, bb, max
+  #     end
+  #   end
+  #   nil
+  # end
+
+  # # :ditto:
+  # def self.matches?(a : Range(Int, Int), b : Range(Int, Int), max = nil)
+  #   if max
+  #     if (a.begin < 0 || a.end < 0)
+  #       ab = a.begin < 0 ? max + a.begin + 1 : a.begin
+  #       ae = a.end < 0 ? max + a.end + 1 : a.end
+  #       a = ab..ae
+  #     end
+  #     if (b.begin < 0 || b.end < 0)
+  #       bb = b.begin < 0 ? max + b.begin + 1 : b.begin
+  #       be = b.end < 0 ? max + b.end + 1 : b.end
+  #       b = bb..be
+  #     end
+  #   end
+  #   a.each do |aa|
+  #     b.each do |bb|
+  #       return true if matches? aa, bb, max
+  #     end
+  #   end
+  #   nil
+  # end
+
+  # # :ditto:
+  # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Steppable::StepIterator(Int, Int, Int), max = nil)
+  #   if max
+  #     if a.current < 0 || a.limit < 0
+  #       ab = a.current < 0 ? max + a.current + 1 : a.current
+  #       ae = a.limit < 0 ? max + a.limit + 1 : a.limit
+  #       a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
+  #     else
+  #       a = a.dup
+  #     end
+  #     if b.current < 0 || b.limit < 0
+  #       bb = b.current < 0 ? max + b.current + 1 : b.current
+  #       be = b.limit < 0 ? max + b.limit + 1 : b.limit
+  #       b = Steppable::StepIterator(Int32, Int32, Int32).new bb, be, b.step, b.exclusive
+  #     else
+  #       b = b.dup
+  #     end
+  #   end
+  #   a.each do |aa|
+  #     b.each do |bb|
+  #       return true if matches? aa, bb, max
+  #     end
+  #   end
+  #   nil
+  # end
+
+  # # ###### Possibly enable
+
+  # :ditto:
+  def self.matches?(a : Enumerable(Int), b : Enumerable(Int), max = nil)
+    a.dup.each do |aa|
+      b.dup.each do |bb|
+        return true if matches? aa, bb, max
+      end
+    end
+    nil
   end
 
   # :ditto:
-  def self.matches?(a : Enumerable(Int), b, max = nil)
-    # XXX What to do about having to dup the enumerable/iterator not to rewind it?
-    aa = a.dup
-    if max # && a.any?(&.<(0))
-      aa = a.map { |e| e < 0 ? max + e + 1 : e }
+  def self.matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
+    a.dup.each do |aa|
+      return true if b.call aa
     end
-    aa.includes?(b) || nil
+    nil
   end
 
   # :ditto:
-  def self.matches?(a : Proc(Int32, Bool), b, max = nil)
+  def self.matches?(a : VirtualProc, b : Int, max = nil)
     a.call b
   end
+
+  # :ditto:
+  def self.matches?(a : VirtualProc, b : VirtualProc, max = nil)
+    raise ArgumentError.new "Proc to Proc comparison not supported (yet?)"
+  end
+
+  def self.matches?(a, b, max = nil)
+    matches? b, a, max
+  end
+
+  # be Bool, Enumerable(Int), Int, Nil, Proc(Virtual, Bool) or Range(Int, Int)
+  # no (Array(Int32) | | Proc(Virtual, Bool) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32)
 
   # Materializing
   # Time: year, month, day, calendar_week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
@@ -201,7 +336,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(value : Proc(Int32, Bool), default : Int32, max = nil, strict = true)
+  def self.materialize(value : Proc(Virtual, Bool), default : Int32, max = nil, strict = true)
     default
   end
 
@@ -334,9 +469,12 @@ class VirtualTime
     #
     # The calculation is identical as the first part of `Time#calendar_week`.
     # .
-    @[AlwaysInline]
-    def self.weeks_in_year(time)
+    def self.weeks_in_year(time : Time)
       (time.at_end_of_year.day_of_year - time.day_of_week.to_i + 10) // 7
+    end
+
+    def self.weeks_in_year(time : VirtualTime)
+      0
     end
 
     # Returns current week of year.
@@ -347,21 +485,46 @@ class VirtualTime
     # Week number 53 means January 1 is on a Friday, or the year was a leap year.
     #
     # The calculation is identical as the first part of `Time#calendar_week`.
-    @[AlwaysInline]
     def self.week_of_year(time)
       (time.day_of_year - time.day_of_week.to_i + 10) // 7
     end
 
     # Returns number of days in current month
-    @[AlwaysInline]
-    def self.days_in_month(time)
+    def self.days_in_month(time : Time)
       Time.days_in_month time.year, time.month
     end
 
+    def self.days_in_month(time : VirtualTime)
+      nil
+    end
+
+    def self.week(time : Time)
+      time.calendar_week[1].to_i
+    end
+
+    def self.week(time : VirtualTime)
+      time.week
+    end
+
+    def self.day_of_week(time : Time)
+      time.day_of_week.to_i
+    end
+
+    def self.day_of_week(time : VirtualTime)
+      time.day_of_week
+    end
+
+    def self.day_of_year(time)
+      time.day_of_year
+    end
+
     # Returns number of days in current year
-    @[AlwaysInline]
-    def self.days_in_year(time)
+    def self.days_in_year(time : Time)
       Time.days_in_year time.year
+    end
+
+    def self.days_in_year(time : VirtualTime)
+      nil
     end
   end
 
@@ -383,17 +546,17 @@ class VirtualTime
   end
 
   # A custom to/from YAML converter for VirtualTime.
-  class VirtualTimeConverter
+  class VirtualConverter
     def self.to_yaml(value : VirtualTime::Virtual, yaml : YAML::Nodes::Builder)
       case value
       # when Nil
       #  # Nils are ignored; they default to nil in constructor if/when a value is missing
       #  yaml.scalar "nil"
-      when Int
-        yaml.scalar value
       when Bool
         yaml.scalar value
         # This case wont match
+      when Int
+        yaml.scalar value
       when Range(Int32, Int32)
         # TODO seems there is no support for range with step?
         yaml.scalar value # .begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
@@ -427,7 +590,6 @@ class VirtualTime
       parse_from node.value
     end
 
-    @[AlwaysInline]
     def self.parse_from(value)
       case value
       when "nil"
@@ -448,8 +610,8 @@ class VirtualTime
         true
       when "false"
         false
-        # XXX The next one is here just to satisfy return type. It doesn't really work.
       when /^->/
+        # XXX This one is here just to satisfy return type. It doesn't really work.
         ->(_v : Int32) { true }
       else
         raise ArgumentError.new "Invalid YAML input (#{value})"
