@@ -154,8 +154,8 @@ vt.matches?(vt2) # ==> true
 It doesn't matter whether you are comparing `vt` to `vt2` or vice-versa, the
 operation is commutative.
 
-When matching `VirtualTime`s to `VirtualTime`s, comparisons between field values
-which are both a `Proc` is not supported and will throw `ArgumentError` in runtime.
+The only note is that comparisons between field values which are both a `Proc`
+are not supported and will throw `ArgumentError` in runtime.
 
 # Field Values in Detail
 
