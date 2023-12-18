@@ -154,13 +154,13 @@ vt.matches?(vt2) # ==> true
 When matching `VirtualTime`s to `VirtualTime`s, comparisons between field values
 which are both a `Proc` is not supported and will throw `ArgumentError` in runtime.
 
-# Field Values
+# Field Values in Detail
 
 As can be seen above, fields can have some interesting values, such as negative numbers.
 
 Here is a list of all non-obvious values that are supported:
 
-1. Negative integer values
+## Negative integer values
 
 Negative integer values count from the end of the range, if the max / wrap-around value is
 specified. Typical end values are 7, 12, 30/31, 365/366, 23, 59, and 999, and virtualtime
@@ -169,22 +169,25 @@ For example, a day of `-1` would always match the last day of the month, be that
 30th, or 31st in a particular case.
 
 If the wrap-around value is not specified, negative values are not converted to positive
-and they enter matching as-is.
+ones, and they enter matching as-is.
 
-2. Week numbers
+## Week numbers
 
 Another interesting case is week number, which is calculated as number of Mondays in the year.
-The first Monday in a year starts week number 1, but not every year starts on Monday so up to
-the first 3 days of new year can still technically belong to the last week of the previous year.
+The first Monday in a year starts week number 1. But since not every year starts on Monday, up to
+the first 3 days of a new year can still technically belong to the last week of the previous year.
 
 That means it is possible for this field to have values between 0 and 53.
 Value 53 indicates a week that has started in one year (53rd Monday seen in a year),
-but up to 3 of its days will overflow into the new year.
+but at least one (and up to 3) of its days will overflow into the new year.
 
 Similarly, a value 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
 and/or Sunday) of the new year that belong to the week started in the previous year.
 
-3. Range values
+That allows for a very flexible matching. If you want to match the first or last 7 days of
+a year irrespective of weeks, then you should use `day: 1..7` or `day: -7..-1`.
+
+## Range values
 
 Crystal allows one to define `Range`s that have `end` value smaller than `begin`.
 Such objects will simply not contain any elements.
@@ -195,7 +198,7 @@ copies of objects with values converted to positive and in the correct order.
 In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
 match every other day from 10th to a day 7 days before the end of the month.
 
-4. Days in month and year
+## Days in month and year
 
 When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_month` and
 `days_in_year` return `nil`. As a consequence, matching is performed without converting
