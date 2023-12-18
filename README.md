@@ -3,9 +3,9 @@
 [![License](https://img.shields.io/github/license/crystallabs/virtualtime.svg)](https://github.com/crystallabs/virtualtime/blob/master/LICENSE)
 
 VirtualTime is a time matching class for Crystal.
-It is used for complex and flexible matching of dates and times, primarily for calendar, scheduling, and reminding purposes.
-
 It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
+
+It is used for complex and flexible matching of dates and times, primarily for calendar, scheduling, and reminding purposes.
 
 For example:
 
