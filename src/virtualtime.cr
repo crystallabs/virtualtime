@@ -10,46 +10,52 @@ class VirtualTime
   VERSION_REVISION = 4
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
-  include Comparable(self)
   include Comparable(Time)
   include YAML::Serializable
 
   # TODO Use Int instead of Int32 when it becomes possible in unions in Crystal
   # Separately, XXX, https://github.com/crystal-lang/crystal/issues/14047, when it gets solved, add Enumerable(Int32) and remove Array/Steppable
-  # alias Virtual = Nil | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32)
   alias Virtual = Nil | Bool | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
   alias VirtualProc = Proc(Int32, Bool)
-
+  alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
   alias TimeOrVirtualTime = Time | self
 
-  # VirtualTime Tuple alias
-  alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
-
   # Date-related properties
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property year : Virtual # 1
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property month : Virtual # 1
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day : Virtual # 1
 
   # Higher-level date-related properties
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property week : Virtual # 1
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day_of_week : Virtual # 1 - Monday
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property day_of_year : Virtual # 1
 
   # Time-related properties
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property hour : Virtual # 0
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property minute : Virtual # 0
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property second : Virtual # 0
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property millisecond : Virtual # 0
+
   @[YAML::Field(converter: VirtualTime::VirtualConverter)]
   property nanosecond : Virtual # 0
 
@@ -88,6 +94,14 @@ class VirtualTime
   def matches?(time : TimeOrVirtualTime = Time.local)
     adjust_location
     matches_date?(time) && matches_time?(time)
+  end
+
+  # :ditto:
+  #
+  # Alias for `matches?`.
+  @[AlwaysInline]
+  def ==(time : TimeOrVirtualTime = Time.local)
+    matches? time
   end
 
   # Returns whether `VirtualTime` matches the date part of specified time
@@ -349,7 +363,7 @@ class VirtualTime
 
   # Comparison with self
 
-  def <=>(other : self)
+  def ==(other : self)
     (year == other.year) &&
       (month == other.month) &&
       (day == other.day) &&
@@ -360,7 +374,7 @@ class VirtualTime
       (minute == other.minute) &&
       (second == other.second) &&
       (millisecond == other.millisecond) &&
-      (nanosecond == other.nanosecond) && 0
+      (nanosecond == other.nanosecond)
   end
 
   # Comparison and conversion to and from time
