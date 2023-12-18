@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 1
-  VERSION_REVISION = 3
+  VERSION_REVISION = 4
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(self)
@@ -129,7 +129,7 @@ class VirtualTime
       a = max + a + 1 if a < 0
       b = max + b + 1 if b < 0
     end
-    (a == b) || nil
+    a == b
   end
 
   # # ###### Possibly enable
@@ -138,7 +138,7 @@ class VirtualTime
   #   a.each do |aa|
   #     return true if matches? aa, b, max
   #   end
-  #   nil
+  #   false
   # end
 
   # # :ditto:
@@ -151,7 +151,7 @@ class VirtualTime
   #   a.each do |aa|
   #     return true if matches? aa, b, max
   #   end
-  #   nil
+  #   false
   # end
 
   # # :ditto:
@@ -166,7 +166,7 @@ class VirtualTime
   #   a.each do |aa|
   #     return true if matches? aa, b, max
   #   end
-  #   nil
+  #   false
   # end
 
   # # ###### Possibly enable
@@ -176,7 +176,7 @@ class VirtualTime
     a.dup.each do |aa|
       return true if matches? aa, b, max
     end
-    nil
+    false
   end
 
   # # ###### Possibly enable
@@ -187,7 +187,7 @@ class VirtualTime
   #       return true if matches? aa, bb, max
   #     end
   #   end
-  #   nil
+  #   false
   # end
 
   # # :ditto:
@@ -209,7 +209,7 @@ class VirtualTime
   #       return true if matches? aa, bb, max
   #     end
   #   end
-  #   nil
+  #   false
   # end
 
   # # :ditto:
@@ -235,7 +235,7 @@ class VirtualTime
   #       return true if matches? aa, bb, max
   #     end
   #   end
-  #   nil
+  #   false
   # end
 
   # # ###### Possibly enable
@@ -247,7 +247,7 @@ class VirtualTime
         return true if matches? aa, bb, max
       end
     end
-    nil
+    false
   end
 
   # :ditto:
@@ -256,7 +256,7 @@ class VirtualTime
       aa = max + aa + 1 if max && (aa < 0)
       return true if b.call aa
     end
-    nil
+    false
   end
 
   # :ditto:

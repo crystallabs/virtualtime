@@ -64,7 +64,7 @@ describe VirtualTime do
     vt.day = (10..20).step(2)
 
     vt.matches?(Time.parse("2018-03-10", "%F", Time::Location::UTC)).should be_true
-    vt.matches?(Time.parse("2018-03-11", "%F", Time::Location::UTC)).should be_nil
+    vt.matches?(Time.parse("2018-03-11", "%F", Time::Location::UTC)).should be_false
   end
 
   it "can match other VirtualTimes" do
@@ -85,7 +85,7 @@ describe VirtualTime do
     vt2.second = 10
     vt2.millisecond = (10..30).step(3)
 
-    vt.matches?(vt2).should be_nil
+    vt.matches?(vt2).should be_false
 
     vt.millisecond = 16
     vt.matches?(vt2).should be_true
@@ -96,7 +96,7 @@ describe VirtualTime do
     vt.hour = 16..20
 
     t = Time.local 2023, 10, 10, hour: 0, location: Time::Location.load("Europe/Berlin")
-    vt.matches?(t).should be_nil
+    vt.matches?(t).should be_false
 
     vt.location = Time::Location.load("America/New_York")
     vt.matches?(t).should be_true
