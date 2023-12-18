@@ -151,7 +151,7 @@ vt2 = VirtualTime.new month: 1..6
 vt.matches?(vt2) # ==> true
 ```
 
-When matching `VirtualTime`s to `VirtualTime`s, comparisons between fields' values
+When matching `VirtualTime`s to `VirtualTime`s, comparisons between field values
 which are both a `Proc` is not supported and will throw `ArgumentError` in runtime.
 
 # Field Values
