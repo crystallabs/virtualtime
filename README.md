@@ -151,6 +151,9 @@ vt2 = VirtualTime.new month: 1..6
 vt.matches?(vt2) # ==> true
 ```
 
+It doesn't matter whether you are comparing `vt` to `vt2` or vice-versa, the
+operation is commutative.
+
 When matching `VirtualTime`s to `VirtualTime`s, comparisons between field values
 which are both a `Proc` is not supported and will throw `ArgumentError` in runtime.
 
@@ -205,8 +208,9 @@ When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_
 negative values to positive ones.
 
 This choice was made because it is only possible to know the exact values if/when `year`
-and `month` happen to be integers. If they are a value of any other type (e.g. a range,
-`2023..2030`), it is ambiguous or indeterminable what the value should be.
+and `month` happen to be defined and contain integers.
+If they are not both defined, or they contain a value of any other type (e.g. a range
+`2023..2030`), it is ambiguous or indeterminable what the exact value should be.
 
 # Materialization
 
