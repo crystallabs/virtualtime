@@ -73,7 +73,7 @@ values. VirtualTime instances contain the following properties:
 
 And each of these properties can have a value of the following types:
 
-1. **Nil** (no setting), to always match anything it is compared with
+1. **Nil**, to default to `VirtualTime.default_match? : Bool = true`
 1. **Boolean**, to always match (`true`) or fail (`false`)
 1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
 1. **Array of Int32s**, such as [1,2,10,-1] to match any value in list
