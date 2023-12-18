@@ -47,7 +47,7 @@ And run `shards install` or just `shards`.
 # Introduction
 
 Think of class `VirtualTime` as of a very flexible time specification against which
-Crystal's `Time` instances can be matched.
+Crystal's `Time` instances and other `VirtualTime`s can be matched.
 
 Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
 to a specific numeric value. Even if some of its fields aren't required in the constructor,
