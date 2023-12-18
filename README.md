@@ -140,14 +140,8 @@ vt.matches?(time) # ==> Depends on current time
 
 In addition to matching `Time` structs, `VirtualTime`s can match other `VirtualTime`s.
 
-For example, if you had a `VirtualTime` that matches every March 15:
-
-```cr
-vt = VirtualTime.new month: 3, day: 15
-```
-
-And you wanted to check whether this was scheduled on any day in the first 6 months of
-the year, you could do:
+For example, if you had a `VirtualTime` that matches every March 15 and you wanted to check
+whether this was falling on any day in the first 6 months of the year, you could do:
 
 ```cr
 vt = VirtualTime.new month: 3, day: 15
