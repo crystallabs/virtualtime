@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 1
-  VERSION_REVISION = 1
+  VERSION_REVISION = 2
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(self)
@@ -248,6 +248,7 @@ class VirtualTime
   # :ditto:
   def self.matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
     a.dup.each do |aa|
+      aa = max + aa + 1 if max && (aa < 0)
       return true if b.call aa
     end
     nil
@@ -255,6 +256,7 @@ class VirtualTime
 
   # :ditto:
   def self.matches?(a : VirtualProc, b : Int, max = nil)
+    b = max + b + 1 if max && (b < 0)
     a.call b
   end
 
