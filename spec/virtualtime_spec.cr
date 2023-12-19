@@ -138,4 +138,26 @@ describe VirtualTime do
     vt.second.should eq true
     vt.location.should eq Time::Location.load("Europe/Berlin")
   end
+
+  it "does range comparison properly" do
+    a = 6..10
+    b = 2..4
+    c = 4..6
+    d = 6..8
+    e = 5..7
+    f = 7..8
+    g = 8..10
+    h = 10..12
+    i = 9..11
+    j = 20..24
+    VirtualTime.matches?(a, b).should be_false
+    VirtualTime.matches?(a, c).should be_true
+    VirtualTime.matches?(a, d).should be_true
+    VirtualTime.matches?(a, e).should be_true
+    VirtualTime.matches?(a, f).should be_true
+    VirtualTime.matches?(a, g).should be_true
+    VirtualTime.matches?(a, h).should be_true
+    VirtualTime.matches?(a, i).should be_true
+    VirtualTime.matches?(a, j).should be_false
+  end
 end

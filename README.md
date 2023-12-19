@@ -2,6 +2,8 @@
 [![Version](https://img.shields.io/github/tag/crystallabs/virtualtime.svg?maxAge=360)](https://github.com/crystallabs/virtualtime/releases/latest)
 [![License](https://img.shields.io/github/license/crystallabs/virtualtime.svg)](https://github.com/crystallabs/virtualtime/blob/master/LICENSE)
 
+# VirtualTime
+
 VirtualTime is a time matching class for Crystal.
 It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
 
@@ -33,7 +35,7 @@ That `VirtualTime` instance will match any `Time` that is:
 As a more advanced feature, it is also possible to match `VirtualTime`s with other
 `VirtualTime`s. That is documented further below.
 
-# Installation
+## Installation
 
 Add the following to your application's "shard.yml":
 
@@ -46,7 +48,7 @@ dependencies:
 
 And run `shards install` or just `shards`.
 
-# Introduction
+## Introduction
 
 Think of class `VirtualTime` as of a very flexible time specification against which
 Crystal's `Time` instances and other `VirtualTime`s can be matched.
@@ -85,7 +87,7 @@ And each of these properties can have a value of the following types:
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
 
-# Matching `Time`s
+## Matching `Time`s
 
 Once `VirtualTime` is created, it can be used for matching `Time` objects.
 
@@ -138,7 +140,7 @@ time = Time.local
 vt.matches?(time) # ==> Depends on current time
 ```
 
-# Matching `VirtualTime`s
+## Matching `VirtualTime`s
 
 In addition to matching `Time` structs, `VirtualTime`s can match other `VirtualTime`s.
 
@@ -159,13 +161,13 @@ operation is commutative.
 The only note is that comparisons between field values which are both a `Proc`
 are not supported and will throw `ArgumentError` in runtime.
 
-# Field Values in Detail
+## Field Values in Detail
 
 As can be seen above, fields can have some interesting values, such as negative numbers.
 
 Here is a list of all non-obvious values that are supported:
 
-## Negative integer values
+### Negative integer values
 
 Negative integer values count from the end of the range, if the max / wrap-around value is
 specified. Typical end values are 7, 12, 30/31, 365/366, 23, 59, and 999, and virtualtime
@@ -176,7 +178,7 @@ For example, a day of `-1` would always match the last day of the month, be that
 If the wrap-around value is not specified, negative values are not converted to positive
 ones, and they enter matching as-is.
 
-## Week numbers
+### Week numbers
 
 Another interesting case is week number, which is calculated as number of Mondays in the year.
 The first Monday in a year starts week number 1. But since not every year starts on Monday, up to
@@ -192,7 +194,7 @@ and/or Sunday) of the new year that belong to the week started in the previous y
 That allows for a very flexible matching. If you want to match the first or last 7 days of
 a year irrespective of weeks, then you should use `day: 1..7` or `day: -7..-1`.
 
-## Range values
+### Range values
 
 Crystal allows one to define `Range`s that have `end` value smaller than `begin`.
 Such objects will simply not contain any elements.
@@ -203,7 +205,7 @@ copies of objects with values converted to positive and in the correct order.
 In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
 match every other day from 10th to a day 7 days before the end of the month.
 
-## Days in month and year
+### Days in month and year
 
 When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_month` and
 `days_in_year` return `nil`. As a consequence, matching is performed without converting
@@ -214,7 +216,7 @@ and `month` happen to be defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
 
-# Materialization
+## Materialization
 
 VirtualTimes sometimes need to be "materialized" for
 the purpose of display, calculation, comparison, or conversion. An obvious such case
@@ -242,7 +244,7 @@ hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
 
-# Time Zones
+## Time Zones
 
 `VirtualTime` is timezone-agnostic. Values are compared against `VirtualTime` values directly.
 
@@ -264,7 +266,7 @@ vt.matches?(t) # ==> true, because time instant 0 hours converted to NY time (-6
 When comparing `VirtualTime`s to `VirtualTime`s, comparisons between objects with different
 `location` values are not supported and will throw `ArgumentError` in runtime.
 
-# Considerations
+## Considerations
 
 Alias `Virtual` is defined as:
 
@@ -295,15 +297,15 @@ it is just disabled.
 
 Please open an issue on the project to discuss if you would advise differently.
 
-# Tests
+## Tests
 
 Run `crystal spec` or just `crystal s`.
 
-# API Documentation
+## API Documentation
 
 Run `crystal docs` or `crystal do` and `firefox ./docs/index.html`.
 
-# Other Projects
+## Other Projects
 
 List of interesting or similar projects in no particular order:
 
