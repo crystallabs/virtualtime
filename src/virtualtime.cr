@@ -464,6 +464,27 @@ class VirtualTime
       nanosecond: nanoseconds ? time.nanosecond : nil
   end
 
+  # Convenience functions
+
+  def nil_date!
+    self.year = nil
+    self.month = nil
+    self.day = nil
+    self.week = nil
+    self.day_of_week = nil
+    self.day_of_year = nil
+    self
+  end
+
+  def nil_time!
+    self.hour = nil
+    self.minute = nil
+    self.second = nil
+    self.millisecond = nil
+    self.nanosecond = nil
+    self
+  end
+
   # Misc conversions
 
   # Outputs VirtualTime instance as a tuple with signature `Tuple(11x Virtual, Time::Location?)`
