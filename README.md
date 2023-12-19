@@ -176,7 +176,7 @@ For example, a day of `-1` would always match the last day of the month, be that
 30th, or 31st in a particular case.
 
 If the wrap-around value is not specified, negative values are not converted to positive
-ones, and they enter matching as-is.
+ones, and they enter matching as-is. In practice, this means they will not match any `Time`s, but may match similar `VirtualTime`s.
 
 ### Week numbers
 
@@ -192,7 +192,7 @@ Similarly, a value 0 matches up to the first 3 days (which inevitably must be Fr
 and/or Sunday) of the new year that belong to the week started in the previous year.
 
 That allows for a very flexible matching. If you want to match the first or last 7 days of
-a year irrespective of weeks, then you should use `day: 1..7` or `day: -7..-1`.
+a year irrespective of weeks, then you should use `day: 1..7` or `day: -7..-1` instead.
 
 ### Range values
 
@@ -211,8 +211,8 @@ When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_
 `days_in_year` return `nil`. As a consequence, matching is performed without converting
 negative values to positive ones.
 
-This choice was made because it is only possible to know the exact values if/when `year`
-and `month` happen to be defined and contain integers.
+This choice was made because it is only possible to know the number of days in a month if both `year`
+and `month` are defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
 
@@ -243,6 +243,8 @@ hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 
 vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
+
+Unless specified, the time hint defaults to current local time.
 
 ## Time Zones
 

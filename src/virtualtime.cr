@@ -482,6 +482,7 @@ class VirtualTime
     self.second = nil
     self.millisecond = nil
     self.nanosecond = nil
+    self.location = nil
     self
   end
 
