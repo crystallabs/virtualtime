@@ -282,8 +282,7 @@ alias Virtual = Nil | Bool | Int32 |
 being replaced with `Enumerable(Int32)` due to a bug in Crystal
 (https://github.com/crystal-lang/crystal/issues/14047).
 
-Another, related consideration is related to matching fields that contain these enumerable
-types.
+Another, related consideration is related to matching fields that contain these enumerable types:
 
 Some enumerables change internal state when they are used, so in the matching function accepting
 `Enumerable` data types they are `#dup`-ed before use, to make sure the original objects
