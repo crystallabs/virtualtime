@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 1
-  VERSION_REVISION = 4
+  VERSION_REVISION = 5
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
