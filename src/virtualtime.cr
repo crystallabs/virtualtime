@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 1
-  VERSION_REVISION = 5
+  VERSION_REVISION = 6
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
@@ -330,18 +330,6 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(value : Enumerable(Int), default : Int32, max = nil, strict = true)
-    if max && value.any?(&.<(0))
-      value = value.map { |e| e < 0 ? max + e + 1 : e }
-    end
-    if !strict || value.includes? default
-      default
-    else
-      value.min
-    end
-  end
-
-  # :ditto:
   def self.materialize(value : Range(Int, Int), default : Int32, max = nil, strict = true)
     if max && (value.begin < 0 || value.end < 0)
       ab = value.begin < 0 ? max + value.begin + 1 : value.begin
@@ -353,6 +341,19 @@ class VirtualTime
       default
     else
       value.begin
+    end
+  end
+
+  # :ditto:
+  def self.materialize(value : Enumerable(Int), default : Int32, max = nil, strict = true)
+    value = value.dup.to_a
+    if max && value.any?(&.<(0))
+      value = value.map { |e| e < 0 ? max + e + 1 : e }
+    end
+    if !strict || value.includes? default
+      default
+    else
+      value.min
     end
   end
 
@@ -381,7 +382,7 @@ class VirtualTime
 
   # Compares `VirtualTime` to `Time` instance
   def <=>(other : Time)
-    to_time <=> other
+    to_time(other) <=> other
   end
 
   # "Rewinds" `day` forward enough to reach `acceptable_day`.
