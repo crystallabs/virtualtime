@@ -559,7 +559,7 @@ class VirtualTime
 
         @current = @virtualtime.to_time @current + @step
 
-        if @current == end_value
+        if end_value && (@current >= end_value)
           @reached_end = true
           stop
         else
