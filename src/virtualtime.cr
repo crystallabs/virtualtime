@@ -13,8 +13,8 @@ class VirtualTime
   include Comparable(Time)
   include YAML::Serializable
 
-  # TODO Use Int instead of Int32 when it becomes possible in unions in Crystal
-  # Separately, XXX, https://github.com/crystal-lang/crystal/issues/14047, when it gets solved, add Enumerable(Int32) and remove Array/Steppable
+  # XXX Use Int instead of Int32 when it becomes possible in unions in Crystal
+  # XXX Possibly add Enumerable(Int32) and remove more specific types after https://github.com/crystal-lang/crystal/issues/14047
   alias Virtual = Nil | Bool | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
   alias VirtualProc = Proc(Int32, Bool)
   alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
@@ -288,46 +288,50 @@ class VirtualTime
     matches? b, a, max
   end
 
-  # be Bool, Enumerable(Int), Int, Nil, Proc(Virtual, Bool) or Range(Int, Int)
-  # no (Array(Int32) | | Proc(Virtual, Bool) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32)
-
   # Materializing
   # Time: year, month, day, calendar_week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
 
-  # Returns a new, "materialized" VirtualTime. I.e., it converts VirtualTime object to a Time-like value, where all fields have "materialized"/specific values
+  # Returns a new, "materialized" VirtualTime, i.e. an object where all fields have "materialized"/specific values
   def materialize(hint = Time.local, strict = true)
-    # TODO Possibly default the hint to now + 1 minute, with second/nanosecond values set to 0
     self.class.new **materialize_with_hint(hint)
   end
 
   # :nodoc:
   def materialize_with_hint(time : Time)
-    carry = 0
-    _nanosecond= self.class.materialize(nanosecond, time.nanosecond+carry, 1_000_000_000)
-    _second=     self.class.materialize(second, time.second+carry, 60)
-    _minute=     self.class.materialize(minute, time.minute+carry, 60)
-    _hour=       self.class.materialize(hour, time.hour+carry, 24)
-    _day=        self.class.materialize(day, time.day+carry, TimeHelper.days_in_month(time)+1)
-    _month=      self.class.materialize(month, time.month+carry, 13)
-    _year=       self.class.materialize(year, time.year+carry, 10000)
+    _nanosecond, carry = self.class.materialize(nanosecond, time.nanosecond, 0, 1_000_000_000)
+    _second, carry = self.class.materialize(second, time.second + carry, 0, 60)
+    _minute, carry = self.class.materialize(minute, time.minute + carry, 0, 60)
+    _hour, carry = self.class.materialize(hour, time.hour + carry, 0, 24)
+    _day, carry = self.class.materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
+    _month, carry = self.class.materialize(month, time.month + carry, 1, 13)
+    _year, _ = self.class.materialize(year, time.year + carry)
 
-    { year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond }
+    {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
 
   # Materialize a particular value with the help of a hint/default value.
   # If 'strict' is true and default value does not satisfy predefined range or requirements, the default is replaced with the first/earliest value from allowed range.
   def self.materialize(value : Nil, default : Int32, max = nil, strict = true)
-    default
+    {default, 0}
   end
 
   # :ditto:
   def self.materialize(value : Bool, default : Int32, max = nil, strict = true)
-    default
+    {default, 0}
   end
 
   # :ditto:
   def self.materialize(value : Int, default : Int32, max = nil, strict = true)
-    max && (value < 0) ? max + value : value
+    carry = 0
+    if !strict
+      value = default
+    else
+      if max
+        value = max + value if value < 0
+        carry = 1 if default > value
+      end
+    end
+    {value, carry}
   end
 
   # :ditto:
@@ -337,12 +341,15 @@ class VirtualTime
       ae = value.end < 0 ? max + value.end : value.end
       value = ab..ae
     end
-
+    carry = 0
     if !strict || value.includes? default
-      default
+      value = default
     else
-      value.begin
+      # carry = max && (exclusive? ? (default >= value.end) : (default > value)) ? 1 : 0
+      carry = max && (default > value.begin) ? 1 : 0
+      value = value.begin
     end
+    {value, carry}
   end
 
   # :ditto:
@@ -351,16 +358,19 @@ class VirtualTime
     if max && value.any?(&.<(0))
       value = value.map { |e| e < 0 ? max + e : e }
     end
+    carry = 0
     if !strict || value.includes? default
-      default
+      value = default
     else
-      value.min
+      carry = max && (default > value.min) ? 1 : 0
+      value = value.min
     end
+    {value, carry}
   end
 
   # :ditto:
   def self.materialize(value : Proc(Virtual, Bool), default : Int32, max = nil, strict = true)
-    default
+    {default, 0}
   end
 
   # Comparison with self
@@ -421,13 +431,16 @@ class VirtualTime
       tries += 1
 
       week_nr = time.calendar_week[1]
-      time += adjust_day(week_nr, self.class.materialize(week, week_nr, TimeHelper.weeks_in_year(time), strict), TimeHelper.weeks_in_year(time)) * 7
+      value, _ = self.class.materialize(week, week_nr, TimeHelper.weeks_in_year(time) + 1, strict)
+      time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
 
       day = time.day_of_week.to_i
-      time += adjust_day(day, self.class.materialize(day_of_week, day, 7, strict), 7)
+      value, _ = self.class.materialize(day_of_week, day, 8, strict)
+      time += adjust_day(day, value, 7)
 
       day = time.day_of_year
-      time += adjust_day(day, self.class.materialize(day_of_year, day, TimeHelper.days_in_year(time), strict), TimeHelper.days_in_year(time))
+      value, _ = self.class.materialize(day_of_year, day, TimeHelper.days_in_year(time) + 1, strict)
+      time += adjust_day(day, value, TimeHelper.days_in_year(time))
 
       if matches_date?(time)
         break
@@ -523,7 +536,7 @@ class VirtualTime
     def next
       return stop if @reached_end
 
-      end_value = nil #Time.local(year: 9999, month: 12, day: 31).at_end_of_year
+      end_value = nil
 
       if @at_start
         @at_start = false
@@ -544,15 +557,8 @@ class VirtualTime
           return stop
         end
 
-        #mul = 1
-        #prev = @current
-        #while prev == @current
-        #  @current = @virtualtime.to_time @current + @step * mul
-        #  mul += 1
-        #end
         @current = @virtualtime.to_time @current + @step
 
-        #if end_value && (@current >= end_value)
         if @current == end_value
           @reached_end = true
           stop
