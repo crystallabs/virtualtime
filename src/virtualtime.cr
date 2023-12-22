@@ -302,15 +302,16 @@ class VirtualTime
 
   # :nodoc:
   def materialize_with_hint(time : Time)
-    {
-      year:       self.class.materialize(year, time.year, 9999),
-      month:      self.class.materialize(month, time.month, 12),
-      day:        self.class.materialize(day, time.day, TimeHelper.days_in_month(time)),
-      hour:       self.class.materialize(hour, time.hour, 23),
-      minute:     self.class.materialize(minute, time.minute, 59),
-      second:     self.class.materialize(second, time.second, 59),
-      nanosecond: self.class.materialize(nanosecond, time.nanosecond, 999_999_999),
-    }
+    carry = 0
+    _nanosecond= self.class.materialize(nanosecond, time.nanosecond+carry, 999_999_999)
+    _second=     self.class.materialize(second, time.second+carry, 59)
+    _minute=     self.class.materialize(minute, time.minute+carry, 59)
+    _hour=       self.class.materialize(hour, time.hour+carry, 23)
+    _day=        self.class.materialize(day, time.day+carry, TimeHelper.days_in_month(time))
+    _month=      self.class.materialize(month, time.month+carry, 12)
+    _year=       self.class.materialize(year, time.year+carry, 9999)
+
+    { year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond }
   end
 
   # Materialize a particular value with the help of a hint/default value.
@@ -498,6 +499,71 @@ class VirtualTime
   # E.g. VirtualTime with `day=1..2` gets expanded into two separate VirtualTimes, day=1 and day=2
   def expand
     ArrayHelper.expand(VTTuple.new year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location).map { |v| self.class.new *(VTTuple.from v) }
+  end
+
+  # Iterator-related stuff
+
+  # :ditto:
+  def step(by = 1, start : Time = to_time) : Iterator
+    StepIterator(self, Time, typeof(by)).new(self, by)
+  end
+
+  private class StepIterator(R, B, N)
+    include Iterator(B)
+
+    @virtualtime : R
+    @step : N
+    @current : B
+    @reached_end : Bool
+    @at_start = true
+
+    def initialize(@virtualtime, @step, @current = virtualtime.to_time, @reached_end = false)
+    end
+
+    def next
+      return stop if @reached_end
+
+      end_value = nil #Time.local(year: 9999, month: 12, day: 31).at_end_of_year
+
+      if @at_start
+        @at_start = false
+
+        if end_value
+          if @current >= end_value
+            @reached_end = true
+            return stop
+          end
+        end
+
+        return @current
+      end
+
+      if end_value.nil? || @current < end_value
+        if end_value && (@current >= end_value)
+          @reached_end = true
+          return stop
+        end
+
+        #mul = 1
+        #prev = @current
+        #while prev == @current
+        #  @current = @virtualtime.to_time @current + @step * mul
+        #  mul += 1
+        #end
+        @current = @virtualtime.to_time @current + @step
+
+        #if end_value && (@current >= end_value)
+        if @current == end_value
+          @reached_end = true
+          stop
+        else
+          @current
+        end
+      else
+        @reached_end = true
+        stop
+      end
+    end
   end
 
   # Helper methods below
