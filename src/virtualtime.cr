@@ -140,8 +140,8 @@ class VirtualTime
   # :ditto:
   def self.matches?(a : Int, b : Int, max = nil)
     if max
-      a = max + a + 1 if a < 0
-      b = max + b + 1 if b < 0
+      a = max + a if a < 0
+      b = max + b if b < 0
     end
     a == b
   end
@@ -158,8 +158,8 @@ class VirtualTime
   # # :ditto:
   # def self.matches?(a : Range(Int, Int), b : Int, max = nil)
   #   if max && (a.begin < 0 || a.end < 0)
-  #     ab = a.begin < 0 ? max + a.begin + 1 : a.begin
-  #     ae = a.end < 0 ? max + a.end + 1 : a.end
+  #     ab = a.begin < 0 ? max + a.begin : a.begin
+  #     ae = a.end < 0 ? max + a.end : a.end
   #     a = ab..ae
   #   end
   #   a.each do |aa|
@@ -171,8 +171,8 @@ class VirtualTime
   # # :ditto:
   # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Int, max = nil)
   #   if max && (a.current < 0 || a.limit < 0)
-  #     ab = a.current < 0 ? max + a.current + 1 : a.current
-  #     ae = a.limit < 0 ? max + a.limit + 1 : a.limit
+  #     ab = a.current < 0 ? max + a.current : a.current
+  #     ae = a.limit < 0 ? max + a.limit : a.limit
   #     a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
   #   else
   #     a = a.dup
@@ -208,13 +208,13 @@ class VirtualTime
   # def self.matches?(a : Range(Int, Int), b : Range(Int, Int), max = nil)
   #   if max
   #     if (a.begin < 0 || a.end < 0)
-  #       ab = a.begin < 0 ? max + a.begin + 1 : a.begin
-  #       ae = a.end < 0 ? max + a.end + 1 : a.end
+  #       ab = a.begin < 0 ? max + a.begin : a.begin
+  #       ae = a.end < 0 ? max + a.end : a.end
   #       a = ab..ae
   #     end
   #     if (b.begin < 0 || b.end < 0)
-  #       bb = b.begin < 0 ? max + b.begin + 1 : b.begin
-  #       be = b.end < 0 ? max + b.end + 1 : b.end
+  #       bb = b.begin < 0 ? max + b.begin : b.begin
+  #       be = b.end < 0 ? max + b.end : b.end
   #       b = bb..be
   #     end
   #   end
@@ -230,15 +230,15 @@ class VirtualTime
   # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Steppable::StepIterator(Int, Int, Int), max = nil)
   #   if max
   #     if a.current < 0 || a.limit < 0
-  #       ab = a.current < 0 ? max + a.current + 1 : a.current
-  #       ae = a.limit < 0 ? max + a.limit + 1 : a.limit
+  #       ab = a.current < 0 ? max + a.current : a.current
+  #       ae = a.limit < 0 ? max + a.limit : a.limit
   #       a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
   #     else
   #       a = a.dup
   #     end
   #     if b.current < 0 || b.limit < 0
-  #       bb = b.current < 0 ? max + b.current + 1 : b.current
-  #       be = b.limit < 0 ? max + b.limit + 1 : b.limit
+  #       bb = b.current < 0 ? max + b.current : b.current
+  #       be = b.limit < 0 ? max + b.limit : b.limit
   #       b = Steppable::StepIterator(Int32, Int32, Int32).new bb, be, b.step, b.exclusive
   #     else
   #       b = b.dup
@@ -267,7 +267,7 @@ class VirtualTime
   # :ditto:
   def self.matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
     a.dup.each do |aa|
-      aa = max + aa + 1 if max && (aa < 0)
+      aa = max + aa if max && (aa < 0)
       return true if b.call aa
     end
     false
@@ -275,7 +275,7 @@ class VirtualTime
 
   # :ditto:
   def self.matches?(a : VirtualProc, b : Int, max = nil)
-    b = max + b + 1 if max && (b < 0)
+    b = max + b if max && (b < 0)
     a.call b
   end
 
@@ -303,13 +303,13 @@ class VirtualTime
   # :nodoc:
   def materialize_with_hint(time : Time)
     carry = 0
-    _nanosecond= self.class.materialize(nanosecond, time.nanosecond+carry, 999_999_999)
-    _second=     self.class.materialize(second, time.second+carry, 59)
-    _minute=     self.class.materialize(minute, time.minute+carry, 59)
-    _hour=       self.class.materialize(hour, time.hour+carry, 23)
-    _day=        self.class.materialize(day, time.day+carry, TimeHelper.days_in_month(time))
-    _month=      self.class.materialize(month, time.month+carry, 12)
-    _year=       self.class.materialize(year, time.year+carry, 9999)
+    _nanosecond= self.class.materialize(nanosecond, time.nanosecond+carry, 1_000_000_000)
+    _second=     self.class.materialize(second, time.second+carry, 60)
+    _minute=     self.class.materialize(minute, time.minute+carry, 60)
+    _hour=       self.class.materialize(hour, time.hour+carry, 24)
+    _day=        self.class.materialize(day, time.day+carry, TimeHelper.days_in_month(time)+1)
+    _month=      self.class.materialize(month, time.month+carry, 13)
+    _year=       self.class.materialize(year, time.year+carry, 10000)
 
     { year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond }
   end
@@ -327,14 +327,14 @@ class VirtualTime
 
   # :ditto:
   def self.materialize(value : Int, default : Int32, max = nil, strict = true)
-    max && (value < 0) ? max + value + 1 : value
+    max && (value < 0) ? max + value : value
   end
 
   # :ditto:
   def self.materialize(value : Range(Int, Int), default : Int32, max = nil, strict = true)
     if max && (value.begin < 0 || value.end < 0)
-      ab = value.begin < 0 ? max + value.begin + 1 : value.begin
-      ae = value.end < 0 ? max + value.end + 1 : value.end
+      ab = value.begin < 0 ? max + value.begin : value.begin
+      ae = value.end < 0 ? max + value.end : value.end
       value = ab..ae
     end
 
@@ -349,7 +349,7 @@ class VirtualTime
   def self.materialize(value : Enumerable(Int), default : Int32, max = nil, strict = true)
     value = value.dup.to_a
     if max && value.any?(&.<(0))
-      value = value.map { |e| e < 0 ? max + e + 1 : e }
+      value = value.map { |e| e < 0 ? max + e : e }
     end
     if !strict || value.includes? default
       default
