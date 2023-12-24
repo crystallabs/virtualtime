@@ -298,8 +298,9 @@ class VirtualTime
   @[AlwaysInline]
   macro adjust_wanted_re_max
     if max
-      if wanted >= 2*max-2*min
-        raise ArgumentError.new "A `wanted` value #{wanted} must not be be >= (2*max - 2*min)."
+      limit = (2*max-2*min).abs
+      if wanted.abs >= limit
+        raise ArgumentError.new "A `wanted.abs` value #{wanted.abs} must not be be >= #{limit} (>= (2*max-2*min).abs)."
       end
       if wanted >= max
         wanted -= max - min
