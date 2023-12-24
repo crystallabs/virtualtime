@@ -39,10 +39,10 @@ class VirtualTime
   # Default match result if one of field values matched is `nil`
   class_property? default_match : Bool = true
 
-  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil)
+  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = 0, @day_of_week = nil, @day_of_year = nil, @week = nil)
   end
 
-  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil)
+  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = 0)
   end
 
   def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location)
@@ -536,7 +536,7 @@ class VirtualTime
   end
 
   # Returns Iterator
-  def step(interval = 1.nanosecond, by = 1, from = Time.local) : Iterator
+  def step(interval = 1.nanosecond, by = 1, from = (Time.local + 1.second).at_beginning_of_second) : Iterator
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
 
@@ -550,7 +550,7 @@ class VirtualTime
     @reached_end : Bool
     @at_start = true
 
-    def initialize(@virtualtime, @interval, @step, @current = virtualtime.to_time, @reached_end = false)
+    def initialize(@virtualtime, @interval, @step, @current = virtualtime.succ, @reached_end = false)
     end
 
     def next
@@ -567,6 +567,8 @@ class VirtualTime
             return stop
           end
         end
+
+        return @current
       end
 
       if end_value.nil? || @current < end_value
