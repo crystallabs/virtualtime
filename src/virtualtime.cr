@@ -6,8 +6,8 @@ end
 
 class VirtualTime
   VERSION_MAJOR    = 1
-  VERSION_MINOR    = 1
-  VERSION_REVISION = 6
+  VERSION_MINOR    = 2
+  VERSION_REVISION = 0
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
@@ -297,80 +297,122 @@ class VirtualTime
   end
 
   # :nodoc:
-  def materialize_with_hint(time : Time)
-    _nanosecond, carry = self.class.materialize(nanosecond, time.nanosecond, 0, 1_000_000_000)
+  def materialize_with_hint(time : Time, carry = 0)
+    _nanosecond, carry = self.class.materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
     _second, carry = self.class.materialize(second, time.second + carry, 0, 60)
     _minute, carry = self.class.materialize(minute, time.minute + carry, 0, 60)
     _hour, carry = self.class.materialize(hour, time.hour + carry, 0, 24)
     _day, carry = self.class.materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
     _month, carry = self.class.materialize(month, time.month + carry, 1, 13)
-    _year, _ = self.class.materialize(year, time.year + carry)
+    _year, _ = self.class.materialize(year, time.year + carry, 1)
 
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
 
-  # Materialize a particular value with the help of a hint/default value.
-  # If 'strict' is true and default value does not satisfy predefined range or requirements, the default is replaced with the first/earliest value from allowed range.
-  def self.materialize(value : Nil, default : Int32, max = nil, strict = true)
-    {default, 0}
-  end
-
-  # :ditto:
-  def self.materialize(value : Bool, default : Int32, max = nil, strict = true)
-    {default, 0}
-  end
-
-  # :ditto:
-  def self.materialize(value : Int, default : Int32, max = nil, strict = true)
-    carry = 0
-    if !strict
-      value = default
-    else
-      if max
-        value = max + value if value < 0
-        carry = 1 if default > value
+  # If `max` is specified, adjusts `hint` in respect to `max`.
+  #
+  # Specifically, if `hint` is equal or greater than `max`, it wraps it around
+  # by increasing `carry` by 1 and reducing `hint` by `max`.
+  #
+  # The current implementation does not support wrapping more than once, e.g.
+  # a wanted of `120` with a max of `60` would produce an error.
+  # That is because some of `VirtualTime`s fields (like e.g. `day`) do not have
+  # a fixed max value (it can be 28, 29, 30, or 31, depending on month).
+  @[AlwaysInline]
+  macro adjust_wanted_re_max
+    if max
+      if wanted >= 2*max-2*min
+        raise ArgumentError.new "A `wanted` value #{wanted} must not be be >= (2*max - 2*min)."
+      end
+      if wanted >= max
+        wanted -= max - min
+        carry += 1
       end
     end
-    {value, carry}
   end
 
-  # :ditto:
-  def self.materialize(value : Range(Int, Int), default : Int32, max = nil, strict = true)
-    if max && (value.begin < 0 || value.end < 0)
-      ab = value.begin < 0 ? max + value.begin : value.begin
-      ae = value.end < 0 ? max + value.end : value.end
-      value = ab..ae
+  # Materialize a particular value with the help of a wanted/wanted value.
+  # If 'strict' is true and wanted value does not satisfy predefined range or requirements, it is replaced with the first/earliest value from allowed range.
+  def self.materialize(allowed : Nil, wanted : Int32, min, max = nil, strict = true)
+    unless default_match?
+      raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
     carry = 0
-    if !strict || value.includes? default
-      value = default
-    else
-      # carry = max && (exclusive? ? (default >= value.end) : (default > value)) ? 1 : 0
-      carry = max && (default > value.begin) ? 1 : 0
-      value = value.begin
-    end
-    {value, carry}
+    adjust_wanted_re_max
+    {wanted, carry}
   end
 
   # :ditto:
-  def self.materialize(value : Enumerable(Int), default : Int32, max = nil, strict = true)
-    value = value.dup.to_a
-    if max && value.any?(&.<(0))
-      value = value.map { |e| e < 0 ? max + e : e }
+  def self.materialize(allowed : Bool, wanted : Int32, min, max = nil, strict = true)
+    unless allowed
+      raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
     carry = 0
-    if !strict || value.includes? default
-      value = default
+    adjust_wanted_re_max
+    {wanted, carry}
+  end
+
+  # XXX What to do with wanted == -X > -max
+
+  # :ditto:
+  def self.materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
+    carry = 0
+    adjust_wanted_re_max
+    if !strict
+      # wanted is OK
     else
-      carry = max && (default > value.min) ? 1 : 0
-      value = value.min
+      if max
+        carry += 1 if wanted > allowed
+        wanted = allowed
+      end
     end
-    {value, carry}
+    {wanted, carry}
   end
 
   # :ditto:
-  def self.materialize(value : Proc(Virtual, Bool), default : Int32, max = nil, strict = true)
-    {default, 0}
+  def self.materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
+    carry = 0
+    adjust_wanted_re_max
+    if max && (allowed.begin < 0 || allowed.end < 0)
+      ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
+      ae = allowed.end < 0 ? max + allowed.end : allowed.end
+      allowed = ab..ae
+    end
+    if !strict || allowed.includes? wanted
+    else
+      # carry = max && (exclusive? ? (wanted >= allowed.end) : (wanted > allowed)) ? 1 : 0
+      carry += max && (wanted > allowed.begin) ? 1 : 0
+      wanted = allowed.begin
+    end
+    {wanted, carry}
+  end
+
+  # :ditto:
+  def self.materialize(allowed : Enumerable(Int), wanted : Int32, min, max = nil, strict = true)
+    carry = 0
+    adjust_wanted_re_max
+    allowed = allowed.dup.to_a
+    if max && allowed.any?(&.<(0))
+      allowed = allowed.map { |e| e < 0 ? max + e : e }
+    end
+    if !strict || allowed.includes? wanted
+      # allowed = wanted
+    else
+      if candidate = allowed.dup.find &.>=(wanted)
+        wanted = candidate
+      else
+        carry += max && (wanted > allowed.min) ? 1 : 0
+        wanted = allowed.min
+      end
+    end
+    {wanted, carry}
+  end
+
+  # :ditto:
+  def self.materialize(allowed : Proc(Virtual, Bool), wanted : Int32, min, max = nil, strict = true)
+    carry = 0
+    adjust_wanted_re_max
+    {wanted, carry}
   end
 
   # Comparison with self
@@ -431,15 +473,15 @@ class VirtualTime
       tries += 1
 
       week_nr = time.calendar_week[1]
-      value, _ = self.class.materialize(week, week_nr, TimeHelper.weeks_in_year(time) + 1, strict)
+      value, _ = self.class.materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
       time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
 
       day = time.day_of_week.to_i
-      value, _ = self.class.materialize(day_of_week, day, 8, strict)
+      value, _ = self.class.materialize(day_of_week, day, 1, 8, strict)
       time += adjust_day(day, value, 7)
 
       day = time.day_of_year
-      value, _ = self.class.materialize(day_of_year, day, TimeHelper.days_in_year(time) + 1, strict)
+      value, _ = self.class.materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
       time += adjust_day(day, value, TimeHelper.days_in_year(time))
 
       if matches_date?(time)
@@ -516,12 +558,16 @@ class VirtualTime
 
   # Iterator-related stuff
 
-  # :ditto:
-  def step(by = 1, start : Time = to_time) : Iterator
-    StepIterator(self, Time, typeof(by)).new(self, by)
+  def succ(time : Time = Time.local)
+    to_time time + 1.nanosecond
   end
 
-  private class StepIterator(R, B, N)
+  # Returns Iterator
+  def step(by = 1.nanosecond, round = 1.nanosecond, from = Time.local) : Iterator
+    StepIterator(self, Time, typeof(by), typeof(round)).new(self, by, round, from)
+  end
+
+  private class StepIterator(R, B, N, D)
     include Iterator(B)
 
     @virtualtime : R
@@ -529,8 +575,9 @@ class VirtualTime
     @current : B
     @reached_end : Bool
     @at_start = true
+    @round : D
 
-    def initialize(@virtualtime, @step, @current = virtualtime.to_time, @reached_end = false)
+    def initialize(@virtualtime, @step, @round, @current = virtualtime.to_time, @reached_end = false)
     end
 
     def next
@@ -547,8 +594,6 @@ class VirtualTime
             return stop
           end
         end
-
-        return @current
       end
 
       if end_value.nil? || @current < end_value
@@ -557,7 +602,10 @@ class VirtualTime
           return stop
         end
 
-        @current = @virtualtime.to_time @current + @step
+        @step.times do
+          # XXX Why aren't there int/int128 versions of Time::Span#total_nanoseconds?
+          @current = @virtualtime.succ @current + @round - (@current.to_unix_ns % @round.total_nanoseconds.to_i64 + 1).nanoseconds
+        end
 
         if end_value && (@current >= end_value)
           @reached_end = true
