@@ -56,7 +56,7 @@ describe VirtualTime do
   end
 
   it "can match Crystal's Times" do
-    vt = VirtualTime.new
+    vt = VirtualTime.new nanosecond: nil
 
     vt.matches?(Time.local).should be_true
 
@@ -128,7 +128,7 @@ describe VirtualTime do
     vt.second = true
     vt.location = Time::Location.load("Europe/Berlin")
     # vt.millisecond = ->( val : Int32) { true }
-    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
+    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nnanosecond: 0\nlocation: Europe/Berlin\n"
   end
   it "converts from YAML" do
     vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
