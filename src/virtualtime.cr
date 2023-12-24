@@ -22,42 +22,15 @@ class VirtualTime
 
   # Date-related properties
 
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property year : Virtual # 1
+  # Macro to define properties with a common YAML converter
+  macro virtual_time_property(*properties)
+    {% for property in properties %}
+      @[YAML::Field(converter: VirtualTime::VirtualConverter)]
+      property {{property.id}} : Virtual # default comment or value
+    {% end %}
+  end
 
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property month : Virtual # 1
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property day : Virtual # 1
-
-  # Higher-level date-related properties
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property week : Virtual # 1
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property day_of_week : Virtual # 1 - Monday
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property day_of_year : Virtual # 1
-
-  # Time-related properties
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property hour : Virtual # 0
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property minute : Virtual # 0
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property second : Virtual # 0
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property millisecond : Virtual # 0
-
-  @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-  property nanosecond : Virtual # 0
+  virtual_time_property year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond
 
   # Location/timezone in which to perform matching, if any
   @[YAML::Field(converter: VirtualTime::TimeLocationConverter)]
