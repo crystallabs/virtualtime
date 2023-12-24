@@ -355,7 +355,6 @@ class VirtualTime
     end
     if !strict || allowed.includes? wanted
     else
-      # carry = max && (exclusive? ? (wanted >= allowed.end) : (wanted > allowed)) ? 1 : 0
       carry += max && (wanted > allowed.begin) ? 1 : 0
       wanted = allowed.begin
     end
@@ -371,7 +370,6 @@ class VirtualTime
       allowed = allowed.map { |e| e < 0 ? max + e : e }
     end
     if !strict || allowed.includes? wanted
-      # allowed = wanted
     else
       if candidate = allowed.dup.find &.>=(wanted)
         wanted = candidate
@@ -537,6 +535,7 @@ class VirtualTime
 
   # Returns Iterator
   def step(interval = 1.nanosecond, by = 1, from = (Time.local + 1.second).at_beginning_of_second) : Iterator
+    from = succ from
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
 
