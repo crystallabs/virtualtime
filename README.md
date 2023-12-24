@@ -51,7 +51,78 @@ And run `shards install` or just `shards`.
 ## Introduction
 
 Think of class `VirtualTime` as of a very flexible time specification against which
-Crystal's `Time` instances and other `VirtualTime`s can be matched.
+Crystal's `Time` instances and other `VirtualTime`s can be matched, and that can
+successively generate `Time`s that satisfy the specified constraints.
+
+In a nutshell, to match `Time`s against `VirtualTime`:
+
+```cr
+# VirtualTime that matches anything in current month
+vt = VirtualTime.new month: Time.local.month
+
+# It will match any date in this month:
+vt.matches?(Time.local) # => true
+
+# But it would not match something from a month ahead:
+vt.matches?(Time.local + 30.days) # => false
+```
+
+To generate new `Time`s which match the `VirtualTime`:
+
+```cr
+# VT that matches time 12:15:00 and 18:15:00 on Monday and Tuesday of every week
+vt = VirtualTime.new(day_of_week: 1..2, hour: [12, 18], minute: 15, second: 0, nanosecond: 0)
+
+# Generate a list of next 10 events:
+vti = vt.step
+10.times do p vti.next end
+```
+
+```txt
+2023-12-25 18:15:00.0 +01:00 Local
+2023-12-26 12:15:00.0 +01:00 Local
+2023-12-26 18:15:00.0 +01:00 Local
+2024-01-01 12:15:00.0 +01:00 Local
+2024-01-01 18:15:00.0 +01:00 Local
+2024-01-02 12:15:00.0 +01:00 Local
+2024-01-02 18:15:00.0 +01:00 Local
+2024-01-08 12:15:00.0 +01:00 Local
+2024-01-08 18:15:00.0 +01:00 Local
+2024-01-09 12:15:00.0 +01:00 Local
+```
+
+In the case that the original `VirtualTime` did not specify exact values in certain places
+(primarily for values like `second` and `nanosecond`), the code that finds next events
+will find events occurring at every consecutive nanosecond:
+
+```cr
+# Continuing with the previous example:
+vt.nanosecond = nil
+3.times do p vti.next end
+```
+
+```txt
+2024-01-09 12:15:00.000000001 +01:00 Local
+2024-01-09 12:15:00.000000002 +01:00 Local
+2024-01-09 12:15:00.000000003 +01:00 Local
+```
+
+That can be solved by instructing the `StepIterator` which minimal interval between events
+should be used.
+
+```cr
+# Continuing with the previous example:
+vti = vt.step(1.day)
+3.times do p vti.next end
+```
+
+```txt
+2023-12-25 12:15:00.0 +01:00 Local
+2023-12-26 12:15:00.0 +01:00 Local
+2024-01-01 12:15:00.0 +01:00 Local
+```
+
+## Time and VirtualTime Differences
 
 Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
 to a specific numeric value. Even if some of its fields aren't required in the constructor,

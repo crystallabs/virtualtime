@@ -304,7 +304,11 @@ class VirtualTime
     _hour, carry = self.class.materialize(hour, time.hour + carry, 0, 24)
     _day, carry = self.class.materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
     _month, carry = self.class.materialize(month, time.month + carry, 1, 13)
-    _year, _ = self.class.materialize(year, time.year + carry, 1)
+    _year, carry = self.class.materialize(year, time.year + carry, 1, 10_000)
+
+    if carry > 0
+      raise ArgumentError.new "Cannot find compliant materialized time"
+    end
 
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
@@ -351,8 +355,6 @@ class VirtualTime
     adjust_wanted_re_max
     {wanted, carry}
   end
-
-  # XXX What to do with wanted == -X > -max
 
   # :ditto:
   def self.materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
@@ -466,9 +468,9 @@ class VirtualTime
   def to_time(hint = Time.local, strict = true)
     # TODO Possibly default the hint to now + 1 minute, with second/nanosecond values set to 0
     time = Time.local **materialize_with_hint(hint), location: hint.location
-
     max_tries = 10
     tries = 0
+
     loop do
       tries += 1
 
@@ -484,13 +486,11 @@ class VirtualTime
       value, _ = self.class.materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
       time += adjust_day(day, value, TimeHelper.days_in_year(time))
 
-      if matches_date?(time)
-        break
-      else
-        if tries >= max_tries
-          # TODO maybe some other error, not arg err
-          raise ArgumentError.new "Could not find a date that satisfies week number, day of week, and day of year after #{max_tries} iterations"
-        end
+      break if matches_date?(time)
+
+      if tries >= max_tries
+        # TODO maybe some other error, not arg err
+        raise ArgumentError.new "Could not find a date that satisfies week number, day of week, and day of year after #{max_tries} iterations"
       end
     end
 
@@ -563,21 +563,21 @@ class VirtualTime
   end
 
   # Returns Iterator
-  def step(by = 1.nanosecond, round = 1.nanosecond, from = Time.local) : Iterator
-    StepIterator(self, Time, typeof(by), typeof(round)).new(self, by, round, from)
+  def step(interval = 1.nanosecond, by = 1, from = Time.local) : Iterator
+    StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
 
-  private class StepIterator(R, B, N, D)
+  private class StepIterator(R, D, N, B)
     include Iterator(B)
 
     @virtualtime : R
+    @interval : D
     @step : N
     @current : B
     @reached_end : Bool
     @at_start = true
-    @round : D
 
-    def initialize(@virtualtime, @step, @round, @current = virtualtime.to_time, @reached_end = false)
+    def initialize(@virtualtime, @interval, @step, @current = virtualtime.to_time, @reached_end = false)
     end
 
     def next
@@ -603,8 +603,11 @@ class VirtualTime
         end
 
         @step.times do
-          # XXX Why aren't there int/int128 versions of Time::Span#total_nanoseconds?
-          @current = @virtualtime.succ @current + @round - (@current.to_unix_ns % @round.total_nanoseconds.to_i64 + 1).nanoseconds
+          begin
+            @current = @virtualtime.succ @current + @interval - (@current.to_unix_ns % @interval.total_nanoseconds.to_i64 + 1).nanoseconds
+          rescue ArgumentError
+            end_value = @current
+          end
         end
 
         if end_value && (@current >= end_value)
