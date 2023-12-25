@@ -36,13 +36,16 @@ class VirtualTime
   @[YAML::Field(converter: VirtualTime::TimeLocationConverter)]
   property location : Time::Location?
 
-  # Default match result if one of field values matched is `nil`
+  # Class-default match result if one of field values matched is `nil`
   class_property? default_match : Bool = true
 
-  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = 0, @day_of_week = nil, @day_of_year = nil, @week = nil)
+  # Instance-default match result if one of field values matched is `nil`
+  #property? default_match : Bool = true
+
+  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil) #, @default_match = @@default_match)
   end
 
-  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = 0)
+  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil) #, @default_match = self.class.default_match?)
   end
 
   def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location)
@@ -80,38 +83,38 @@ class VirtualTime
   # Returns whether `VirtualTime` matches the date part of specified time
   def matches_date?(time : TimeOrVirtualTime = Time.local)
     adjust_location
-    self.class.matches?(year, time.year, 9999) &&
-      self.class.matches?(month, time.month, 12) &&
-      self.class.matches?(day, time.day, TimeHelper.days_in_month(time)) &&
-      self.class.matches?(week, TimeHelper.week(time), TimeHelper.weeks_in_year(time)) &&
-      self.class.matches?(day_of_week, TimeHelper.day_of_week(time), 7) &&
-      self.class.matches?(day_of_year, TimeHelper.day_of_year(time), TimeHelper.days_in_year(time))
+    matches?(year, time.year, 9999) &&
+      matches?(month, time.month, 12) &&
+      matches?(day, time.day, TimeHelper.days_in_month(time)) &&
+      matches?(week, TimeHelper.week(time), TimeHelper.weeks_in_year(time)) &&
+      matches?(day_of_week, TimeHelper.day_of_week(time), 7) &&
+      matches?(day_of_year, TimeHelper.day_of_year(time), TimeHelper.days_in_year(time))
   end
 
   # Returns whether `VirtualTime` matches the time part of specified time
   def matches_time?(time : TimeOrVirtualTime = Time.local)
     adjust_location
-    self.class.matches?(hour, time.hour, 23) &&
-      self.class.matches?(minute, time.minute, 59) &&
-      self.class.matches?(second, time.second, 59) &&
-      self.class.matches?(millisecond, time.millisecond, 999) &&
-      self.class.matches?(nanosecond, time.nanosecond, 999_999_999)
+    matches?(hour, time.hour, 23) &&
+      matches?(minute, time.minute, 59) &&
+      matches?(second, time.second, 59) &&
+      matches?(millisecond, time.millisecond, 999) &&
+      matches?(nanosecond, time.nanosecond, 999_999_999)
   end
 
   # Performs matching between VirtualTime and other supported types
-  def self.matches?(a : Nil, b, max = nil)
+  def matches?(a : Nil, b, max = nil)
     return false if b == false
-    default_match?
+    self.class.default_match?
   end
 
   # :ditto:
-  def self.matches?(a : Bool, b, max = nil)
+  def matches?(a : Bool, b, max = nil)
     return false if b == false
     a
   end
 
   # :ditto:
-  def self.matches?(a : Int, b : Int, max = nil)
+  def matches?(a : Int, b : Int, max = nil)
     if max
       a = max + a if a < 0
       b = max + b if b < 0
@@ -121,7 +124,7 @@ class VirtualTime
 
   # # ###### Possibly enable
   # # :ditto:
-  # def self.matches?(a : Array(Int), b : Int, max = nil)
+  # def matches?(a : Array(Int), b : Int, max = nil)
   #   a.each do |aa|
   #     return true if matches? aa, b, max
   #   end
@@ -129,7 +132,7 @@ class VirtualTime
   # end
 
   # # :ditto:
-  # def self.matches?(a : Range(Int, Int), b : Int, max = nil)
+  # def matches?(a : Range(Int, Int), b : Int, max = nil)
   #   if max && (a.begin < 0 || a.end < 0)
   #     ab = a.begin < 0 ? max + a.begin : a.begin
   #     ae = a.end < 0 ? max + a.end : a.end
@@ -142,7 +145,7 @@ class VirtualTime
   # end
 
   # # :ditto:
-  # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Int, max = nil)
+  # def matches?(a : Steppable::StepIterator(Int, Int, Int), b : Int, max = nil)
   #   if max && (a.current < 0 || a.limit < 0)
   #     ab = a.current < 0 ? max + a.current : a.current
   #     ae = a.limit < 0 ? max + a.limit : a.limit
@@ -159,7 +162,7 @@ class VirtualTime
   # # ###### Possibly enable
 
   # :ditto:
-  def self.matches?(a : Enumerable(Int), b : Int, max = nil)
+  def matches?(a : Enumerable(Int), b : Int, max = nil)
     a.dup.each do |aa|
       return true if matches? aa, b, max
     end
@@ -168,7 +171,7 @@ class VirtualTime
 
   # # ###### Possibly enable
   # # :ditto:
-  # def self.matches?(a : Array(Int), b : Array(Int), max = nil)
+  # def matches?(a : Array(Int), b : Array(Int), max = nil)
   #   a.each do |aa|
   #     b.each do |bb|
   #       return true if matches? aa, bb, max
@@ -178,7 +181,7 @@ class VirtualTime
   # end
 
   # # :ditto:
-  # def self.matches?(a : Range(Int, Int), b : Range(Int, Int), max = nil)
+  # def matches?(a : Range(Int, Int), b : Range(Int, Int), max = nil)
   #   if max
   #     if (a.begin < 0 || a.end < 0)
   #       ab = a.begin < 0 ? max + a.begin : a.begin
@@ -200,7 +203,7 @@ class VirtualTime
   # end
 
   # # :ditto:
-  # def self.matches?(a : Steppable::StepIterator(Int, Int, Int), b : Steppable::StepIterator(Int, Int, Int), max = nil)
+  # def matches?(a : Steppable::StepIterator(Int, Int, Int), b : Steppable::StepIterator(Int, Int, Int), max = nil)
   #   if max
   #     if a.current < 0 || a.limit < 0
   #       ab = a.current < 0 ? max + a.current : a.current
@@ -228,7 +231,7 @@ class VirtualTime
   # # ###### Possibly enable
 
   # :ditto:
-  def self.matches?(a : Enumerable(Int), b : Enumerable(Int), max = nil)
+  def matches?(a : Enumerable(Int), b : Enumerable(Int), max = nil)
     a.dup.each do |aa|
       b.dup.each do |bb|
         return true if matches? aa, bb, max
@@ -238,7 +241,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
+  def matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
     a.dup.each do |aa|
       aa = max + aa if max && (aa < 0)
       return true if b.call aa
@@ -247,17 +250,17 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.matches?(a : VirtualProc, b : Int, max = nil)
+  def matches?(a : VirtualProc, b : Int, max = nil)
     b = max + b if max && (b < 0)
     a.call b
   end
 
   # :ditto:
-  def self.matches?(a : VirtualProc, b : VirtualProc, max = nil)
+  def matches?(a : VirtualProc, b : VirtualProc, max = nil)
     raise ArgumentError.new "Proc to Proc comparison not supported (yet?)"
   end
 
-  def self.matches?(a, b, max = nil)
+  def matches?(a, b, max = nil)
     matches? b, a, max
   end
 
