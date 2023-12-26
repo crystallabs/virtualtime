@@ -40,12 +40,12 @@ class VirtualTime
   class_property? default_match : Bool = true
 
   # Instance-default match result if one of field values matched is `nil`
-  #property? default_match : Bool = true
+  # property? default_match : Bool = true
 
-  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil) #, @default_match = @@default_match)
+  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil) # , @default_match = @@default_match)
   end
 
-  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil) #, @default_match = self.class.default_match?)
+  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = nil) # , @default_match = self.class.default_match?)
   end
 
   def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location)
@@ -53,36 +53,15 @@ class VirtualTime
 
   # Matching
 
-  # :nodoc:
-  macro adjust_location
-    if time.is_a? Time
-      if (l = location) && (time.location != l)
-        time = time.in l
-      end
-    else
-      if location != time.location
-        raise ArgumentError.new "Comparing VirtualTimes with different locations/timezones not supported (yet?)"
-      end
-    end
-  end
-
   # Returns whether `VirtualTime` matches the specified time
   def matches?(time : TimeOrVirtualTime = Time.local)
-    adjust_location
+    time = adjust_location time
     matches_date?(time) && matches_time?(time)
-  end
-
-  # :ditto:
-  #
-  # Alias for `matches?`.
-  @[AlwaysInline]
-  def ==(time : TimeOrVirtualTime = Time.local)
-    matches? time
   end
 
   # Returns whether `VirtualTime` matches the date part of specified time
   def matches_date?(time : TimeOrVirtualTime = Time.local)
-    adjust_location
+    time = adjust_location time
     matches?(year, time.year, 9999) &&
       matches?(month, time.month, 12) &&
       matches?(day, time.day, TimeHelper.days_in_month(time)) &&
@@ -93,7 +72,7 @@ class VirtualTime
 
   # Returns whether `VirtualTime` matches the time part of specified time
   def matches_time?(time : TimeOrVirtualTime = Time.local)
-    adjust_location
+    time = adjust_location time
     matches?(hour, time.hour, 23) &&
       matches?(minute, time.minute, 59) &&
       matches?(second, time.second, 59) &&
@@ -102,166 +81,149 @@ class VirtualTime
   end
 
   # Performs matching between VirtualTime and other supported types
-  def matches?(a : Nil, b, max = nil)
-    return false if b == false
-    self.class.default_match?
-  end
+  def matches?(a, b, max = nil) : Bool
+    a = adjust_value a, max
+    b = adjust_value b, max
 
-  # :ditto:
-  def matches?(a : Bool, b, max = nil)
-    return false if b == false
-    a
-  end
-
-  # :ditto:
-  def matches?(a : Int, b : Int, max = nil)
-    if max
-      a = max + a if a < 0
-      b = max + b if b < 0
-    end
-    a == b
-  end
-
-  # # ###### Possibly enable
-  # # :ditto:
-  # def matches?(a : Array(Int), b : Int, max = nil)
-  #   a.each do |aa|
-  #     return true if matches? aa, b, max
-  #   end
-  #   false
-  # end
-
-  # # :ditto:
-  # def matches?(a : Range(Int, Int), b : Int, max = nil)
-  #   if max && (a.begin < 0 || a.end < 0)
-  #     ab = a.begin < 0 ? max + a.begin : a.begin
-  #     ae = a.end < 0 ? max + a.end : a.end
-  #     a = ab..ae
-  #   end
-  #   a.each do |aa|
-  #     return true if matches? aa, b, max
-  #   end
-  #   false
-  # end
-
-  # # :ditto:
-  # def matches?(a : Steppable::StepIterator(Int, Int, Int), b : Int, max = nil)
-  #   if max && (a.current < 0 || a.limit < 0)
-  #     ab = a.current < 0 ? max + a.current : a.current
-  #     ae = a.limit < 0 ? max + a.limit : a.limit
-  #     a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
-  #   else
-  #     a = a.dup
-  #   end
-  #   a.each do |aa|
-  #     return true if matches? aa, b, max
-  #   end
-  #   false
-  # end
-
-  # # ###### Possibly enable
-
-  # :ditto:
-  def matches?(a : Enumerable(Int), b : Int, max = nil)
-    a.dup.each do |aa|
-      return true if matches? aa, b, max
-    end
-    false
-  end
-
-  # # ###### Possibly enable
-  # # :ditto:
-  # def matches?(a : Array(Int), b : Array(Int), max = nil)
-  #   a.each do |aa|
-  #     b.each do |bb|
-  #       return true if matches? aa, bb, max
-  #     end
-  #   end
-  #   false
-  # end
-
-  # # :ditto:
-  # def matches?(a : Range(Int, Int), b : Range(Int, Int), max = nil)
-  #   if max
-  #     if (a.begin < 0 || a.end < 0)
-  #       ab = a.begin < 0 ? max + a.begin : a.begin
-  #       ae = a.end < 0 ? max + a.end : a.end
-  #       a = ab..ae
-  #     end
-  #     if (b.begin < 0 || b.end < 0)
-  #       bb = b.begin < 0 ? max + b.begin : b.begin
-  #       be = b.end < 0 ? max + b.end : b.end
-  #       b = bb..be
-  #     end
-  #   end
-  #   a.each do |aa|
-  #     b.each do |bb|
-  #       return true if matches? aa, bb, max
-  #     end
-  #   end
-  #   false
-  # end
-
-  # # :ditto:
-  # def matches?(a : Steppable::StepIterator(Int, Int, Int), b : Steppable::StepIterator(Int, Int, Int), max = nil)
-  #   if max
-  #     if a.current < 0 || a.limit < 0
-  #       ab = a.current < 0 ? max + a.current : a.current
-  #       ae = a.limit < 0 ? max + a.limit : a.limit
-  #       a = Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
-  #     else
-  #       a = a.dup
-  #     end
-  #     if b.current < 0 || b.limit < 0
-  #       bb = b.current < 0 ? max + b.current : b.current
-  #       be = b.limit < 0 ? max + b.limit : b.limit
-  #       b = Steppable::StepIterator(Int32, Int32, Int32).new bb, be, b.step, b.exclusive
-  #     else
-  #       b = b.dup
-  #     end
-  #   end
-  #   a.each do |aa|
-  #     b.each do |bb|
-  #       return true if matches? aa, bb, max
-  #     end
-  #   end
-  #   false
-  # end
-
-  # # ###### Possibly enable
-
-  # :ditto:
-  def matches?(a : Enumerable(Int), b : Enumerable(Int), max = nil)
-    a.dup.each do |aa|
-      b.dup.each do |bb|
-        return true if matches? aa, bb, max
+    case a
+    in Nil
+      b == false ? false : self.class.default_match?
+    in Bool
+      b == false ? false : a
+    in Int
+      case b
+      in Nil, Bool, Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+        matches? b, a, max
+      in Int
+        a == b
+      in VirtualProc
+        b.call a
+      end
+    in Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+      a = a.dup if a.is_a? Steppable::StepIterator(Int32, Int32, Int32)
+      case b
+      in Nil, Bool
+        matches? b, a, max
+      in Int
+        a.each do |aa|
+          return true if aa == b
+        end
+        false
+      in Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+        a.each do |aa|
+          bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
+          bb.each do |bbb|
+            return true if aa == bbb
+          end
+        end
+        false
+      in VirtualProc
+        a.each do |aa|
+          return true if b.call aa
+        end
+        false
+      end
+    in VirtualProc
+      case b
+      in Nil, Bool, Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+        matches? b, a, max
+      in Int32
+        a.call b
+      in VirtualProc
+        raise ArgumentError.new "Proc to Proc comparison not supported (yet?)"
       end
     end
-    false
   end
 
-  # :ditto:
-  def matches?(a : Enumerable(Int), b : VirtualProc, max = nil)
-    a.dup.each do |aa|
-      aa = max + aa if max && (aa < 0)
-      return true if b.call aa
+  # Commutative pairs of above functions:
+
+  # # :ditto:
+  # def matches?(a, b : Nil | Bool | Array(Int) | Range(Int, Int) | Steppable::StepIterator(Int, Int, Int) | VirtualProc, max = nil)
+  #  matches? b, a, max
+  # end
+
+  # Helpers:
+
+  @[AlwaysInline]
+  def adjust_value(a, max)
+    case a
+    in Nil, Bool
+      a
+    in Int
+      if max
+        a < 0 ? max + a : a
+      else
+        a
+      end
+    in Array(Int32)
+      if max
+        a.map { |aa| aa < 0 ? max + aa : aa }
+      else
+        a
+      end.sort
+    in Range(Int32, Int32)
+      if max && (a.begin < 0 || a.end < 0)
+        ab = a.begin < 0 ? max + a.begin : a.begin
+        ae = a.end < 0 ? max + a.end : a.end
+        ab..ae
+      else
+        a
+      end
+    in Steppable::StepIterator(Int32, Int32, Int32)
+      if max && (a.current < 0 || a.limit < 0)
+        ab = a.current < 0 ? max + a.current : a.current
+        ae = a.limit < 0 ? max + a.limit : a.limit
+        Steppable::StepIterator(Int32, Int32, Int32).new ab, ae, a.step, a.exclusive
+      else
+        a
+      end
+    in Enumerable(Int32)
+      if max
+        a.map { |aa| aa < 0 ? max + aa : aa }
+      else
+        a
+      end.sort
+    in VirtualProc, Proc(Bool)
+      a
     end
-    false
   end
 
-  # :ditto:
-  def matches?(a : VirtualProc, b : Int, max = nil)
-    b = max + b if max && (b < 0)
-    a.call b
+  # :nodoc:
+  @[AlwaysInline]
+  def adjust_location(time)
+    if time.is_a? Time
+      if (l = location) && (time.location != l)
+        time = time.in l
+      end
+    else
+      if location != time.location
+        raise ArgumentError.new "Comparing VirtualTimes with different locations/timezones not supported (yet?)"
+      end
+    end
+    time
   end
 
-  # :ditto:
-  def matches?(a : VirtualProc, b : VirtualProc, max = nil)
-    raise ArgumentError.new "Proc to Proc comparison not supported (yet?)"
-  end
-
-  def matches?(a, b, max = nil)
-    matches? b, a, max
+  # If `max` is specified, adjusts `hint` in respect to `max`.
+  #
+  # Specifically, if `hint` is equal or greater than `max`, it wraps it around
+  # by increasing `carry` by 1 and reducing `hint` by `max`.
+  #
+  # The current implementation does not support wrapping more than once, e.g.
+  # a wanted of `120` with a max of `60` would produce an error.
+  # That is because some of `VirtualTime`s fields (like e.g. `day`) do not have
+  # a fixed max value (it can be 28, 29, 30, or 31, depending on month).
+  @[AlwaysInline]
+  macro adjust_wanted_re_max
+    if max
+      limit = (2*max-2*min).abs
+      if wanted.abs >= limit
+        raise ArgumentError.new "A `wanted.abs` value #{wanted.abs} must not be be >= #{limit} (>= (2*max-2*min).abs)."
+      end
+      if wanted >= max
+        wanted -= max - min
+        carry += 1
+      end
+    end
   end
 
   # Materializing
@@ -287,29 +249,6 @@ class VirtualTime
     end
 
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
-  end
-
-  # If `max` is specified, adjusts `hint` in respect to `max`.
-  #
-  # Specifically, if `hint` is equal or greater than `max`, it wraps it around
-  # by increasing `carry` by 1 and reducing `hint` by `max`.
-  #
-  # The current implementation does not support wrapping more than once, e.g.
-  # a wanted of `120` with a max of `60` would produce an error.
-  # That is because some of `VirtualTime`s fields (like e.g. `day`) do not have
-  # a fixed max value (it can be 28, 29, 30, or 31, depending on month).
-  @[AlwaysInline]
-  macro adjust_wanted_re_max
-    if max
-      limit = (2*max-2*min).abs
-      if wanted.abs >= limit
-        raise ArgumentError.new "A `wanted.abs` value #{wanted.abs} must not be be >= #{limit} (>= (2*max-2*min).abs)."
-      end
-      if wanted >= max
-        wanted -= max - min
-        carry += 1
-      end
-    end
   end
 
   # Materialize a particular value with the help of a wanted/wanted value.
@@ -352,6 +291,7 @@ class VirtualTime
   def self.materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
     carry = 0
     adjust_wanted_re_max
+    # XXX adjust_range...
     if max && (allowed.begin < 0 || allowed.end < 0)
       ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
       ae = allowed.end < 0 ? max + allowed.end : allowed.end
@@ -411,8 +351,19 @@ class VirtualTime
   # Comparison and conversion to and from time
 
   # Compares `VirtualTime` to `Time` instance
+  #
+  # Alias for `matches?`.
+  @[AlwaysInline]
+  def ==(time : TimeOrVirtualTime = Time.local)
+    matches? time
+  end
+
+  # Compares `VirtualTime` to `Time` instance
   def <=>(other : Time)
-    to_time(other) <=> other
+    # This is one possible implementation:
+    # to_time(other) <=> other
+    # Another could be:
+    matches?(other) ? 1 : -1
   end
 
   # "Rewinds" `day` forward enough to reach `acceptable_day`.

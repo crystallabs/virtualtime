@@ -89,6 +89,7 @@ describe VirtualTime do
 
     vt.millisecond = 16
     vt.matches?(vt2).should be_true
+    vt.matches?(vt2).should be_true
   end
 
   it "can match Crystal's Times in different locations" do
@@ -137,7 +138,7 @@ describe VirtualTime do
     vt.hour.should eq 10..20
     vt.second.should eq true
     vt.location.should eq Time::Location.load("Europe/Berlin")
-    #vt.default_match?.should eq false
+    # vt.default_match?.should eq false
   end
 
   it "does range comparison properly" do
@@ -165,10 +166,371 @@ describe VirtualTime do
 
   # Other
 
-  it "honors default_match?" do
+  it "honors class-level default_match?" do
+    dm = VirtualTime.default_match?
     vt = VirtualTime.new
     vt.matches?(Time.local).should be_true
     VirtualTime.default_match = false
     vt.matches?(Time.local).should be_false
+    VirtualTime.default_match = dm
+  end
+
+  it "can adjust timezone for Times" do
+    time = Time.local year: 2020, month: 1, day: 15, location: Time::Location.load("Europe/Berlin")
+    vt = VirtualTime.new location: Time::Location.load("America/New_York")
+    time2 = vt.adjust_location time
+    time2.should eq time.in vt.location.not_nil!
+
+    vt = VirtualTime.new location: Time::Location.load("Europe/Berlin")
+    vt2 = VirtualTime.new location: Time::Location.load("America/New_York")
+    expect_raises(ArgumentError) do
+      vt.adjust_location vt2
+    end
+  end
+
+  it "Handles comparisons with Time" do
+    vt = VirtualTime.new
+    t = Time.local
+    (vt == t).should be_true
+    (vt <=> t).should eq 1
+    vt.year = 1970
+    (vt == t).should be_false
+    (vt <=> t).should eq -1
+  end
+
+  it "matches?(Nil, any, max)" do
+    vt = VirtualTime.new
+    {nil, 0, 1, 1000}.each do |max|
+      vt.matches?(nil, nil, max).should be_true
+      vt.matches?(nil, false, max).should be_false
+      vt.matches?(nil, true, max).should be_true
+      vt.matches?(nil, 0, max).should be_true
+      vt.matches?(nil, 15, max).should be_true
+      vt.matches?(nil, [1, 2, 3], max).should be_true
+      vt.matches?(nil, 1..10, max).should be_true
+      vt.matches?(nil, (1..10).step(3), max).should be_true
+      vt.matches?(nil, ->{ false }, max).should be_true
+    end
+  end
+
+  it "matches?(Bool, any, max)" do
+    vt = VirtualTime.new
+    {nil, 0, 1, 1000}.each do |max|
+      vt.matches?(true, nil, max).should be_true
+      vt.matches?(true, false, max).should be_false
+      vt.matches?(true, true, max).should be_true
+      vt.matches?(true, 0, max).should be_true
+      vt.matches?(true, 15, max).should be_true
+      vt.matches?(true, [1, 2, 3], max).should be_true
+      vt.matches?(true, 1..10, max).should be_true
+      vt.matches?(true, (1..10).step(3), max).should be_true
+      vt.matches?(true, ->{ false }, max).should be_true
+
+      vt.matches?(false, nil, max).should be_false
+      vt.matches?(false, false, max).should be_false
+      vt.matches?(false, true, max).should be_false
+      vt.matches?(false, 0, max).should be_false
+      vt.matches?(false, 15, max).should be_false
+      vt.matches?(false, [1, 2, 3], max).should be_false
+      vt.matches?(false, 1..10, max).should be_false
+      vt.matches?(false, (1..10).step(3), max).should be_false
+      vt.matches?(false, ->{ false }, max).should be_false
+    end
+  end
+
+  it "matches?(Int, Int, max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?(9, 13, max).should be_false
+    vt.matches?(9, 1, max).should be_false
+    vt.matches?(9, 9, max).should be_true
+    vt.matches?(9, 0, max).should be_false
+    vt.matches?(9, 31, max).should be_false
+    vt.matches?(5, -5, max).should be_false
+    vt.matches?(-5, -5, max).should be_true
+    vt.matches?(-5, 5, max).should be_false
+    vt.matches?(6, -5, max).should be_false
+    vt.matches?(5, -6, max).should be_false
+    vt.matches?(0, 0, max).should be_true
+
+    max = 10
+    vt.matches?(9, 13, max).should be_false
+    vt.matches?(9, 1, max).should be_false
+    vt.matches?(9, 9, max).should be_true
+    vt.matches?(9, 0, max).should be_false
+    vt.matches?(9, 31, max).should be_false
+    vt.matches?(5, -5, max).should be_true
+    vt.matches?(-5, -5, max).should be_true
+    vt.matches?(-5, 5, max).should be_true
+    vt.matches?(6, -5, max).should be_false
+    vt.matches?(5, -6, max).should be_false
+    vt.matches?(max, max, max).should be_true
+    vt.matches?(-max, max, max).should be_false
+    vt.matches?(max, -max, max).should be_false
+    vt.matches?(-max, -max, max).should be_true
+  end
+
+  it "matches?(Array(Int), Int, max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?([9], 13, max).should be_false
+    vt.matches?([9], 1, max).should be_false
+    vt.matches?([9], 9, max).should be_true
+    vt.matches?([9], 0, max).should be_false
+    vt.matches?([9], 31, max).should be_false
+    vt.matches?([5], -5, max).should be_false
+    vt.matches?([-5], -5, max).should be_true
+    vt.matches?([-5], 5, max).should be_false
+    vt.matches?([6], -5, max).should be_false
+    vt.matches?([5], -6, max).should be_false
+    vt.matches?([0], 0, max).should be_true
+
+    max = 10
+    vt.matches?([9], 13, max).should be_false
+    vt.matches?([9], 1, max).should be_false
+    vt.matches?([9], 9, max).should be_true
+    vt.matches?([9], 0, max).should be_false
+    vt.matches?([9], 31, max).should be_false
+    vt.matches?([5], -5, max).should be_true
+    vt.matches?([-5], -5, max).should be_true
+    vt.matches?([-5], 5, max).should be_true
+    vt.matches?([6], -5, max).should be_false
+    vt.matches?([5], -6, max).should be_false
+    vt.matches?([max], max, max).should be_true
+    vt.matches?([-max], max, max).should be_false
+    vt.matches?([max], -max, max).should be_false
+    vt.matches?([-max], -max, max).should be_true
+
+    max = nil
+    vt.matches?([1, 9], 13, max).should be_false
+    vt.matches?([1, 9], 1, max).should be_true
+    vt.matches?([9], 9, max).should be_true
+    vt.matches?([9], 0, max).should be_false
+    vt.matches?([9], 31, max).should be_false
+    vt.matches?([5], -5, max).should be_false
+    vt.matches?([-5], -5, max).should be_true
+    vt.matches?([-5], 5, max).should be_false
+    vt.matches?([6, -5], -5, max).should be_true
+    vt.matches?([5], -6, max).should be_false
+    vt.matches?([0], 0, max).should be_true
+
+    max = 10
+    vt.matches?([9], 13, max).should be_false
+    vt.matches?([9], 1, max).should be_false
+    vt.matches?([9], 9, max).should be_true
+    vt.matches?([9], 0, max).should be_false
+    vt.matches?([9], 31, max).should be_false
+    vt.matches?([5], -5, max).should be_true
+    vt.matches?([-5], -5, max).should be_true
+    vt.matches?([-5], 5, max).should be_true
+    vt.matches?([6], -5, max).should be_false
+    vt.matches?([5], -6, max).should be_false
+    vt.matches?([max], max, max).should be_true
+    vt.matches?([-max], max, max).should be_false
+    vt.matches?([max], -max, max).should be_false
+    vt.matches?([-max], -max, max).should be_true
+  end
+
+  it "matches?(Range(Int, Int), Int, max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?(1..8, -1, max).should be_false
+    vt.matches?(1..8, 0, max).should be_false
+    vt.matches?(1..8, 1, max).should be_true
+    vt.matches?(1..8, -5, max).should be_false
+    vt.matches?(1..8, 5, max).should be_true
+    vt.matches?(1..8, 8, max).should be_true
+    vt.matches?(1..8, 9, max).should be_false
+    vt.matches?(1..8, -8, max).should be_false
+    vt.matches?(1..8, -7, max).should be_false
+    vt.matches?(1..8, -9, max).should be_false
+    vt.matches?(1..8, 13, max).should be_false
+
+    max = 8
+    vt.matches?(1..8, -1, max).should be_true
+    vt.matches?(1..8, 0, max).should be_false
+    vt.matches?(1..8, 1, max).should be_true
+    vt.matches?(1..8, -5, max).should be_true
+    vt.matches?(1..8, 5, max).should be_true
+    vt.matches?(1..8, 8, max).should be_true
+    vt.matches?(1..8, 9, max).should be_false
+    vt.matches?(1..8, -8, max).should be_false
+    vt.matches?(1..8, -7, max).should be_true
+    vt.matches?(1..8, -9, max).should be_false
+    vt.matches?(1..8, 13, max).should be_false
+  end
+
+  it "matches?(Steppable(Int, Int), Int, max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?((1..8).step(2), -1, max).should be_false
+    vt.matches?((1..8).step(2), 0, max).should be_false
+    vt.matches?((1..8).step(2), 1, max).should be_true
+    vt.matches?((1..8).step(2), -5, max).should be_false
+    vt.matches?((1..8).step(2), 5, max).should be_true
+    vt.matches?((1..8).step(2), 8, max).should be_false
+    vt.matches?((1..8).step(2), 9, max).should be_false
+    vt.matches?((1..8).step(2), -8, max).should be_false
+    vt.matches?((1..8).step(2), -7, max).should be_false
+    vt.matches?((1..8).step(2), -9, max).should be_false
+    vt.matches?((1..8).step(2), 13, max).should be_false
+
+    max = 8
+    vt.matches?((1..8).step(2), -1, max).should be_true
+    vt.matches?((1..8).step(2), 0, max).should be_false
+    vt.matches?((1..8).step(2), 1, max).should be_true
+    vt.matches?((1..8).step(2), -5, max).should be_true
+    vt.matches?((1..8).step(2), 5, max).should be_true
+    vt.matches?((1..8).step(2), 8, max).should be_false
+    vt.matches?((1..8).step(2), 9, max).should be_false
+    vt.matches?((1..8).step(2), -8, max).should be_false
+    vt.matches?((1..8).step(2), -7, max).should be_true
+    vt.matches?((1..8).step(2), -9, max).should be_false
+    vt.matches?((1..8).step(2), 13, max).should be_false
+  end
+
+  # Enumerable not tested directly
+
+  it "matches?(Array(Int), Array(Int), max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?([9], [1], max).should be_false
+    vt.matches?([9], [1, 2, 3, 4, 8, 10, 11], max).should be_false
+    vt.matches?([9], [9], max).should be_true
+    vt.matches?([9], [-1, -8, -9, -10], max).should be_false
+    vt.matches?([9], [0], max).should be_false
+    vt.matches?([5], [-5], max).should be_false
+    vt.matches?([-5], [-5], max).should be_true
+    vt.matches?([-5], [5], max).should be_false
+    vt.matches?([6], [-1], max).should be_false
+    vt.matches?([0], [-1, 0, 1], max).should be_true
+
+    max = 10
+    vt.matches?([9], [1], max).should be_false
+    vt.matches?([9], [1, 2, 3, 4, 8, 10, 11], max).should be_false
+    vt.matches?([9], [9], max).should be_true
+    vt.matches?([9], [-1, -8, -9, -10], max).should be_true
+    vt.matches?([9], [0], max).should be_false
+    vt.matches?([5], [-5], max).should be_true
+    vt.matches?([-5], [-5], max).should be_true
+    vt.matches?([-5], [5], max).should be_true
+    vt.matches?([6], [-1], max).should be_false
+    vt.matches?([0], [-1, 0, 1], max).should be_true
+  end
+
+  it "matches?(Range(Int,Int), Range(Int,Int), max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?(10..23, 1..30, max).should be_true
+    vt.matches?(10..23, 1..10, max).should be_true
+    vt.matches?(10..23, 23..30, max).should be_true
+    vt.matches?(10..23, 5..9, max).should be_false
+    vt.matches?(10..23, 24..30, max).should be_false
+    vt.matches?(10..23, 1..12, max).should be_true
+    vt.matches?(10..23, 21..30, max).should be_true
+    vt.matches?(1..5, 6..10, max).should be_false
+    vt.matches?(6..10, 1..5, max).should be_false
+    vt.matches?(10..-1, 15..20, max).should be_false
+    vt.matches?(1..-10, 5..-15, max).should be_false
+
+    max = 30
+    vt.matches?(10..23, 1..30, max).should be_true
+    vt.matches?(10..23, 1..10, max).should be_true
+    vt.matches?(10..23, 23..30, max).should be_true
+    vt.matches?(10..23, 5..9, max).should be_false
+    vt.matches?(10..23, 24..30, max).should be_false
+    vt.matches?(10..23, 1..12, max).should be_true
+    vt.matches?(10..23, 21..30, max).should be_true
+    vt.matches?(1..5, 6..10, max).should be_false
+    vt.matches?(6..10, 1..5, max).should be_false
+    vt.matches?(10..-1, 15..20, max).should be_true
+    vt.matches?(1..-10, 5..-15, max).should be_true
+    vt.matches?(1..-1, 10..-10, max).should be_true
+    vt.matches?(1..-1, 40..50, max).should be_false
+  end
+
+  it "matches?(Steppable::StepIterator(Int,Int,Int), Int, max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?((10..23).step(2), 10, max).should be_true
+    vt.matches?((10..23).step(2), 11, max).should be_false
+    vt.matches?((10..23).step(2), 22, max).should be_true
+    vt.matches?((10..23).step(3), 23, max).should be_false
+    vt.matches?((10..23).step(2), 9, max).should be_false
+    vt.matches?((10..23).step(2), 24, max).should be_false
+    vt.matches?((1..5).step(2), -28, max).should be_false
+    vt.matches?((6..10).step(2), 3, max).should be_false
+    vt.matches?((10..-1).step(2), 20, max).should be_false
+    vt.matches?((1..-10).step(2), 2, max).should be_false
+
+    max = 30
+    vt.matches?((10..23).step(2), 10, max).should be_true
+    vt.matches?((10..23).step(2), 11, max).should be_false
+    vt.matches?((10..23).step(2), 22, max).should be_true
+    vt.matches?((10..23).step(3), 23, max).should be_false
+    vt.matches?((10..23).step(2), 9, max).should be_false
+    vt.matches?((10..23).step(2), 24, max).should be_false
+    vt.matches?((1..5).step(3), -26, max).should be_true
+    vt.matches?((6..10).step(2), 3, max).should be_false
+    vt.matches?((10..-1).step(2), 20, max).should be_true
+    vt.matches?((1..-10).step(2), 2, max).should be_false
+    vt.matches?((10..-1).step(2), 0, max).should be_false
+    vt.matches?((2..-10).step(2), 0, max).should be_false
+    vt.matches?((1..-1).step(7), 6, max).should be_false
+    vt.matches?((1..-1).step(6), 7, max).should be_true
+    vt.matches?((1..-1).step(7), 15, max).should be_true
+  end
+
+  it "matches?(Steppable::StepIterator(Int,Int,Int), Steppable::StepIterator(Int,Int,Int), max)" do
+    vt = VirtualTime.new
+    max = nil
+    vt.matches?((10..23).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((10..23).step(2), (10..23).step(3), max).should be_true
+    vt.matches?((10..23).step(2), (11..23).step(2), max).should be_false
+    vt.matches?((10..23).step(3), (5..10).step(2), max).should be_false
+    vt.matches?((10..23).step(2), (6..10).step(2), max).should be_true
+    vt.matches?((10..23).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((1..5).step(2), (10..23).step(2), max).should be_false
+    vt.matches?((6..10).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((10..-1).step(2), (10..23).step(2), max).should be_false
+    vt.matches?((1..-10).step(2), (10..23).step(2), max).should be_false
+
+    max = 30
+    vt.matches?((10..23).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((10..23).step(2), (10..23).step(3), max).should be_true
+    vt.matches?((10..23).step(2), (11..23).step(2), max).should be_false
+    vt.matches?((10..23).step(3), (5..10).step(2), max).should be_false
+    vt.matches?((10..23).step(2), (6..10).step(2), max).should be_true
+    vt.matches?((10..23).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((1..5).step(2), (10..23).step(2), max).should be_false
+    vt.matches?((6..10).step(2), (10..23).step(2), max).should be_true
+    vt.matches?((10..-1).step(2), (16..23).step(2), max).should be_true
+    vt.matches?((10..-1).step(2), (17..23).step(2), max).should be_false
+    vt.matches?((1..-10).step(2), (-20..-10).step(2), max).should be_false
+    vt.matches?((1..-10).step(3), (-25..-10).step(2), max).should be_true
+    vt.matches?((2..-10).step(2), (40..-10).step(2), max).should be_false
+    vt.matches?((-20..-1).step(2), (40..50).step(3), max).should be_false
+    vt.matches?((1..-1).step(6), (5..23).step(2), max).should be_true
+    vt.matches?((1..-1).step(7), (5..23).step(2), max).should be_true
+  end
+
+  it "matches?(VirtualProc, Int, max)" do
+    vt = VirtualTime.new
+    v_true = ->(v : Int32) { true }
+    v_false = ->(v : Int32) { false }
+    v_ge_10 = ->(v : Int32) { v >= 10 }
+
+    vt.matches?(v_true, 0, nil).should be_true
+    vt.matches?(v_false, 0, nil).should be_false
+    vt.matches?(v_ge_10, 0, nil).should be_false
+    vt.matches?(v_ge_10, 20, nil).should be_true
+  end
+
+  it "can't do matches?(VirtualProc, VirtualProc, max)" do
+    vt = VirtualTime.new
+    v_true = ->(v : Int32) { true }
+    expect_raises(ArgumentError) {
+      vt.matches? v_true, v_true
+    }
   end
 end
