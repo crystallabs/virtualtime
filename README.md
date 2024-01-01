@@ -7,7 +7,7 @@
 VirtualTime is a time matching class for Crystal.
 It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
 
-It is used for complex and flexible matching of dates and times, primarily for calendar, scheduling, and reminding purposes.
+It is used for complex matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
 
 For example:
 
@@ -19,9 +19,16 @@ vt.day_of_week = [6,7]
 vt.hour = 12..16
 vt.minute = ->( val : Int32) { true }
 
+# Check if a specified Time matches
 time = Time.local
-
 vt.matches? time
+
+# Generate the next two Times
+vti = vt.step(1.day)
+p vti.next
+p vti.next
+2024-01-27 12:16:36.0 +01:00 Local
+2024-01-28 12:00:00.0 +01:00 Local
 ```
 
 That `VirtualTime` instance will match any `Time` that is:
@@ -33,7 +40,13 @@ That `VirtualTime` instance will match any `Time` that is:
 - And any minute (since example block always returns true)
 
 As a more advanced feature, it is also possible to match `VirtualTime`s with other
-`VirtualTime`s. That is documented further below.
+`VirtualTime`s.
+
+It is also possible to create a VirtualTime with desired settings and then call
+`step().next` on it to continuously generate `Time`s that satisy the specified
+requirements/constraints.
+
+Both of those features are documented further below.
 
 ## Installation
 
@@ -151,7 +164,7 @@ And each of these properties can have a value of the following types:
 1. **Nil**, to default to `VirtualTime.default_match? : Bool = true`
 1. **Boolean**, to always match (`true`) or fail (`false`)
 1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
-1. **Array of Int32s**, such as [1,2,10,-1] to match any value in list
+1. **Array or Set of Int32s**, such as [1,2,10,-1] to match any value in list
 1. **Range of Int32..Int32**, such as `10..20` to match any value in range
 1. **Range with step**, e.g. `day: (10..20).step(2)`, to match all even days between 10th and 20th
 1. **Proc**, to match a value if the return value from calling a proc is `true`

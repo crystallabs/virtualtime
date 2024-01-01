@@ -15,12 +15,11 @@ class VirtualTime
 
   # XXX Use Int instead of Int32 when it becomes possible in unions in Crystal
   # XXX Possibly add Enumerable(Int32) and remove more specific types after https://github.com/crystal-lang/crystal/issues/14047
-  alias Virtual = Nil | Bool | Int32 | Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
+
+  alias Virtual = Nil | Bool | Int32 | Array(Int32) | Set(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
   alias VirtualProc = Proc(Int32, Bool)
   alias VTTuple = Tuple(Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Virtual, Time::Location?)
   alias TimeOrVirtualTime = Time | self
-
-  # Date-related properties
 
   # Macro to define properties with a common YAML converter
   macro virtual_time_property(*properties)
@@ -36,19 +35,16 @@ class VirtualTime
   @[YAML::Field(converter: VirtualTime::TimeLocationConverter)]
   property location : Time::Location?
 
-  # Class-default match result if one of field values matched is `nil`
-  class_property? default_match : Bool = true
-
   # Instance-default match result if one of field values matched is `nil`
-  # property? default_match : Bool = true
+  property? default_match : Bool = true
 
-  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil) # , @default_match = @@default_match)
+  def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil, @default_match = true)
   end
 
-  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = nil) # , @default_match = self.class.default_match?)
+  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = ni, @default_match = true)
   end
 
-  def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location)
+  def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location, @default_match = true)
   end
 
   # Matching
@@ -87,19 +83,19 @@ class VirtualTime
 
     case a
     in Nil
-      b == false ? false : self.class.default_match?
+      b == false ? false : default_match?
     in Bool
       b == false ? false : a
     in Int
       case b
-      in Nil, Bool, Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+      in Nil, Bool, Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
         matches? b, a, max
       in Int
         a == b
       in VirtualProc
         b.call a
       end
-    in Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+    in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
       a = a.dup if a.is_a? Steppable::StepIterator(Int32, Int32, Int32)
       case b
       in Nil, Bool
@@ -109,7 +105,7 @@ class VirtualTime
           return true if aa == b
         end
         false
-      in Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+      in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
         a.each do |aa|
           bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
           bb.each do |bbb|
@@ -125,7 +121,7 @@ class VirtualTime
       end
     in VirtualProc
       case b
-      in Nil, Bool, Array(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
+      in Nil, Bool, Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
         matches? b, a, max
       in Int32
         a.call b
@@ -135,15 +131,11 @@ class VirtualTime
     end
   end
 
-  # Commutative pairs of above functions:
-
-  # # :ditto:
-  # def matches?(a, b : Nil | Bool | Array(Int) | Range(Int, Int) | Steppable::StepIterator(Int, Int, Int) | VirtualProc, max = nil)
-  #  matches? b, a, max
-  # end
-
   # Helpers:
 
+  # Adjusts values to be suitable for use in comparisons.
+  # At the moment, that includes converting negative values to offsets from end of range, reorganizing ranges so ttat begin <= end, and sorting Arrays and Sets,
+  # If calling this function yourself, provide `max` whenever possible.
   @[AlwaysInline]
   def adjust_value(a, max)
     case a
@@ -155,11 +147,11 @@ class VirtualTime
       else
         a
       end
-    in Array(Int32)
+    in Array(Int32), Set(Int32)
       if max
         a.map { |aa| aa < 0 ? max + aa : aa }
       else
-        a
+        a.to_a
       end.sort
     in Range(Int32, Int32)
       if max && (a.begin < 0 || a.end < 0)
@@ -188,7 +180,8 @@ class VirtualTime
     end
   end
 
-  # :nodoc:
+  # Ensures that `Time`'s timezone is equal to VT's timezone.
+  # Raises ArgumentError if comparing two VTs with different timezones.
   @[AlwaysInline]
   def adjust_location(time)
     if time.is_a? Time
@@ -234,15 +227,12 @@ class VirtualTime
     self.class.new **materialize_with_hint(hint)
   end
 
-  # :nodoc:
+  # Materializes VT and returns fields needed to create a `Time` object.
+  # This function does not check that the materialized values match the week number, day of week, and day of year constraints.
+  # If you need those values checked, use `#to_time`.
   def materialize_with_hint(time : Time, carry = 0)
-    _nanosecond, carry = self.class.materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
-    _second, carry = self.class.materialize(second, time.second + carry, 0, 60)
-    _minute, carry = self.class.materialize(minute, time.minute + carry, 0, 60)
-    _hour, carry = self.class.materialize(hour, time.hour + carry, 0, 24)
-    _day, carry = self.class.materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
-    _month, carry = self.class.materialize(month, time.month + carry, 1, 13)
-    _year, carry = self.class.materialize(year, time.year + carry, 1, 10_000)
+    _nanosecond, _second, _minute, _hour, carry = materialize_time_with_hint time, carry
+    _day, _month, _year, carry = materialize_date_with_hint time, carry
 
     if carry > 0
       raise ArgumentError.new "Cannot find compliant materialized time"
@@ -251,9 +241,28 @@ class VirtualTime
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
 
+  # Materialize date part of current VT
+  def materialize_date_with_hint(time : Time, carry = 0)
+    _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
+    _month, carry = materialize(month, time.month + carry, 1, 13)
+    _year, carry = materialize(year, time.year + carry, 1, 10_000)
+
+    {_day, _month, _year, carry}
+  end
+
+  # Materialize time part of current VT
+  def materialize_time_with_hint(time : Time, carry = 0)
+    _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
+    _second, carry = materialize(second, time.second + carry, 0, 60)
+    _minute, carry = materialize(minute, time.minute + carry, 0, 60)
+    _hour, carry = materialize(hour, time.hour + carry, 0, 24)
+
+    {_nanosecond, _second, _minute, _hour, carry}
+  end
+
   # Materialize a particular value with the help of a wanted/wanted value.
   # If 'strict' is true and wanted value does not satisfy predefined range or requirements, it is replaced with the first/earliest value from allowed range.
-  def self.materialize(allowed : Nil, wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Nil, wanted : Int32, min, max = nil, strict = true)
     unless default_match?
       raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
@@ -263,7 +272,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(allowed : Bool, wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Bool, wanted : Int32, min, max = nil, strict = true)
     unless allowed
       raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
@@ -273,7 +282,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
     carry = 0
     adjust_wanted_re_max
     if !strict
@@ -288,7 +297,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
     carry = 0
     adjust_wanted_re_max
     # XXX adjust_range...
@@ -306,7 +315,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(allowed : Enumerable(Int), wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Enumerable(Int), wanted : Int32, min, max = nil, strict = true)
     carry = 0
     adjust_wanted_re_max
     allowed = allowed.dup.to_a
@@ -326,7 +335,7 @@ class VirtualTime
   end
 
   # :ditto:
-  def self.materialize(allowed : Proc(Virtual, Bool), wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed : Proc(Virtual, Bool), wanted : Int32, min, max = nil, strict = true)
     carry = 0
     adjust_wanted_re_max
     {wanted, carry}
@@ -372,12 +381,10 @@ class VirtualTime
   def adjust_day(day : Int, acceptable_day : Int, wrap_day : Int)
     amount = 0
 
-    if day != acceptable_day
-      if acceptable_day > day
-        amount = (acceptable_day - day)
-      else
-        amount = (wrap_day - day) + acceptable_day
-      end
+    if acceptable_day > day
+      amount = (acceptable_day - day)
+    elsif acceptable_day < day
+      amount = (wrap_day - day) + acceptable_day
     end
 
     amount.days
@@ -390,34 +397,40 @@ class VirtualTime
   #
   # Additionally, any requirements for week number, day of week, and day of year are also met,
   # possibly by doing multiple iterations to find a suitable date. The process is limited to
-  # 10 attempts of trying to find a value that simultaneously satisfies all constraints.
+  # some max attempts of trying to find a value that simultaneously satisfies all constraints.
   def to_time(hint = Time.local, strict = true)
-    # TODO Possibly default the hint to now + 1 minute, with second/nanosecond values set to 0
-    time = Time.local **materialize_with_hint(hint), location: hint.location
-    max_tries = 10
+    begin
+      time = Time.local **materialize_with_hint(hint), location: hint.location
+    rescue ArgumentError
+      raise ArgumentError.new "#{inspect} produces an invalid Time"
+    end
+    max_tries = 100
     tries = 0
 
     loop do
       tries += 1
 
       week_nr = time.calendar_week[1]
-      value, _ = self.class.materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
+      value, _ = materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
       time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
 
       day = time.day_of_week.to_i
-      value, _ = self.class.materialize(day_of_week, day, 1, 8, strict)
+      value, _ = materialize(day_of_week, day, 1, 8, strict)
       time += adjust_day(day, value, 7)
 
       day = time.day_of_year
-      value, _ = self.class.materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
+      value, _ = materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
       time += adjust_day(day, value, TimeHelper.days_in_year(time))
 
       break if matches_date?(time)
 
       if tries >= max_tries
         # TODO maybe some other error, not arg err
-        raise ArgumentError.new "Could not find a date that satisfies week number, day of week, and day of year after #{max_tries} iterations"
+        raise ArgumentError.new "Could not find a date that satisfies week number, day of week, and day of year after #{max_tries} iterations (reached #{time})"
       end
+
+      # If it didn't match, then since we are only checking for days in this loop, advance by 1 day and retry.
+      time += 1.day
     end
 
     time
@@ -449,6 +462,7 @@ class VirtualTime
 
   # Convenience functions
 
+  # Sets date-related fields to nil
   def nil_date!
     self.year = nil
     self.month = nil
@@ -459,6 +473,7 @@ class VirtualTime
     self
   end
 
+  # Sets time-related fields to nil
   def nil_time!
     self.hour = nil
     self.minute = nil
@@ -478,22 +493,26 @@ class VirtualTime
 
   # Expands VirtualTime containing ranges or lists into a list of individual VirtualTimes with specific values
   # E.g. VirtualTime with `day=1..2` gets expanded into two separate VirtualTimes, day=1 and day=2
+  #
+  # This function is used only in tests.
   def expand
     ArrayHelper.expand(VTTuple.new year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location).map { |v| self.class.new *(VTTuple.from v) }
   end
 
   # Iterator-related stuff
 
-  def succ(time : Time = Time.local)
-    to_time time + 1.nanosecond
+  # Produces closest-next `Time` that matches the current VT, starting with `from` + 1 nanosecond onwards
+  def succ(from : Time = Time.local)
+    to_time from + 1.nanosecond
   end
 
   # Returns Iterator
-  def step(interval = 1.nanosecond, by = 1, from = (Time.local + 1.second).at_beginning_of_second) : Iterator
+  def step(interval = 1.nanosecond, by = 1, from = Time.local.at_end_of_second) : Iterator
     from = succ from
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
 
+  # Iterator for generating successive `Time`s that match the VT constraints
   private class StepIterator(R, D, N, B)
     include Iterator(B)
 
@@ -533,7 +552,7 @@ class VirtualTime
 
         @step.times do
           begin
-            @current = @virtualtime.succ @current + @interval - (@current.to_unix_ns % @interval.total_nanoseconds.to_i64 + 1).nanoseconds
+            @current = @virtualtime.succ @current + @interval - 1.nanosecond # Or: - (@current.to_unix_ns % @interval.total_nanoseconds.to_i64 + 1).nanoseconds
           rescue ArgumentError
             end_value = @current
           end
@@ -564,11 +583,11 @@ class VirtualTime
     # In other words, value `53` will be seen if January 1 of next year is on a Friday, or the year was a leap year.
     #
     # The calculation is identical as the first part of `Time#calendar_week`.
-    # .
     def self.weeks_in_year(time : Time)
       (time.at_end_of_year.day_of_year - time.day_of_week.to_i + 10) // 7
     end
 
+    # :nodoc:
     def self.weeks_in_year(time : VirtualTime)
       0
     end
@@ -585,31 +604,37 @@ class VirtualTime
       (time.day_of_year - time.day_of_week.to_i + 10) // 7
     end
 
-    # Returns number of days in current month
+    # Returns number of days in month of specified `time`
     def self.days_in_month(time : Time)
       Time.days_in_month time.year, time.month
     end
 
+    # :ditto:
     def self.days_in_month(time : VirtualTime)
       nil
     end
 
+    # Returns week number (0..53) of specified `time`
     def self.week(time : Time)
       time.calendar_week[1].to_i
     end
 
+    # :ditto:
     def self.week(time : VirtualTime)
       time.week
     end
 
+    # Returns day of week of specified `time`
     def self.day_of_week(time : Time)
       time.day_of_week.to_i
     end
 
+    # :ditto:
     def self.day_of_week(time : VirtualTime)
       time.day_of_week
     end
 
+    # Returns day of year of specified `time`
     def self.day_of_year(time)
       time.day_of_year
     end
@@ -619,6 +644,7 @@ class VirtualTime
       Time.days_in_year time.year
     end
 
+    # Returns number of days in current year. For a VT this is always `nil` since value is not determinable
     def self.days_in_year(time : VirtualTime)
       nil
     end
@@ -627,6 +653,7 @@ class VirtualTime
   module ArrayHelper
     # Expands ranges and other expandable types into a long list of all possible options.
     # E.g. [1, 2..3, 4..5] gets expanded into [[1, 2, 4], [1,2, 5], [1,3,4], [1,3,5]].
+    # Used only for convenience in tests.
     def self.expand(list)
       Indexable.cartesian_product list.map { |e|
         case e
@@ -656,7 +683,7 @@ class VirtualTime
       when Range(Int32, Int32)
         # TODO seems there is no support for range with step?
         yaml.scalar value # .begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
-      when Array(Int32)
+      when Array(Int32), Set(Int32)
         yaml.scalar value.join ","
       when Enumerable
         # The IF is here to workaround a bug in Crystal <= 0.23:

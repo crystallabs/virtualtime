@@ -129,16 +129,16 @@ describe VirtualTime do
     vt.second = true
     vt.location = Time::Location.load("Europe/Berlin")
     # vt.millisecond = ->( val : Int32) { true }
-    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
+    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\ndefault_match: true\n"
   end
   it "converts from YAML" do
-    vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\n"
+    vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\ndefault_match: false\n"
     vt.month.should eq 3
     vt.day.should eq [1, 2]
     vt.hour.should eq 10..20
     vt.second.should eq true
     vt.location.should eq Time::Location.load("Europe/Berlin")
-    # vt.default_match?.should eq false
+    vt.default_match?.should eq false
   end
 
   it "does range comparison properly" do
@@ -166,13 +166,11 @@ describe VirtualTime do
 
   # Other
 
-  it "honors class-level default_match?" do
-    dm = VirtualTime.default_match?
+  it "honors default_match?" do
     vt = VirtualTime.new
     vt.matches?(Time.local).should be_true
-    VirtualTime.default_match = false
+    vt.default_match = false
     vt.matches?(Time.local).should be_false
-    VirtualTime.default_match = dm
   end
 
   it "can adjust timezone for Times" do
