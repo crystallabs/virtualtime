@@ -4,49 +4,9 @@
 
 # VirtualTime
 
-VirtualTime is a time matching class for Crystal.
-It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
+VirtualTime is a Time-related class for Crystal. It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
 
-It is used for complex matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
-
-For example:
-
-```cr
-vt = VirtualTime.new
-vt.year = 2020..2030
-vt.day = -8..-1
-vt.day_of_week = [6,7]
-vt.hour = 12..16
-vt.minute = ->( val : Int32) { true }
-
-# Check if a specified Time matches
-time = Time.local
-vt.matches? time
-
-# Generate the next two Times
-vti = vt.step(1.day)
-p vti.next
-p vti.next
-2024-01-27 12:16:36.0 +01:00 Local
-2024-01-28 12:00:00.0 +01:00 Local
-```
-
-That `VirtualTime` instance will match any `Time` that is:
-
-- Between years 2020 and 2030, inclusively
-- In the last 7 days of each/any month (day = -8..-1; negative values count from the end)
-- Falling on Saturday or Sunday (day_of_week = 6 or 7)
-- Between hours noon and 4PM (hour = 12..16)
-- And any minute (since example block always returns true)
-
-As a more advanced feature, it is also possible to match `VirtualTime`s with other
-`VirtualTime`s.
-
-It is also possible to create a VirtualTime with desired settings and then call
-`step().next` on it to continuously generate `Time`s that satisy the specified
-requirements/constraints.
-
-Both of those features are documented further below.
+VirtualTime is used for matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
 
 ## Installation
 
@@ -61,81 +21,88 @@ dependencies:
 
 And run `shards install` or just `shards`.
 
-## Introduction
+## Overview of Functionality
 
-Think of class `VirtualTime` as of a very flexible time specification against which
-Crystal's `Time` instances and other `VirtualTime`s can be matched, and that can
-successively generate `Time`s that satisfy the specified constraints.
+### 1. Time Matching
 
-In a nutshell, to match `Time`s against `VirtualTime`:
+One can express date and time constraints in the form of `VirtualTime` object and then match various `Time`s against it,
+to determine which ones match, and when.
 
-```cr
-# VirtualTime that matches anything in current month
-vt = VirtualTime.new month: Time.local.month
+For example, let's create a VirtualTime that matches the last Saturday and Sunday of every month.
+This can be expressed using two constraints:
 
-# It will match any date in this month:
-vt.matches?(Time.local) # => true
-
-# But it would not match something from a month ahead:
-vt.matches?(Time.local + 30.days) # => false
-```
-
-To generate new `Time`s which match the `VirtualTime`:
+- Day of month should be between -8 and -1 (the last 7 days of any month)
+- And day of week should be 6 or 7 (Saturday or Sunday)
 
 ```cr
-# VT that matches time 12:15:00 and 18:15:00 on Monday and Tuesday of every week
-vt = VirtualTime.new(day_of_week: 1..2, hour: [12, 18], minute: 15, second: 0, nanosecond: 0)
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
 
-# Generate a list of next 10 events:
-vti = vt.step
-10.times do p vti.next end
+# Check if a specified Time matches
+vt.matches?(Time.local)
 ```
 
-```txt
-2023-12-25 18:15:00.0 +01:00 Local
-2023-12-26 12:15:00.0 +01:00 Local
-2023-12-26 18:15:00.0 +01:00 Local
-2024-01-01 12:15:00.0 +01:00 Local
-2024-01-01 18:15:00.0 +01:00 Local
-2024-01-02 12:15:00.0 +01:00 Local
-2024-01-02 18:15:00.0 +01:00 Local
-2024-01-08 12:15:00.0 +01:00 Local
-2024-01-08 18:15:00.0 +01:00 Local
-2024-01-09 12:15:00.0 +01:00 Local
-```
+### 2. VirtualTime Matching
 
-In the case that the original `VirtualTime` did not specify exact values in certain places
-(primarily for values like `second` and `nanosecond`), the code that finds next events
-will find events occurring at every consecutive nanosecond:
+In addition to matching `Time`s, it is also possible to match `VirtualTime`s against each other.
+
+Let's say we are interested whether the above VT would match any day in the month of March.
+
+We could do this with:
 
 ```cr
-# Continuing with the previous example:
-vt.nanosecond = nil
-3.times do p vti.next end
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
+
+# Check if the specivied VT matches any day in month of March
+any_in_march = VirtualTime.new month: 3
+vt.matches?(any_in_march) # => true
 ```
 
-```txt
-2024-01-09 12:15:00.000000001 +01:00 Local
-2024-01-09 12:15:00.000000002 +01:00 Local
-2024-01-09 12:15:00.000000003 +01:00 Local
-```
+Note that `#matches?` is commutative and could have also been written as `any_in_march.matches?(vt)`.
 
-That can be solved by instructing the `StepIterator` which minimal interval between events
-should be used.
+The only note is that comparisons between field values which are both a `Proc` are not supported and
+will throw `ArgumentError` in runtime.
+
+### 3. Time Generation
+
+In addition to matching, it is also possible to successively generate `Time`s that match the specified
+constraints. This is done via the usual Iterator approach.
+
+For example, let's take the same `VirtualTime` as above which matches the last weekend days of every month,
+and print a list of the next 10:
 
 ```cr
-# Continuing with the previous example:
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
+
 vti = vt.step(1.day)
-3.times do p vti.next end
+
+10.times do
+  p vti.next
+end
 ```
 
-```txt
-2023-12-25 12:15:00.0 +01:00 Local
-2023-12-26 12:15:00.0 +01:00 Local
-2024-01-01 12:15:00.0 +01:00 Local
+```text
+2024-01-27 11:16:00.0 +01:00 Local
+2024-01-28 11:16:00.0 +01:00 Local
+2024-02-24 11:16:00.0 +01:00 Local
+2024-02-25 11:16:00.0 +01:00 Local
+2024-03-24 11:16:00.0 +01:00 Local
+2024-03-30 11:16:00.0 +01:00 Local
+2024-03-31 12:16:00.0 +02:00 Local
+2024-04-27 12:16:00.0 +02:00 Local
+2024-04-28 12:16:00.0 +02:00 Local
+2024-05-25 12:16:00.0 +02:00 Local
 ```
 
-## Time and VirtualTime Differences
+## Supported Values
 
 Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
 to a specific numeric value. Even if some of its fields aren't required in the constructor,
@@ -144,8 +111,10 @@ internally they still get initialized to 0, 1, or other suitable value.
 As such, `Time` instances always represent specific dates and times ("materialized" dates and times).
 
 On the other hand, `VirtualTime`s do not have to represent any specific points in time (although they can
-be set or converted so that they do); they are primarily intended for conveniently matching broader sets of
-values. VirtualTime instances contain the following properties:
+be defined precisely enough (or converted) so that they do).
+They are primarily intended for conveniently matching broader sets of values.
+
+All VirtualTime instances contain the following properties:
 
 1. **Year** (0..9999)
 1. **Month** (1..12)
@@ -170,80 +139,59 @@ And each of these properties can have a value of the following types:
 1. **Proc**, to match a value if the return value from calling a proc is `true`
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
+Properties that *are* nil will match depending on the value of `#default_match?`, which is `true`.
 
-## Matching `Time`s
+Knowing the structure of `VirtualTime` now, let's create a more elaborate example:
 
-Once `VirtualTime` is created, it can be used for matching `Time` objects.
+```cr
+vt = VirtualTime.new
 
-Here is again the example from the introduction section, showing use of different value types:
+vt.month = 3                # Month of March
+vt.day = [1,-1]             # First and last day of every month
+vt.hour = (10..20)          # Hour between 10 and 20, inclusively
+vt.minute = (0..59).step(2) # Every other (even) minute in an hour
+vt.second = true            # Unconditional match
+vt.millisecond = ->( val : Int32) { true } # Unconditional match, since block returns true
+vt.location = Time::Location.load("Europe/Amsterdam")
+
+vt.matches?(Time.local) # ==> result depends on current time
+```
+
+## Level of Granularity
+
+VirtualTime performs all internal calculations using maximum precision available from the
+`Time` struct (nanoseconds), but since the primary intended usage is for human scheduling,
+a decision was made that default displayed granularity is 1 minute, with seconds and
+nanoseconds defaulting to 0.
+
+For maximum precision, user simply has to supply intervals and steps manually, e.g.
+`1.nanosecond` instead of the default `1.minute`.
+
+As a related problem, the default interval of 1 minute could be too small. For example,
+if VirtualTime was created with only the `hour` value specified, it would match (and also
+generate) and event on every minute of that hour.
+
+A user can in that case require step to be 1 hour or 1 day, so that there is enough
+space between generated `Time`s.
+
+For example:
 
 ```cr
 vt = VirtualTime.new
 vt.year = 2020..2030
 vt.day = -8..-1
 vt.day_of_week = [6,7]
-vt.hour = 12..16
-vt.minute = ->( val : Int32) { true }
 
-time = Time.local
+vti = vt.step(1.minute)
+2.times do p vti.next end
+# 2024-01-27 11:16:00.0 +01:00 Local
+# 2024-01-27 11:17:00.0 +01:00 Local
 
-vt.matches? time
+vti = vt.step(1.day)
+2.times do p vti.next end
+# 2024-01-27 11:16:00.0 +01:00 Local
+# 2024-01-28 11:16:00.0 +01:00 Local
 ```
-
-As mentioned, this example will match if the time matched is:
-
-- Between years 2020 and 2030, inclusively
-- In the last 7 days of each/any month (day = -8..-1; negative values count from the end)
-- Falling on Saturday or Sunday (day_of_week = 6 or 7)
-- Between hours noon and 4PM (hour = 12..16)
-- And any minute (since example block always returns true)
-
-The overall syntax allows for specifying simple but flexible rules, such as:
-
-```txt
-day=-1                     -- matches last day of month (28th, 29th, 30th, or 31st of particular month)
-day_of_week=6, day=24..31  -- matches last Saturday in month
-day_of_week=1..5, day=-1   -- matches last day of month if it is a workday
-```
-
-Another example:
-
-```cr
-vt = VirtualTime.new
-
-vt.month = 3       # Month of March
-vt.day = [1,-1]    # First and last day of every month
-vt.hour = (10..20)
-vt.minute = (0..59).step(2) # Every other (even) minute in an hour
-vt.second = true   # Unconditional match
-vt.millisecond = ->( val : Int32) { true } # Will match any value as block returns true
-vt.location = Time::Location.load("Europe/Amsterdam")
-
-time = Time.local
-
-vt.matches?(time) # ==> Depends on current time
-```
-
-## Matching `VirtualTime`s
-
-In addition to matching `Time` structs, `VirtualTime`s can match other `VirtualTime`s.
-
-For example, if you had a `VirtualTime` that matches every March 15 and you wanted to check
-whether this was falling on any day in the first 6 months of the year, you could do:
-
-```cr
-vt = VirtualTime.new month: 3, day: 15
-
-vt2 = VirtualTime.new month: 1..6
-
-vt.matches?(vt2) # ==> true
-```
-
-It doesn't matter whether you are comparing `vt` to `vt2` or vice-versa, the
-operation is commutative.
-
-The only note is that comparisons between field values which are both a `Proc`
-are not supported and will throw `ArgumentError` in runtime.
 
 ## Field Values in Detail
 
@@ -351,36 +299,6 @@ vt.matches?(t) # ==> true, because time instant 0 hours converted to NY time (-6
 
 When comparing `VirtualTime`s to `VirtualTime`s, comparisons between objects with different
 `location` values are not supported and will throw `ArgumentError` in runtime.
-
-## Considerations
-
-Alias `Virtual` is defined as:
-
-```cr
-alias Virtual = Nil | Bool | Int32 |
-  Array(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) |
-  VirtualProc
-```
-
-`Array`, `Range`, and `Steppable::StepIterator` are mentioned explicitly instead of just
-being replaced with `Enumerable(Int32)` due to a bug in Crystal
-(https://github.com/crystal-lang/crystal/issues/14047).
-
-Another, related consideration is related to matching fields that contain these enumerable types:
-
-Some enumerables change internal state when they are used, so in the matching function accepting
-`Enumerable` data types they are `#dup`-ed before use, to make sure the original objects
-remain intact.
-
-An alternative approach, to avoid duplicating objects in every case, would be to define more
-specific function overloads for matching `Array`s, `Range`s, and `StepIterator`s, and only have
-the `Enumerable` function overload as a fallback, unless a more specific match is found.
-
-Currently the first option for doing all matching via `Enumerable`s is used because it
-results is a smaller amount of active code to maintain. But the code for other types exists;
-it is just disabled.
-
-Please open an issue on the project to discuss if you would advise differently.
 
 ## Tests
 
