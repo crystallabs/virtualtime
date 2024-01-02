@@ -260,100 +260,64 @@ class VirtualTime
 
   # Materialize a particular value with the help of a wanted/wanted value.
   # If 'strict' is true and wanted value does not satisfy predefined range or requirements, it is replaced with the first/earliest value from allowed range.
-  def materialize(allowed : Nil, wanted : Int32, min, max = nil, strict = true)
+  def materialize(allowed, wanted : Int, min, max = nil, strict = true)
     allowed = adjust_value allowed, max
     wanted = adjust_value wanted, max
-
-    unless default_match?
-      raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
-    end
     carry = 0
-    adjust_wanted_re_max
-    {wanted, carry}
-  end
 
-  # :ditto:
-  def materialize(allowed : Bool, wanted : Int32, min, max = nil, strict = true)
-    allowed = adjust_value allowed, max
-    wanted = adjust_value wanted, max
-
-    unless allowed
-      raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
-    end
-    carry = 0
-    adjust_wanted_re_max
-    {wanted, carry}
-  end
-
-  # :ditto:
-  def materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
-    allowed = adjust_value allowed, max
-    wanted = adjust_value wanted, max
-
-    carry = 0
-    adjust_wanted_re_max
-    if !strict
-      # wanted is OK
-    else
-      if max
-        carry += 1 if wanted > allowed
-        wanted = allowed
+    case allowed
+    in Nil
+      unless default_match?
+        raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
       end
-    end
-    {wanted, carry}
-  end
-
-  # :ditto:
-  def materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
-    allowed = adjust_value allowed, max
-    wanted = adjust_value wanted, max
-
-    carry = 0
-    adjust_wanted_re_max
-    # XXX adjust_range...
-    if max && (allowed.begin < 0 || allowed.end < 0)
-      ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
-      ae = allowed.end < 0 ? max + allowed.end : allowed.end
-      allowed = ab..ae
-    end
-    if !strict || allowed.includes? wanted
-    else
-      carry += max && (wanted > allowed.begin) ? 1 : 0
-      wanted = allowed.begin
-    end
-    {wanted, carry}
-  end
-
-  # :ditto:
-  def materialize(allowed : Enumerable(Int), wanted : Int32, min, max = nil, strict = true)
-    allowed = adjust_value allowed, max
-    wanted = adjust_value wanted, max
-
-    carry = 0
-    adjust_wanted_re_max
-    allowed = allowed.dup.to_a
-    if max && allowed.any?(&.<(0))
-      allowed = allowed.map { |e| e < 0 ? max + e : e }
-    end
-    if !strict || allowed.includes? wanted
-    else
-      if candidate = allowed.dup.find &.>=(wanted)
-        wanted = candidate
+      adjust_wanted_re_max
+    in Bool
+      unless allowed
+        raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
+      end
+      adjust_wanted_re_max
+    in Int
+      adjust_wanted_re_max
+      if !strict
+        # wanted is OK
       else
-        carry += max && (wanted > allowed.min) ? 1 : 0
-        wanted = allowed.min
+        if max
+          carry += 1 if wanted > allowed
+          wanted = allowed
+        end
       end
+    in Range(Int32, Int32)
+      adjust_wanted_re_max
+      # XXX adjust_range...
+      if max && (allowed.begin < 0 || allowed.end < 0)
+        ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
+        ae = allowed.end < 0 ? max + allowed.end : allowed.end
+        allowed = ab..ae
+      end
+      if !strict || allowed.includes? wanted
+      else
+        carry += max && (wanted > allowed.begin) ? 1 : 0
+        wanted = allowed.begin
+      end
+    in Enumerable(Int32)
+      adjust_wanted_re_max
+      allowed = allowed.dup.to_a
+      if max && allowed.any?(&.<(0))
+        allowed = allowed.map { |e| e < 0 ? max + e : e }
+      end
+      if !strict || allowed.includes? wanted
+      else
+        if candidate = allowed.dup.find &.>=(wanted)
+          wanted = candidate
+        else
+          carry += max && (wanted > allowed.min) ? 1 : 0
+          wanted = allowed.min
+        end
+      end
+    in VirtualProc
+      adjust_wanted_re_max
     end
-    {wanted, carry}
-  end
 
-  # :ditto:
-  def materialize(allowed : Proc(Virtual, Bool), wanted : Int32, min, max = nil, strict = true)
-    allowed = adjust_value allowed, max
-    wanted = adjust_value wanted, max
-
-    carry = 0
-    adjust_wanted_re_max
     {wanted, carry}
   end
 
@@ -627,7 +591,7 @@ class VirtualTime
 
     # :ditto:
     def self.days_in_month(time : VirtualTime)
-      nil
+      0
     end
 
     # Returns week number (0..53) of specified `time`
@@ -660,9 +624,9 @@ class VirtualTime
       Time.days_in_year time.year
     end
 
-    # Returns number of days in current year. For a VT this is always `nil` since value is not determinable
+    # Returns number of days in current year. For a VT this is always `0` since value is not determinable
     def self.days_in_year(time : VirtualTime)
-      nil
+      0
     end
   end
 
