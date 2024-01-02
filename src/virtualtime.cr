@@ -223,7 +223,7 @@ class VirtualTime
   # Time: year, month, day, calendar_week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
 
   # Returns a new, "materialized" VirtualTime, i.e. an object where all fields have "materialized"/specific values
-  def materialize(hint = Time.local, strict = true)
+  def materialize(hint = Time.local.at_beginning_of_minute, strict = true)
     self.class.new **materialize_with_hint(hint)
   end
 
@@ -343,7 +343,7 @@ class VirtualTime
   #
   # Alias for `matches?`.
   @[AlwaysInline]
-  def ==(time : TimeOrVirtualTime = Time.local)
+  def ==(time : TimeOrVirtualTime)
     matches? time
   end
 
@@ -378,7 +378,7 @@ class VirtualTime
   # Additionally, any requirements for week number, day of week, and day of year are also met,
   # possibly by doing multiple iterations to find a suitable date. The process is limited to
   # some max attempts of trying to find a value that simultaneously satisfies all constraints.
-  def to_time(hint = Time.local, strict = true)
+  def to_time(hint = Time.local.at_beginning_of_minute, strict = true)
     begin
       time = Time.local **materialize_with_hint(hint), location: hint.location
     rescue ArgumentError
@@ -482,12 +482,12 @@ class VirtualTime
   # Iterator-related stuff
 
   # Produces closest-next `Time` that matches the current VT, starting with `from` + 1 nanosecond onwards
-  def succ(from : Time = Time.local)
+  def succ(from : Time = Time.local.at_end_of_minute)
     to_time from + 1.nanosecond
   end
 
   # Returns Iterator
-  def step(interval = 1.nanosecond, by = 1, from = Time.local.at_end_of_second) : Iterator
+  def step(interval = 1.minute, by = 1, from = Time.local.at_end_of_minute) : Iterator
     from = succ from
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
@@ -503,7 +503,7 @@ class VirtualTime
     @reached_end : Bool
     @at_start = true
 
-    def initialize(@virtualtime, @interval, @step, @current = virtualtime.succ, @reached_end = false)
+    def initialize(@virtualtime, @interval = 1.minute, @step = 1, @current = virtualtime.succ, @reached_end = false)
     end
 
     def next
