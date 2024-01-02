@@ -23,11 +23,11 @@ And run `shards install` or just `shards`.
 
 ## Overview of Functionality
 
-In general, VirtualTime can be used for matching and generation of `Time`s.
+As mentioned, VirtualTime is used for matching and generation of `Time`s.
 
 ### 1. Time Matching
 
-One can express date and time constraints in the `VirtualTime` object and then match various `Time`s against it,
+One can express date and time constraints in the `VirtualTime` object and then match various `Time`s against it
 to determine which ones match.
 
 For example, let's create a VirtualTime that matches the last Saturday and Sunday of every month.
@@ -71,7 +71,7 @@ In addition to matching, it is also possible to successively generate `Time`s th
 VirtualTime constraints. This is done via the usual Iterator approach.
 
 For example, let's take the same `VirtualTime` as above which matches the last weekend days of every month,
-and print a list of the next 10:
+and print a list of the next 10 such dates:
 
 ```cr
 vt = VirtualTime.new
@@ -148,7 +148,7 @@ vt.second = true            # Unconditional match
 vt.millisecond = ->( val : Int32) { true } # Unconditional match, since block returns true
 vt.location = Time::Location.load("Europe/Amsterdam")
 
-vt.matches?(Time.local) # ==> result depends on current time
+vt.matches?(Time.local) # => result depends on current time
 ```
 
 ## Level of Granularity
@@ -245,12 +245,15 @@ If they are not both defined, or they contain a value of any other type (e.g. a 
 
 ### Unsupported Comparisons
 
-The only note is that comparisons between field values which are both a `Proc` are not supported and
-will throw `ArgumentError` in runtime.
+Comparisons between VirtualTime property values which are both a `Proc` are not supported
+and will throw `ArgumentError` in runtime.
+
+Comparisons between VirtualTime objects with different `location` values are not supported
+and will throw `ArgumentError` in runtime.
 
 ## Materialization
 
-"Materialization" is the process of converting all VirtualTime property values to specific
+"Materialization" is a process of converting all VirtualTime property values to specific
 integers.
 
 VirtualTimes often need to be "materialized", for example for display, calculation, comparison,
@@ -260,8 +263,8 @@ An obvious such case is when `to_time()` is invoked on a VT, because a Time obje
 all of its fields set.
 
 Because VirtualTimes can be very broadly defined, often times there are many equal
-choices to which VTs can be materialized. (For example, if a VT matches anything in the
-month of March, which specific value should it be materialized to?)
+choices to which VTs can be materialized. For example, if a VT matches anything in the
+month of March, which specific value should it be materialized to?
 
 To avoid the problem of too many choices, materialization takes as an argument a time hint,
 and the materialized time will be as close as possible to that time, taking VT constraints
@@ -283,7 +286,7 @@ hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
 
-The time hint defaults to current local time.
+If not specified, the time hint defaults to current local time.
 
 ## Time Zones
 
@@ -303,9 +306,6 @@ vt.matches?(t) # ==> nil, because 00 hours is not between 16 and 20
 vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # ==> true, because time instant 0 hours converted to NY time (-6) is 18 hours
 ```
-
-When comparing `VirtualTime`s to `VirtualTime`s, comparisons between objects with different
-`location` values are not supported and will throw `ArgumentError` in runtime.
 
 ## Tests
 
