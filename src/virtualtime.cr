@@ -230,7 +230,7 @@ class VirtualTime
   # Materializes VT and returns fields needed to create a `Time` object.
   # This function does not check that the materialized values match the week number, day of week, and day of year constraints.
   # If you need those values checked, use `#to_time`.
-  def materialize_with_hint(time : Time, carry = 0)
+  def materialize_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
     _nanosecond, _second, _minute, _hour, carry = materialize_time_with_hint time, carry
     _day, _month, _year, carry = materialize_date_with_hint time, carry
 
@@ -242,7 +242,7 @@ class VirtualTime
   end
 
   # Materialize date part of current VT
-  def materialize_date_with_hint(time : Time, carry = 0)
+  def materialize_date_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
     _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
     _month, carry = materialize(month, time.month + carry, 1, 13)
     _year, carry = materialize(year, time.year + carry, 1, 10_000)
@@ -250,7 +250,7 @@ class VirtualTime
   end
 
   # Materialize time part of current VT
-  def materialize_time_with_hint(time : Time, carry = 0)
+  def materialize_time_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
     _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
     _second, carry = materialize(second, time.second + carry, 0, 60)
     _minute, carry = materialize(minute, time.minute + carry, 0, 60)
@@ -370,7 +370,7 @@ class VirtualTime
     amount.days
   end
 
-  # Converts a VirtualTime to a specific Time object that hopefully matches the VirtualTime.
+  # Converts a VirtualTime to a specific Time object that matches the VirtualTime.
   #
   # Value is converted using a time hint, which defaults to the current time.
   # Lists and ranges of values materialize to their min / begin value.
@@ -442,8 +442,14 @@ class VirtualTime
 
   # Convenience functions
 
+  # Sets all fields to nil
+  def clear!
+    clear_date!
+    clear_time!
+  end
+
   # Sets date-related fields to nil
-  def nil_date!
+  def clear_date!
     self.year = nil
     self.month = nil
     self.day = nil
@@ -454,7 +460,7 @@ class VirtualTime
   end
 
   # Sets time-related fields to nil
-  def nil_time!
+  def clear_time!
     self.hour = nil
     self.minute = nil
     self.second = nil

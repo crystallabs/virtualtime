@@ -4,9 +4,9 @@
 
 # VirtualTime
 
-VirtualTime is a Time-related class for Crystal. It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
+VirtualTime is a Time-related class for Crystal. It is used for matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
 
-VirtualTime is used for matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
+It is a companion project to [virtualdate](https://github.com/crystallabs/virtualdate).
 
 ## Installation
 
@@ -41,7 +41,7 @@ vt = VirtualTime.new
 vt.day = -8..-1
 vt.day_of_week = [6,7]
 
-# Check if a specified Time matches
+# Check if current time matches
 vt.matches?(Time.local) # => result depends on current time
 ```
 
@@ -54,6 +54,7 @@ Let's say we are interested to know whether the above VT would match any day in 
 We could do this with:
 
 ```cr
+# Same VT as before:
 vt = VirtualTime.new
 vt.day = -8..-1
 vt.day_of_week = [6,7]
@@ -68,7 +69,7 @@ Note that `#matches?` is commutative and it could have also been written as `any
 ### 3. Time Generation
 
 In addition to matching, it is also possible to successively generate `Time`s that match the specified
-VirtualTime constraints. This is done via the usual Iterator approach.
+VirtualTime constraints. This is done using the standard iterator approach.
 
 For example, let's take the same `VirtualTime` as above which matches the last weekend days of every month,
 and print a list of the next 10 such dates:
@@ -165,8 +166,8 @@ As a related, opposite problem, the default interval of 1 minute could be too sm
 if VirtualTime was created with only the `hour` value specified, it would match (and also
 generate) and event on every minute of that hour.
 
-A user can in that case require step to be 1 hour or 1 day, so that there is reasonable
-space between generated `Time`s.
+In that case, a user could require step to be 1 hour or 1 day, so that there would be reasonable
+space between the generated `Time`s.
 
 For example:
 
