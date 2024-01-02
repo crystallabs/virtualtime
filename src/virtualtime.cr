@@ -58,22 +58,22 @@ class VirtualTime
   # Returns whether `VirtualTime` matches the date part of specified time
   def matches_date?(time : TimeOrVirtualTime = Time.local)
     time = adjust_location time
-    matches?(year, time.year, 9999) &&
-      matches?(month, time.month, 12) &&
-      matches?(day, time.day, TimeHelper.days_in_month(time)) &&
-      matches?(week, TimeHelper.week(time), TimeHelper.weeks_in_year(time)) &&
-      matches?(day_of_week, TimeHelper.day_of_week(time), 7) &&
-      matches?(day_of_year, TimeHelper.day_of_year(time), TimeHelper.days_in_year(time))
+    matches?(year, time.year, 10_000) &&
+      matches?(month, time.month, 13) &&
+      matches?(day, time.day, TimeHelper.days_in_month(time) + 1) &&
+      matches?(week, TimeHelper.week(time), TimeHelper.weeks_in_year(time) + 1) &&
+      matches?(day_of_week, TimeHelper.day_of_week(time), 8) &&
+      matches?(day_of_year, TimeHelper.day_of_year(time), TimeHelper.days_in_year(time) + 1)
   end
 
   # Returns whether `VirtualTime` matches the time part of specified time
   def matches_time?(time : TimeOrVirtualTime = Time.local)
     time = adjust_location time
-    matches?(hour, time.hour, 23) &&
-      matches?(minute, time.minute, 59) &&
-      matches?(second, time.second, 59) &&
-      matches?(millisecond, time.millisecond, 999) &&
-      matches?(nanosecond, time.nanosecond, 999_999_999)
+    matches?(hour, time.hour, 24) &&
+      matches?(minute, time.minute, 60) &&
+      matches?(second, time.second, 60) &&
+      matches?(millisecond, time.millisecond, 1_000) &&
+      matches?(nanosecond, time.nanosecond, 1_000_000_000)
   end
 
   # Performs matching between VirtualTime and other supported types
@@ -246,7 +246,6 @@ class VirtualTime
     _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
     _month, carry = materialize(month, time.month + carry, 1, 13)
     _year, carry = materialize(year, time.year + carry, 1, 10_000)
-
     {_day, _month, _year, carry}
   end
 
@@ -256,13 +255,15 @@ class VirtualTime
     _second, carry = materialize(second, time.second + carry, 0, 60)
     _minute, carry = materialize(minute, time.minute + carry, 0, 60)
     _hour, carry = materialize(hour, time.hour + carry, 0, 24)
-
     {_nanosecond, _second, _minute, _hour, carry}
   end
 
   # Materialize a particular value with the help of a wanted/wanted value.
   # If 'strict' is true and wanted value does not satisfy predefined range or requirements, it is replaced with the first/earliest value from allowed range.
   def materialize(allowed : Nil, wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     unless default_match?
       raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
@@ -273,6 +274,9 @@ class VirtualTime
 
   # :ditto:
   def materialize(allowed : Bool, wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     unless allowed
       raise ArgumentError.new "A VirtualTime with value `false` isn't materializable."
     end
@@ -283,6 +287,9 @@ class VirtualTime
 
   # :ditto:
   def materialize(allowed : Int, wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     carry = 0
     adjust_wanted_re_max
     if !strict
@@ -298,6 +305,9 @@ class VirtualTime
 
   # :ditto:
   def materialize(allowed : Range(Int, Int), wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     carry = 0
     adjust_wanted_re_max
     # XXX adjust_range...
@@ -316,6 +326,9 @@ class VirtualTime
 
   # :ditto:
   def materialize(allowed : Enumerable(Int), wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     carry = 0
     adjust_wanted_re_max
     allowed = allowed.dup.to_a
@@ -336,6 +349,9 @@ class VirtualTime
 
   # :ditto:
   def materialize(allowed : Proc(Virtual, Bool), wanted : Int32, min, max = nil, strict = true)
+    allowed = adjust_value allowed, max
+    wanted = adjust_value wanted, max
+
     carry = 0
     adjust_wanted_re_max
     {wanted, carry}
@@ -402,7 +418,7 @@ class VirtualTime
     begin
       time = Time.local **materialize_with_hint(hint), location: hint.location
     rescue ArgumentError
-      raise ArgumentError.new "#{inspect} produces an invalid Time"
+      raise ArgumentError.new "#{inspect} with hint #{hint} produced an invalid Time"
     end
     max_tries = 100
     tries = 0
