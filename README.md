@@ -25,7 +25,7 @@ And run `shards install` or just `shards`.
 
 As mentioned, VirtualTime is used for matching and generation of `Time`s.
 
-### 1. Time Matching
+### 1. Matching Times
 
 One can express date and time constraints in the `VirtualTime` object and then match various `Time`s against it
 to determine which ones match.
@@ -45,7 +45,7 @@ vt.day_of_week = [6,7]
 vt.matches?(Time.local) # => result depends on current time
 ```
 
-### 2. VirtualTime Matching
+### 2. Matching VirtualTimes
 
 In addition to matching `Time`s, it is also possible to match `VirtualTime`s against each other.
 
