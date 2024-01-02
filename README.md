@@ -23,55 +23,52 @@ And run `shards install` or just `shards`.
 
 ## Overview of Functionality
 
+In general, VirtualTime can be used for matching and generation of `Time`s.
+
 ### 1. Time Matching
 
-One can express date and time constraints in the form of `VirtualTime` object and then match various `Time`s against it,
-to determine which ones match, and when.
+One can express date and time constraints in the `VirtualTime` object and then match various `Time`s against it,
+to determine which ones match.
 
 For example, let's create a VirtualTime that matches the last Saturday and Sunday of every month.
 This can be expressed using two constraints:
 
 - Day of month should be between -8 and -1 (the last 7 days of any month)
-- And day of week should be 6 or 7 (Saturday or Sunday)
+- Day of week should be 6 or 7 (Saturday and Sunday)
 
 ```cr
 vt = VirtualTime.new
-vt.year = 2020..2030
 vt.day = -8..-1
 vt.day_of_week = [6,7]
 
 # Check if a specified Time matches
-vt.matches?(Time.local)
+vt.matches?(Time.local) # => result depends on current time
 ```
 
 ### 2. VirtualTime Matching
 
 In addition to matching `Time`s, it is also possible to match `VirtualTime`s against each other.
 
-Let's say we are interested whether the above VT would match any day in the month of March.
+Let's say we are interested to know whether the above VT would match any day in the month of March.
 
 We could do this with:
 
 ```cr
 vt = VirtualTime.new
-vt.year = 2020..2030
 vt.day = -8..-1
 vt.day_of_week = [6,7]
 
-# Check if the specivied VT matches any day in month of March
+# Check if the specified VT matches any day in month of March
 any_in_march = VirtualTime.new month: 3
 vt.matches?(any_in_march) # => true
 ```
 
-Note that `#matches?` is commutative and could have also been written as `any_in_march.matches?(vt)`.
-
-The only note is that comparisons between field values which are both a `Proc` are not supported and
-will throw `ArgumentError` in runtime.
+Note that `#matches?` is commutative and it could have also been written as `any_in_march.matches?(vt)`.
 
 ### 3. Time Generation
 
 In addition to matching, it is also possible to successively generate `Time`s that match the specified
-constraints. This is done via the usual Iterator approach.
+VirtualTime constraints. This is done via the usual Iterator approach.
 
 For example, let's take the same `VirtualTime` as above which matches the last weekend days of every month,
 and print a list of the next 10:
@@ -79,7 +76,7 @@ and print a list of the next 10:
 ```cr
 vt = VirtualTime.new
 vt.year = 2020..2030
-vt.day = -8..-1
+vt.day = -7..-1
 vt.day_of_week = [6,7]
 
 vti = vt.step(1.day)
@@ -87,22 +84,20 @@ vti = vt.step(1.day)
 10.times do
   p vti.next
 end
+
+# 2024-01-27 11:16:00.0 +01:00 Local
+# 2024-01-28 11:16:00.0 +01:00 Local
+# 2024-02-24 11:16:00.0 +01:00 Local
+# 2024-02-25 11:16:00.0 +01:00 Local
+# 2024-03-30 11:16:00.0 +01:00 Local
+# 2024-03-31 12:16:00.0 +02:00 Local
+# 2024-04-27 12:16:00.0 +02:00 Local
+# 2024-04-28 12:16:00.0 +02:00 Local
+# 2024-05-25 12:16:00.0 +02:00 Local
+# 2024-05-26 12:16:00.0 +02:00 Local
 ```
 
-```text
-2024-01-27 11:16:00.0 +01:00 Local
-2024-01-28 11:16:00.0 +01:00 Local
-2024-02-24 11:16:00.0 +01:00 Local
-2024-02-25 11:16:00.0 +01:00 Local
-2024-03-24 11:16:00.0 +01:00 Local
-2024-03-30 11:16:00.0 +01:00 Local
-2024-03-31 12:16:00.0 +02:00 Local
-2024-04-27 12:16:00.0 +02:00 Local
-2024-04-28 12:16:00.0 +02:00 Local
-2024-05-25 12:16:00.0 +02:00 Local
-```
-
-## Supported Values
+## Supported Property Values
 
 Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
 to a specific numeric value. Even if some of its fields aren't required in the constructor,
@@ -139,13 +134,12 @@ And each of these properties can have a value of the following types:
 1. **Proc**, to match a value if the return value from calling a proc is `true`
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
-Properties that *are* nil will match depending on the value of `#default_match?`, which is `true`.
+Properties that *are* nil will match depending on the value of `#default_match?`.
 
 Knowing the structure of `VirtualTime` now, let's create a more elaborate example:
 
 ```cr
 vt = VirtualTime.new
-
 vt.month = 3                # Month of March
 vt.day = [1,-1]             # First and last day of every month
 vt.hour = (10..20)          # Hour between 10 and 20, inclusively
@@ -167,11 +161,11 @@ nanoseconds defaulting to 0.
 For maximum precision, user simply has to supply intervals and steps manually, e.g.
 `1.nanosecond` instead of the default `1.minute`.
 
-As a related problem, the default interval of 1 minute could be too small. For example,
+As a related, opposite problem, the default interval of 1 minute could be too small. For example,
 if VirtualTime was created with only the `hour` value specified, it would match (and also
 generate) and event on every minute of that hour.
 
-A user can in that case require step to be 1 hour or 1 day, so that there is enough
+A user can in that case require step to be 1 hour or 1 day, so that there is reasonable
 space between generated `Time`s.
 
 For example:
@@ -193,7 +187,7 @@ vti = vt.step(1.day)
 # 2024-01-28 11:16:00.0 +01:00 Local
 ```
 
-## Field Values in Detail
+## Property Values in Detail
 
 As can be seen above, fields can have some interesting values, such as negative numbers.
 
@@ -208,7 +202,8 @@ For example, a day of `-1` would always match the last day of the month, be that
 30th, or 31st in a particular case.
 
 If the wrap-around value is not specified, negative values are not converted to positive
-ones, and they enter matching as-is. In practice, this means they will not match any `Time`s, but may match similar `VirtualTime`s.
+ones, and they enter matching as-is. In practice, this means they will not match any `Time`s,
+but may match similar `VirtualTime`s.
 
 ### Week numbers
 
@@ -218,13 +213,13 @@ the first 3 days of a new year can still technically belong to the last week of 
 
 That means it is possible for this field to have values between 0 and 53.
 Value 53 indicates a week that has started in one year (53rd Monday seen in a year),
-but at least one (and up to 3) of its days will overflow into the new year.
+but at least one (and up to 3) of its days will surely overflow into the new year.
 
 Similarly, a value 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
 and/or Sunday) of the new year that belong to the week started in the previous year.
 
-That allows for a very flexible matching. If you want to match the first or last 7 days of
-a year irrespective of weeks, then you should use `day: 1..7` or `day: -7..-1` instead.
+Note: if you want to match the first or last 7 days of a year irrespective of weeks, you
+should use `day: 1..7` or `day: -7..-1` instead.
 
 ### Range values
 
@@ -235,30 +230,42 @@ Because creating such ranges *is* allowed, VirtualTime detects such cases and cr
 copies of objects with values converted to positive and in the correct order.
 
 In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
-match every other day from 10th to a day 7 days before the end of the month.
+match every other day from 10th to a day 7 days before the end of a month.
 
 ### Days in month and year
 
 When matching `VirtualTime`s to other `VirtualTime`s, helper functions `days_in_month` and
-`days_in_year` return `nil`. As a consequence, matching is performed without converting
+`days_in_year` return `0`. As a consequence, matching is performed without converting
 negative values to positive ones.
 
-This choice was made because it is only possible to know the number of days in a month if both `year`
-and `month` are defined and contain integers.
+This choice was made because it is only possible to know the number of days in a month
+if both `year` and `month` are defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
 
+### Unsupported Comparisons
+
+The only note is that comparisons between field values which are both a `Proc` are not supported and
+will throw `ArgumentError` in runtime.
+
 ## Materialization
 
-VirtualTimes sometimes need to be "materialized" for
-the purpose of display, calculation, comparison, or conversion. An obvious such case
-which happens implicitly is when `to_time()` is invoked on a VT, because a Time object
-must have all of its fields set.
+"Materialization" is the process of converting all VirtualTime property values to specific
+integers.
+
+VirtualTimes often need to be "materialized", for example for display, calculation, comparison,
+or further conversion.
+
+An obvious such case is when `to_time()` is invoked on a VT, because a Time object must have
+all of its fields set.
 
 Because VirtualTimes can be very broadly defined, often times there are many equal
-choices to which VTs can be materialized. To avoid the problem of too many choices,
-materialization takes as argument a time hint,
-and the materialized time will be as close as possible to that time.
+choices to which VTs can be materialized. (For example, if a VT matches anything in the
+month of March, which specific value should it be materialized to?)
+
+To avoid the problem of too many choices, materialization takes as an argument a time hint,
+and the materialized time will be as close as possible to that time, taking VT constraints
+in account.
 
 For example:
 
@@ -276,7 +283,7 @@ hint= Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 vt.materialize(hint).to_tuple # ==> {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
 ```
 
-Unless specified, the time hint defaults to current local time.
+The time hint defaults to current local time.
 
 ## Time Zones
 
