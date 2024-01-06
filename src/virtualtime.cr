@@ -234,9 +234,9 @@ class VirtualTime
     _nanosecond, _second, _minute, _hour, carry = materialize_time_with_hint time, carry
     _day, _month, _year, carry = materialize_date_with_hint time, carry
 
-    if carry > 0
-      raise ArgumentError.new "Cannot find compliant materialized time"
-    end
+    # if carry > 0
+    #  raise ArgumentError.new "Cannot find compliant materialized time"
+    # end
 
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
@@ -380,9 +380,10 @@ class VirtualTime
   # some max attempts of trying to find a value that simultaneously satisfies all constraints.
   def to_time(hint = Time.local.at_beginning_of_minute, strict = true)
     begin
-      time = Time.local **materialize_with_hint(hint), location: hint.location
-    rescue ArgumentError
-      raise ArgumentError.new "#{inspect} with hint #{hint} produced an invalid Time"
+      timespec = materialize_with_hint hint
+      time = Time.local **timespec, location: hint.location
+    rescue e : ArgumentError
+      raise ArgumentError.new "#{inspect} with hint #{hint} produced an invalid Time #{timespec} (#{e.message})"
     end
     max_tries = 100
     tries = 0
