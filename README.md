@@ -1,5 +1,5 @@
-[![Linux CI](https://github.com/crystallabs/virtualtime/workflows/Linux%20CI/badge.svg)](https://github.com/crystallabs/virtualtime/actions?query =workflow%3A%22Linux+CI%22+event%3Apush+branch%3Amaster)
-[![Version](https://img.shields.io/github/tag/crystallabs/virtualtime.svg?maxAge =360)](https://github.com/crystallabs/virtualtime/releases/latest)
+[![Linux CI](https://github.com/crystallabs/virtualtime/workflows/Linux%20CI/badge.svg)](https://github.com/crystallabs/virtualtime/actions?query=workflow%3A%22Linux+CI%22+event%3Apush+branch%3Amaster)
+[![Version](https://img.shields.io/github/tag/crystallabs/virtualtime.svg?maxAge=360)](https://github.com/crystallabs/virtualtime/releases/latest)
 [![License](https://img.shields.io/github/license/crystallabs/virtualtime.svg)](https://github.com/crystallabs/virtualtime/blob/master/LICENSE)
 
 # VirtualTime
