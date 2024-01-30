@@ -159,10 +159,9 @@ VirtualTime performs all internal calculations using maximum precision available
 scheduling, the default displayed granularity is 1 minute, with seconds and
 nanoseconds defaulting to 0.
 
-For maximum precision, simply specify interval and step arguments manually (e.g. `1.second`) 
-instead of defaulting to `1.minute`.
+To increase granularity, simply specify interval and step arguments manually (e.g. `1.second`) instead of defaulting to `1.minute`.
 
-On a related subject, in other cases the default interval of 1 minute could be too small. For example,
+In other cases, the default interval of 1 minute could be too small. For example,
 if VirtualTime was created with only the `hour` value specified, it would match (and also
 generate) and event on every minute of that hour.
 
@@ -319,6 +318,16 @@ vt.matches?(t) # => true, because time instant 0 hours converted to NY time (-6)
 ```
 
 Matching VTs to VTs with timezones is also possible, as long as they are in the same timezone; otherwise a runtime error is thrown, as already mentioned above under "Unsupported Comparisons".
+
+## Durations
+
+VirtualTime objects are not designed or intended to represent durations.
+
+While this may seem possible at first, for example by specifying
+`#hour = 11..13`, it is not generally viable because there is no way to
+define a duration of e.g. 2.5 hours from 11:00 to 13:30.
+
+For such higher level constructs, see https://github.com/crystallabs/virtualdate.
 
 ## Tests
 
