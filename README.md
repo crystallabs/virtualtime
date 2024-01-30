@@ -130,7 +130,7 @@ And each of these properties can have a value of the following types:
 1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
 1. **Array or Set of Int32s**, such as [1,2,10,-1] to match any value in list
 1. **Range of Int32..Int32**, such as `10..-1` to match any value in range
-1. **Range with step**, e.g. `day: (10..20).step(2)`, to match all even days between 10th and 20th
+1. **Range with step**, e.g. `day: (10..20).step(2)`, to match any value in range with step
 1. **Proc**, to match a value if the return value from calling a proc is `true`
 
 All properties (that are specified, i.e. not nil) must match for the match to succeed.
@@ -159,10 +159,10 @@ VirtualTime performs all internal calculations using maximum precision available
 scheduling, the default displayed granularity is 1 minute, with seconds and
 nanoseconds defaulting to 0.
 
-For maximum precision, simply specify intervals and steps manually, e.g. `1.nanosecond`
-instead of the default `1.minute`.
+For maximum precision, simply specify interval and step arguments manually (e.g. `1.second`) 
+instead of defaulting to `1.minute`.
 
-On a related subject, the default interval of 1 minute could be too small. For example,
+On a related subject, in other cases the default interval of 1 minute could be too small. For example,
 if VirtualTime was created with only the `hour` value specified, it would match (and also
 generate) and event on every minute of that hour.
 
@@ -239,13 +239,13 @@ should use `day: 1..7` or `day: -7..-1` instead.
 
 For `VirtualTime` objects, helper functions `days_in_month` and `days_in_year` return `0`.
 
-As a consequence, when matching `VirtualTime`s to other `VirtualTime`s, matching is performed
-on the negative values directly.
+As a consequence, when matching `VirtualTime`s to other `VirtualTime`s, any negative values remain negative and are matched directly.
 
 This choice was made because it is only possible to know the number of days in a month
 if both `year` and `month` are defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
+So comparing VTs to VTs is always done without conversion of negative values.
 
 ### Unsupported Comparisons
 
@@ -266,15 +266,14 @@ or further conversion.
 An obvious such case is when `to_time()` is invoked on a VT, because a Time object must have
 all of its fields set to some integer value.
 
-Because VirtualTimes can be very broadly defined, often times there are many equal
-choices to which VTs can be materialized. For example, if a VT matches anything in the
+(Difference between `#materialize` and `#to_time` is that materialize produces another VT, just with its fields materialized, while to_time produces a `Time` instance.)
+
+So because VirtualTimes can be very broadly defined, often times there are many equal
+choices to which they can be materialized. For example, if a VT matches anything in the
 month of March, which specific value should it be materialized to?
 
-To avoid the problem of too many choices, materialization takes as an argument a time hint,
-and the materialized time will be as close as possible to that time, taking VT constraints
-into account.
-
-The hint defaults to the current time.
+To avoid the problem of too many choices, materialization takes as an argument a `Time` hint which defaults to `Time.local`.
+The materialized time will be equal to that time or moved to the future to satisfy all VT's constraints.
 
 For example:
 
@@ -290,6 +289,7 @@ vt.hour = 0
 hint = Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 
 vt.materialize(hint).to_tuple # => {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
+p vt.to_time(hint) # => 2018-02-15 00:56:26.837441132 +01:00 Local
 ```
 
 If not specified, the time hint defaults to current local time.
@@ -301,6 +301,8 @@ If not specified, the time hint defaults to current local time.
 However, `VirtualTime` has property `#location` which, if set and different than `Time`'s
 `#location`, will cause the time to be duplicated and have its timezone converted to
 `VirtualTime`'s location before matching.
+
+For example:
 
 ```cr
 vt = VirtualTime.new
@@ -315,6 +317,8 @@ vt.matches?(t) # => nil, because 00 hours is not between 16 and 20
 vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # => true, because time instant 0 hours converted to NY time (-6) is 18 hours
 ```
+
+Matching VTs to VTs with timezones is also possible, as long as they are in the same timezone; otherwise a runtime error is thrown, as already mentioned above under "Unsupported Comparisons".
 
 ## Tests
 
