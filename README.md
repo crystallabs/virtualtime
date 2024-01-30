@@ -265,9 +265,9 @@ or further conversion.
 An obvious such case is when `to_time()` is invoked on a VT, because a Time object must have
 all of its fields set to some integer value.
 
-(Difference between `#materialize` and `#to_time` is that materialize produces another VT, just with its fields materialized, while to_time produces a `Time` instance.)
+(The difference between `#materialize` and `#to_time` is that materialize produces another VT with its fields materialized, while to_time produces a `Time` instance.)
 
-So because VirtualTimes can be very broadly defined, often times there are many equal
+Because VirtualTimes can be very broadly defined, often times there are many equal
 choices to which they can be materialized. For example, if a VT matches anything in the
 month of March, which specific value should it be materialized to?
 
@@ -317,7 +317,7 @@ vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # => true, because time instant 0 hours converted to NY time (-6) is 18 hours
 ```
 
-Matching VTs to VTs with timezones is also possible, as long as they are in the same timezone; otherwise a runtime error is thrown, as already mentioned above under "Unsupported Comparisons".
+Matching VTs to VTs with timezones is also possible as long as the timezone is equal; otherwise a runtime error is thrown as already mentioned above under "Unsupported Comparisons".
 
 ## Durations
 
