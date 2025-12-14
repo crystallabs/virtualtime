@@ -36,11 +36,11 @@ matching broader sets of values and for finding/generating times that match cert
 You can express date and time constraints in the `VirtualTime` object and then match various `Time`s
 against it to determine which ones match.
 
-For example, let's create a VirtualTime that matches the last Saturday and Sunday of every month.
+For example, let's create a VirtualTime that matches the last Saturday or Sunday of every month.
 This can be expressed using two constraints:
 
-- Day of month should be between -8 and -1 (the last 7 days of any month)
-- Day of week should be 6 or 7 (Saturday and Sunday)
+- Day of month should be between -7 and -1 (the last 7 days of any month)
+- Day of week should be 6 or 7 (Saturday or Sunday)
 
 Then we can check if the current Time matches it:
 
@@ -203,7 +203,8 @@ Because creating such ranges *is* allowed, VirtualTime detects such cases and cr
 copies of objects with values converted to positive and in the correct order.
 
 In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
-match every other day from 10th to a day 7 days before the end of a month.
+match every other day from 10th to a day 7 days before the end of a particular month.
+Very useful!
 
 ### Week Numbers
 
@@ -219,7 +220,7 @@ Similarly, a week number 0 matches up to the first 3 days (which inevitably must
 and/or Sunday) of the new year that belong to the week started in the previous year.
 
 Note 1: if you want to match the first or last 7 days of a year irrespective of weeks, you
-should use `day: 1..7` or `day: -7..-1` instead of `week: 1` or `-1`.
+should use `day: 1..7` or `day: -7..-1` instead of `week: 1` or `week: -1`.
 
 Note 2: it is allowed to specify `week: 53, day_of_week: 7`. That is sure to represent a day
 whose week number and actual date are in different years. For example, 2027-01-03 would match
@@ -227,15 +228,23 @@ this rule and represent the last day of 2026's 53th calendar week.
 
 ### Days in Month and Year
 
-For `VirtualTime` objects, helper functions `days_in_month` and `days_in_year` return `0`.
+As mentioned above, `VirtualTime` is aware of the number of days in months and years when
+`Time` objects are involved.
 
-As a consequence, when matching `VirtualTime`s to other `VirtualTime`s, any negative values remain negative and are matched directly.
+But for `VirtualTime` objects which do not necessarily have the month or year value specified,
+helper functions `days_in_month` and `days_in_year` return `0`.
+
+As a consequence, when matching `VirtualTime`s to other `VirtualTime`s, any negative values
+(such as `day: -1`) remain negative (i.e. not converted to actual values) and are matched
+directly.
 
 This choice was made because it is only possible to know the number of days in a month
 if both `year` and `month` are defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
-So comparing VTs to VTs is always done without conversion of negative values.
+
+So comparing VTs to VTs is always done without the conversion of negative values to
+actual values.
 
 ### Unsupported Comparisons
 
@@ -249,10 +258,10 @@ and will throw `ArgumentError` in runtime.
 
 VirtualTime performs all internal calculations using maximum precision available from the
 `Time` struct (which is nanoseconds), but since the primary intended usage is for human
-scheduling, the default displayed granularity is 1 minute, with seconds and
+scheduling, the default granularity is 1 minute, with seconds and
 nanoseconds defaulting to 0.
 
-To increase granularity, simply specify interval and step arguments manually (e.g.
+To increase granularity, simply specify	`interval` and/or `step` arguments manually (e.g.
 `interval = 1.second`) instead of defaulting to `1.minute`.
 
 In some other cases, the default interval of 1 minute could be too small. For example,
@@ -262,7 +271,7 @@ generate) an event on every minute of that hour.
 In that case, you could easily request the step to be e.g.  1 hour or 1 day, so that
 there would be reasonable space between the generated `Time`s.
 
-For example:
+Here are examples for both cases:
 
 ```cr
 vt = VirtualTime.new
@@ -292,14 +301,16 @@ or further conversion.
 An obvious such case is when `to_time()` is invoked on a VT, because a Time object must have
 all of its fields set to some integer value.
 
-(The difference between `#materialize` and `#to_time` is that materialize produces another VT with its fields materialized, while to_time produces a `Time` instance.)
+(The difference between `#materialize` and `#to_time` is that materialize produces another VT with its fields materialized, while to_time
+further converts it to a `Time` instance.)
 
 Because VirtualTimes can be very broadly defined, often times there are many equal
-choices to which they can be materialized. For example, if a VT matches anything in the
+choices to which they can be materialized. For example, if a VT matches everything in the
 month of March, which specific value should it be materialized to?
 
 To avoid the problem of too many choices, materialization takes as an argument a `Time` hint.
-The materialized time will be equal to that time or moved to the future to satisfy all VT's constraints.
+The materialized time will be equal to that time or moved to the future as little as
+necessary to satisfy all VT's constraints.
 
 For example:
 

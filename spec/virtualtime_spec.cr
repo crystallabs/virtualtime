@@ -29,7 +29,7 @@ describe VirtualTime do
   end
 
   it "materializes respecting week and day_of_week constraints" do
-  vt = VirtualTime.new
+    vt = VirtualTime.new
     vt.week = 1
     vt.day_of_week = 1 # Monday
     t = vt.to_time(Time.local 2023, 1, 1)
@@ -239,7 +239,7 @@ describe VirtualTime do
       vt.matches?(nil, [1, 2, 3], max).should be_true
       vt.matches?(nil, 1..10, max).should be_true
       vt.matches?(nil, (1..10).step(3), max).should be_true
-      vt.matches?(nil, ->(_val : Int32){ false }, max).should be_true
+      vt.matches?(nil, ->(_val : Int32) { false }, max).should be_true
     end
   end
 
@@ -254,7 +254,7 @@ describe VirtualTime do
       vt.matches?(true, [1, 2, 3], max).should be_true
       vt.matches?(true, 1..10, max).should be_true
       vt.matches?(true, (1..10).step(3), max).should be_true
-      vt.matches?(true, ->(_val : Int32){ false }, max).should be_true
+      vt.matches?(true, ->(_val : Int32) { false }, max).should be_true
 
       vt.matches?(false, nil, max).should be_false
       vt.matches?(false, false, max).should be_false
@@ -264,7 +264,7 @@ describe VirtualTime do
       vt.matches?(false, [1, 2, 3], max).should be_false
       vt.matches?(false, 1..10, max).should be_false
       vt.matches?(false, (1..10).step(3), max).should be_false
-      vt.matches?(false, ->(_val : Int32){ false }, max).should be_false
+      vt.matches?(false, ->(_val : Int32) { false }, max).should be_false
     end
   end
 
@@ -570,9 +570,9 @@ describe VirtualTime do
     expect_raises(Exception) {
       yaml = vt.to_yaml
     }
-    #vt2 = VirtualTime.from_yaml yaml
-    #vt2.second.should be_a(Proc(Int32, Bool))
-    #vt2.matches?(Time.local).should be_true # placeholder proc always true
+    # vt2 = VirtualTime.from_yaml yaml
+    # vt2.second.should be_a(Proc(Int32, Bool))
+    # vt2.matches?(Time.local).should be_true # placeholder proc always true
   end
 
   it "respects exclusive ranges in matching" do
