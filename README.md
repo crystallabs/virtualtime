@@ -2,10 +2,6 @@
 [![Version](https://img.shields.io/github/tag/crystallabs/virtualtime.svg?maxAge=360)](https://github.com/crystallabs/virtualtime/releases/latest)
 [![License](https://img.shields.io/github/license/crystallabs/virtualtime.svg)](https://github.com/crystallabs/virtualtime/blob/master/LICENSE)
 
-# VirtualTime
-
-VirtualTime is a Time-related class for Crystal. It is used for matching and generation of compliant dates and times, primarily for calendar, scheduling, and reminding purposes.
-
 ## Installation
 
 Add the following to your application's "shard.yml":
@@ -19,20 +15,34 @@ dependencies:
 
 And run `shards install` or just `shards`.
 
-## Overview of Functionality
+## Introduction
 
-As mentioned, VirtualTime is used for matching and generation of `Time`s.
+VirtualTime is a Time-related class for Crystal. It is used for matching and generation of compliant dates
+and times, primarily for calendar, scheduling, and reminding purposes.
+
+Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
+to a specific numeric value. Even if some of its fields aren't required in the constructor,
+internally they still get initialized to 0, 1, or other suitable value.
+
+As such, `Time` instances always represent specific dates and times ("materialized" dates and times
+in VirtualTime's terminology).
+
+On the other hand, `VirtualTime`s do not have to represent any specific points in time (although they can
+be defined precisely enough (or converted) so that they do). They are intended for conveniently
+matching broader sets of values and for finding/generating times that match certain constraints.
 
 ### 1. Matching Times
 
-You can express date and time constraints in the `VirtualTime` object and then match various `Time`s against it
-to determine which ones match.
+You can express date and time constraints in the `VirtualTime` object and then match various `Time`s
+against it to determine which ones match.
 
 For example, let's create a VirtualTime that matches the last Saturday and Sunday of every month.
 This can be expressed using two constraints:
 
 - Day of month should be between -8 and -1 (the last 7 days of any month)
 - Day of week should be 6 or 7 (Saturday and Sunday)
+
+Then we can check if the current Time matches it:
 
 ```cr
 vt = VirtualTime.new
@@ -64,50 +74,64 @@ vt.matches?(any_in_march) # => true
 
 Note that `#matches?` is commutative and it could have also been written as `any_in_march.matches?(vt)`.
 
-### 3. Time Generation
+### 3. Generating Times
 
-In addition to matching, it is also possible to successively generate `Time`s that match the specified
+In addition to matching, it is also possible to successively generate `Time`s that match specified
 VirtualTime constraints.
 
-For example, let's take the same `VirtualTime` as above which matches the last weekend days of every month,
-and print a list of next 10 such dates:
+For example, let's create a `VirtualTime` that matches the last weekend days of every month and print a
+list of next 10 such dates.
+
+Note: This can be expressed as:
 
 ```cr
 vt = VirtualTime.new
 vt.year = 2020..2030
 vt.day = -7..-1
 vt.day_of_week = [6,7]
+```
 
-vti = vt.step(1.day)
+But it would match cases like Sunday 25th and Saturday 31st. If that matches your requirements nothing
+else needs to be done. But if you want to find dates of the last full weekends in every month, use
+a slightly dfferent rule that matches Saturday in the last week of the month, with at least one more
+day in the month remaining:
+
+```cr
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-2
+vt.day_of_week = 6
+```
+
+Then we can print 10 such Saturdays, starting from the earliest date satisfiable by our constraints:
+
+```cr
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-2
+vt.day_of_week = 6
+
+vti = vt.step(interval = 1.day, by = 1, from: Time.unix(0))
 
 10.times do
   p vti.next
 end
 
-# 2024-01-27 11:16:00.0 +01:00 Local
-# 2024-01-28 11:16:00.0 +01:00 Local
-# 2024-02-24 11:16:00.0 +01:00 Local
-# 2024-02-25 11:16:00.0 +01:00 Local
-# 2024-03-30 11:16:00.0 +01:00 Local
-# 2024-03-31 12:16:00.0 +02:00 Local
-# 2024-04-27 12:16:00.0 +02:00 Local
-# 2024-04-28 12:16:00.0 +02:00 Local
-# 2024-05-25 12:16:00.0 +02:00 Local
-# 2024-05-26 12:16:00.0 +02:00 Local
+2020-01-25 00:00:00.000000001+01:00Z
+2020-02-22 00:00:00.000000001+01:00Z
+2020-03-28 00:00:00.000000001+01:00Z
+2020-04-25 01:00:00.000000001+02:00Z
+2020-05-30 01:00:00.000000001+02:00Z
+2020-06-27 01:00:00.000000001+02:00Z
+2020-07-25 01:00:00.000000001+02:00Z
+2020-08-29 01:00:00.000000001+02:00Z
+2020-09-26 01:00:00.000000001+02:00Z
+2020-10-24 01:00:00.000000001+02:00Z
 ```
 
+Now let's take a look at implementation details.
+
 ## Supported Property Values
-
-Crystal's `struct Time` has all its fields (year, month, day, hour, minute, second, nanosecond) set
-to a specific numeric value. Even if some of its fields aren't required in the constructor,
-internally they still get initialized to 0, 1, or other suitable value.
-
-As such, `Time` instances always represent specific dates and times ("materialized" dates and times
-in virtualtime's terminology).
-
-On the other hand, `VirtualTime`s do not have to represent any specific points in time (although they can
-be defined precisely enough (or converted) so that they do).
-They are primarily intended for conveniently matching broader sets of values.
 
 All VirtualTime instances contain the following properties:
 
@@ -125,7 +149,7 @@ All VirtualTime instances contain the following properties:
 
 And each of these properties can have a value of the following types:
 
-1. **Nil**, to default to `VirtualTime.default_match? : Bool = true`
+1. **Nil**, to default matches to `VirtualTime.default_match? : Bool = true`
 1. **Boolean**, to always match (`true`) or fail (`false`)
 1. **Int32**, to match a specific value such as 5, 12, 2023, -1, or -5
 1. **Array or Set of Int32s**, such as [1,2,10,-1] to match any value in list
@@ -152,46 +176,9 @@ vt.location = Time::Location.load("Europe/Amsterdam")
 vt.matches?(Time.local) # => result depends on current time
 ```
 
-## Level of Granularity
-
-VirtualTime performs all internal calculations using maximum precision available from the
-`Time` struct (which is nanoseconds), but since the primary intended usage is for human
-scheduling, the default displayed granularity is 1 minute, with seconds and
-nanoseconds defaulting to 0.
-
-To increase granularity, simply specify interval and step arguments manually (e.g. `1.second`) instead of defaulting to `1.minute`.
-
-In other cases, the default interval of 1 minute could be too small. For example,
-if VirtualTime was created with only the `hour` value specified, it would match (and also
-generate) and event on every minute of that hour.
-
-In that case, you could easily request the step to be e.g.  1 hour or 1 day, so that
-there would be reasonable space between the generated `Time`s.
-
-For example:
-
-```cr
-vt = VirtualTime.new
-vt.year = 2020..2030
-vt.day = -8..-1
-vt.day_of_week = [6,7]
-
-vti = vt.step(1.minute)
-2.times do p vti.next end
-# 2024-01-27 11:16:00.0 +01:00 Local
-# 2024-01-27 11:17:00.0 +01:00 Local
-
-vti = vt.step(1.day)
-2.times do p vti.next end
-# 2024-01-27 11:16:00.0 +01:00 Local
-# 2024-01-28 11:16:00.0 +01:00 Local
-```
-
-## Property Values in Detail
-
 As can be seen above, fields can have some interesting values, such as negative numbers.
 
-Here is a list of all non-obvious values that are supported:
+Here is a more detailed list of all non-obvious values that are supported:
 
 ### Negative Integer Values
 
@@ -228,11 +215,15 @@ Therefore, this field can have values between 0 and 53 inclusively.
 Value 53 indicates a week that has started in one year (53rd Monday seen in a year),
 but at least one (and up to 3) of its days will surely overflow into the new year.
 
-Similarly, a value 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
+Similarly, a week number 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
 and/or Sunday) of the new year that belong to the week started in the previous year.
 
-Note: if you want to match the first or last 7 days of a year irrespective of weeks, you
-should use `day: 1..7` or `day: -7..-1` instead.
+Note 1: if you want to match the first or last 7 days of a year irrespective of weeks, you
+should use `day: 1..7` or `day: -7..-1` instead of `week: 1` or `-1`.
+
+Note 2: it is allowed to specify `week: 53, day_of_week: 7`. That is sure to represent a day
+whose week number and actual date are in different years. For example, 2027-01-03 would match
+this rule and represent the last day of 2026's 53th calendar week.
 
 ### Days in Month and Year
 
@@ -248,11 +239,47 @@ So comparing VTs to VTs is always done without conversion of negative values.
 
 ### Unsupported Comparisons
 
-Comparisons between VirtualTime property values which are both a `Proc` are not supported
+Comparisons between `VirtualTime` property values which are both a `Proc` are not supported
 and will throw `ArgumentError` in runtime.
 
 Comparisons between VirtualTime objects with different `location` values are not supported
 and will throw `ArgumentError` in runtime.
+
+## Level of Granularity
+
+VirtualTime performs all internal calculations using maximum precision available from the
+`Time` struct (which is nanoseconds), but since the primary intended usage is for human
+scheduling, the default displayed granularity is 1 minute, with seconds and
+nanoseconds defaulting to 0.
+
+To increase granularity, simply specify interval and step arguments manually (e.g.
+`interval = 1.second`) instead of defaulting to `1.minute`.
+
+In some other cases, the default interval of 1 minute could be too small. For example,
+if VirtualTime was created with only the `hour` value specified, it would match (and also
+generate) an event on every minute of that hour.
+
+In that case, you could easily request the step to be e.g.  1 hour or 1 day, so that
+there would be reasonable space between the generated `Time`s.
+
+For example:
+
+```cr
+vt = VirtualTime.new
+vt.year = 2020..2030
+vt.day = -8..-1
+vt.day_of_week = [6,7]
+
+vti = vt.step(1.minute)
+2.times do p vti.next end
+# 2024-01-27 11:16:00.0 +01:00 Local
+# 2024-01-27 11:17:00.0 +01:00 Local
+
+vti = vt.step(1.day)
+2.times do p vti.next end
+# 2024-01-27 11:16:00.0 +01:00 Local
+# 2024-01-28 11:16:00.0 +01:00 Local
+```
 
 ## Materialization
 
@@ -271,7 +298,7 @@ Because VirtualTimes can be very broadly defined, often times there are many equ
 choices to which they can be materialized. For example, if a VT matches anything in the
 month of March, which specific value should it be materialized to?
 
-To avoid the problem of too many choices, materialization takes as an argument a `Time` hint which defaults to `Time.local`.
+To avoid the problem of too many choices, materialization takes as an argument a `Time` hint.
 The materialized time will be equal to that time or moved to the future to satisfy all VT's constraints.
 
 For example:
@@ -291,7 +318,7 @@ vt.materialize(hint).to_tuple # => {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil,
 p vt.to_time(hint) # => 2018-02-15 00:56:26.837441132 +01:00 Local
 ```
 
-If not specified, the time hint defaults to current local time.
+If not specified, the time hint defaults to `Time.local.at_beginning_of_minute`.
 
 ## Time Zones
 
@@ -315,6 +342,15 @@ vt.matches?(t) # => nil, because 00 hours is not between 16 and 20
 
 vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # => true, because time instant 0 hours converted to NY time (-6) is 18 hours
+```
+
+Since it is timezone-agnostic, any timezones present in `hint`s propagate to final
+`Time` objects:
+
+```cr
+vt = VirtualTime.new
+vt.to_time(Time.local(1970,1,1)) # => 1970-01-01 00:00:00+01:00[Europe/Berlin]
+vt.to_time(Time.unix(0))         # => 1970-01-01 00:00:00Z
 ```
 
 Matching VTs to VTs with timezones is also possible as long as the timezone is equal; otherwise a runtime error is thrown as already mentioned above under "Unsupported Comparisons".
@@ -341,4 +377,4 @@ Run `crystal docs` or `crystal do` and `firefox ./docs/index.html`.
 
 List of interesting or similar projects in no particular order:
 
-- https://dianne.skoll.ca/projects/remind/ - a sophisticated calendar and alarm program
+- https://dianne.skoll.ca/projects/remind/ - a traditional calendar and alarm program

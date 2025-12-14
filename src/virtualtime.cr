@@ -41,7 +41,7 @@ class VirtualTime
   def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil, @default_match = true)
   end
 
-  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = ni, @default_match = true)
+  def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = nil, @default_match = true)
   end
 
   def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location, @default_match = true)
@@ -101,29 +101,20 @@ class VirtualTime
       in Nil, Bool
         matches? b, a, max
       in Int
-        a.each do |aa|
-          return true if aa == b
-        end
-        false
+        a.any? { |aa| aa == b }
       in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
-        a.each do |aa|
+        a.any? do |aa|
           bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
-          bb.each do |bbb|
-            return true if aa == bbb
-          end
+          bb.any? { |bbb| aa == bbb }
         end
-        false
       in VirtualProc
-        a.each do |aa|
-          return true if b.call aa
-        end
-        false
+        a.any? { |aa| b.call(aa) }
       end
     in VirtualProc
       case b
       in Nil, Bool, Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
         matches? b, a, max
-      in Int32
+      in Int
         a.call b
       in VirtualProc
         raise ArgumentError.new "Proc to Proc comparison not supported (yet?)"
@@ -137,9 +128,9 @@ class VirtualTime
   # At the moment, that includes converting negative values to offsets from end of range, reorganizing ranges so ttat begin <= end, and sorting Arrays and Sets,
   # If calling this function yourself, provide `max` whenever possible.
   @[AlwaysInline]
-  def adjust_value(a, max)
+  def adjust_value(a : Virtual, max)
     case a
-    in Nil, Bool
+    in Nil, Bool, VirtualProc
       a
     in Int
       if max
@@ -175,8 +166,6 @@ class VirtualTime
       else
         a
       end.sort
-    in VirtualProc, Proc(Bool)
-      a
     end
   end
 
@@ -391,13 +380,26 @@ class VirtualTime
     loop do
       tries += 1
 
-      week_nr = time.calendar_week[1]
-      value, _ = materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
-      time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
-
-      day = time.day_of_week.to_i
-      value, _ = materialize(day_of_week, day, 1, 8, strict)
-      time += adjust_day(day, value, 7)
+      if week && day_of_week # Anchor deterministically using ISO week rules
+        year = time.year
+        # ISO week 1 is the week containing Jan 4
+        jan4 = Time.local(year, 1, 4, location: time.location)
+        week1_monday = jan4 - (jan4.day_of_week.to_i - 1).days
+        target_week, _ = materialize week, time.calendar_week[1], 0, TimeHelper.weeks_in_year(time) + 1, strict
+        target_dow, _ = materialize day_of_week, time.day_of_week.to_i, 1, 8, strict
+        time = week1_monday + (target_week - 1).weeks + (target_dow - 1).days
+      else # Apply incremental logic for partial constraints
+        if week
+          week_nr = time.calendar_week[1]
+          value, _ = materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
+          time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
+        end
+        if day_of_week
+          day = time.day_of_week.to_i
+          value, _ = materialize(day_of_week, day, 1, 8, strict)
+          time += adjust_day(day, value, 7)
+        end
+      end
 
       day = time.day_of_year
       value, _ = materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
@@ -700,31 +702,33 @@ class VirtualTime
       parse_from node.value
     end
 
-    def self.parse_from(value)
+    def self.parse_from(raw)
+      value = raw.to_s.strip
+
       case value
       when "nil"
         nil
-      when /^\d+$/
-        value.to_i
-      when /^(\d+,?)+$/
-        value.split(",").map &.to_i
-      when /^(\d+)\.\.\.(\d+)(?:\/(\d+))$/
-        ($1.to_i...$2.to_i).step($3.to_i)
-      when /^(\d+)\.\.\.(\d+)$/
-        $1.to_i...$2.to_i
-      when /^(\d+)\.\.(\d+)(?:\/(\d+))$/
-        ($1.to_i..$2.to_i).step($3.to_i)
-      when /^(\d+)\.\.(\d+)$/
-        $1.to_i..$2.to_i
       when "true"
         true
       when "false"
         false
+      when /^-?\d+$/
+        value.to_i
+      when /^-?\d+(?:\s*,\s*-?\d+)*$/
+        value.split(/\s*,\s*/).map(&.to_i)
+      when /^(-?\d+)\.\.\.(-?\d+)(?:\/(\d+))$/
+        ($1.to_i...$2.to_i).step($3.to_i)
+      when /^(-?\d+)\.\.\.(-?\d+)$/
+        $1.to_i...$2.to_i
+      when /^(-?\d+)\.\.(-?\d+)(?:\/(\d+))$/
+        ($1.to_i..$2.to_i).step($3.to_i)
+      when /^(-?\d+)\.\.(-?\d+)$/
+        $1.to_i..$2.to_i
       when /^->/
         # XXX This one is here just to satisfy return type. It doesn't really work.
         ->(_v : Int32) { true }
       else
-        raise ArgumentError.new "Invalid YAML input (#{value})"
+        raise ArgumentError.new("Invalid YAML input (#{value})")
       end
     end
   end

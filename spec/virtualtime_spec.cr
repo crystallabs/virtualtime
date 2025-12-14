@@ -28,6 +28,24 @@ describe VirtualTime do
     vt.materialize(Time::UNIX_EPOCH).to_tuple.should eq({1970, 1, 1, nil, nil, nil, 0, 0, 0, nil, 0, nil})
   end
 
+  it "materializes respecting week and day_of_week constraints" do
+  vt = VirtualTime.new
+    vt.week = 1
+    vt.day_of_week = 1 # Monday
+    t = vt.to_time(Time.local 2023, 1, 1)
+    t.calendar_week[1].should eq 1
+    t.day_of_week.to_i.should eq 1
+  end
+
+  it "raises on materialize when rules are impossible" do
+    vt = VirtualTime.new
+    vt.week = 54
+    vt.day_of_week = 1
+    expect_raises(ArgumentError) do
+      vt.to_time(Time.local 2023, 1, 1)
+    end
+  end
+
   it "can expand VTs" do
     d = VirtualTime.new
     d.year = 2017
@@ -166,11 +184,18 @@ describe VirtualTime do
 
   # Other
 
-  it "honors default_match?" do
+  it "respects default_match?" do
     vt = VirtualTime.new
     vt.matches?(Time.local).should be_true
     vt.default_match = false
     vt.matches?(Time.local).should be_false
+  end
+
+  it "respects default_match only for nil fields" do
+    vt = VirtualTime.new
+    vt.hour = 10
+    vt.matches?(Time.local 2023, 1, 1, 10).should be_true
+    vt.matches?(Time.local 2023, 1, 1, 11).should be_false
   end
 
   it "can adjust timezone for Times" do
@@ -178,11 +203,18 @@ describe VirtualTime do
     vt = VirtualTime.new location: Time::Location.load("America/New_York")
     time2 = vt.adjust_location time
     time2.should eq time.in vt.location.not_nil!
+  end
 
+  it "raises when matching VTs with different locations" do
     vt = VirtualTime.new location: Time::Location.load("Europe/Berlin")
     vt2 = VirtualTime.new location: Time::Location.load("America/New_York")
+
     expect_raises(ArgumentError) do
       vt.adjust_location vt2
+    end
+
+    expect_raises(ArgumentError) do
+      vt.matches?(vt2)
     end
   end
 
@@ -207,7 +239,7 @@ describe VirtualTime do
       vt.matches?(nil, [1, 2, 3], max).should be_true
       vt.matches?(nil, 1..10, max).should be_true
       vt.matches?(nil, (1..10).step(3), max).should be_true
-      vt.matches?(nil, ->{ false }, max).should be_true
+      vt.matches?(nil, ->(_val : Int32){ false }, max).should be_true
     end
   end
 
@@ -222,7 +254,7 @@ describe VirtualTime do
       vt.matches?(true, [1, 2, 3], max).should be_true
       vt.matches?(true, 1..10, max).should be_true
       vt.matches?(true, (1..10).step(3), max).should be_true
-      vt.matches?(true, ->{ false }, max).should be_true
+      vt.matches?(true, ->(_val : Int32){ false }, max).should be_true
 
       vt.matches?(false, nil, max).should be_false
       vt.matches?(false, false, max).should be_false
@@ -232,7 +264,7 @@ describe VirtualTime do
       vt.matches?(false, [1, 2, 3], max).should be_false
       vt.matches?(false, 1..10, max).should be_false
       vt.matches?(false, (1..10).step(3), max).should be_false
-      vt.matches?(false, ->{ false }, max).should be_false
+      vt.matches?(false, ->(_val : Int32){ false }, max).should be_false
     end
   end
 
@@ -530,5 +562,39 @@ describe VirtualTime do
     expect_raises(ArgumentError) {
       vt.matches? v_true, v_true
     }
+  end
+
+  it "does not support Proc serialization to YAML" do
+    vt = VirtualTime.new
+    vt.second = ->(v : Int32) { v > 10 }
+    expect_raises(Exception) {
+      yaml = vt.to_yaml
+    }
+    #vt2 = VirtualTime.from_yaml yaml
+    #vt2.second.should be_a(Proc(Int32, Bool))
+    #vt2.matches?(Time.local).should be_true # placeholder proc always true
+  end
+
+  it "respects exclusive ranges in matching" do
+    vt = VirtualTime.new
+    vt.hour = 10...12
+
+    vt.matches?(Time.local 2023, 1, 1, 10).should be_true
+    vt.matches?(Time.local 2023, 1, 1, 11).should be_true
+    vt.matches?(Time.local 2023, 1, 1, 12).should be_false
+  end
+
+  it "raises when wanted exceeds single wrap limit" do
+    vt = VirtualTime.new
+    expect_raises(ArgumentError) do
+      vt.materialize(nil, 120, 0, 60)
+    end
+  end
+
+  it "handles empty arrays and ranges safely" do
+    vt = VirtualTime.new
+    vt.matches?([] of Int32, 5, nil).should be_false
+    vt.matches?(5, [] of Int32, nil).should be_false
+    vt.matches?((1...1), 1, nil).should be_false
   end
 end
