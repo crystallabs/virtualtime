@@ -7,7 +7,7 @@ end
 class VirtualTime
   VERSION_MAJOR    = 1
   VERSION_MINOR    = 4
-  VERSION_REVISION = 0
+  VERSION_REVISION = 1
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
@@ -773,31 +773,9 @@ class VirtualTime
     # - max_shift bounds the returned delta (inclusive)
     # - max_shifts bounds the number of step applications (inclusive)
     # - stepping is done on Time values (DST-safe)
-    def self.shift_from_base(base : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Time::Span | Bool
-      return false if step == 0.seconds
-
-      current = base
-      delta = Time::Span.zero
-      shifts = 0
-
-      loop do
-        # successor step
-        current = current + step
-        delta += step
-        shifts += 1
-
-        return false if max_shifts && shifts > max_shifts
-        return false if max_shift && delta.abs > max_shift
-
-        unless blocked.call(current)
-          return delta
-        end
-      end
-    end
-
-    # Forward search, returning `Result` object. Behavior matches shift_from_base.
-    def self.shift_from_base_get_result(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
+    def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
       return Result::InvalidStep.new if step == 0.seconds
+      return Result::OutOfBounds.new if max_shifts && max_shifts <= 0
 
       current = base
       delta = Time::Span.zero
@@ -817,6 +795,7 @@ class VirtualTime
         end
 
         unless blocked.call(current)
+          raise "BUG: shift_from_base produced zero delta" if delta == 0.seconds
           return Result::Found.new(delta)
         end
       end
@@ -867,6 +846,7 @@ class VirtualTime
   end
 
   module Result
+    # Result types for Search operations. Intentionally orthogonal to VirtualDate's policies.
     abstract struct Result
     end
 

@@ -648,7 +648,7 @@ describe VirtualTime do
           t <= t0 + 1.minute
         end
 
-        delta.should eq 2.minutes
+        delta.should eq VirtualTime::Result::Found.new 2.minutes
       end
 
       it "returns false when max_shifts is exceeded" do
@@ -658,7 +658,7 @@ describe VirtualTime do
           true # always blocked
         end
 
-        delta.should be_false
+        delta.should eq VirtualTime::Result::Blocked.new
       end
 
       it "returns false when max_shift window is exceeded" do
@@ -668,7 +668,7 @@ describe VirtualTime do
           true
         end
 
-        delta.should be_false
+        delta.should eq VirtualTime::Result::OutOfBounds.new
       end
 
       it "handles DST transitions correctly" do
@@ -680,8 +680,8 @@ describe VirtualTime do
           false
         end
 
-        delta.should be_a(Time::Span)
-        (t0 + delta.as(Time::Span)).hour.should eq 3
+        delta.should eq VirtualTime::Result::Found.new 1.hours
+        (t0 + delta.as(VirtualTime::Result::Found).delta).hour.should eq 3
       end
 
       it "rejects zero-length step defensively" do
@@ -691,7 +691,7 @@ describe VirtualTime do
           false
         end
 
-        delta.should be_false
+        delta.should eq VirtualTime::Result::InvalidStep.new
       end
     end
 
@@ -812,11 +812,11 @@ describe VirtualTime do
         reachable.should be_true
       end
 
-      describe ".shift_from_base_get_result successor contract" do
+      describe ".shift_from_base successor contract" do
         it "never returns a zero-length delta (successor semantics)" do
           base = Time.local(2023, 5, 10, 10, 0, 0)
 
-          result = VirtualTime::Search.shift_from_base_get_result(base, 1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
+          result = VirtualTime::Search.shift_from_base(base, 1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
             false # never blocked
           end
 
@@ -832,7 +832,7 @@ describe VirtualTime do
       it "never returns zero delta for negative steps either" do
         base = Time.local(2023, 5, 10, 10, 0, 0)
 
-        result = VirtualTime::Search.shift_from_base_get_result(base, -1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
+        result = VirtualTime::Search.shift_from_base(base, -1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
           false
         end
 
