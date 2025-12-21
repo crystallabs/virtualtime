@@ -1,6 +1,45 @@
 require "spec"
 require "../src/virtualtime"
 
+# Simple shrinker for fuzzer-found problems:
+# try to reduce delta and step, then normalize time-of-day
+def shrink_case(
+  base : Time,
+  step : Time::Span,
+  delta : Time::Span,
+  max_shift : Time::Span,
+  max_shifts : Int32,
+  &fails : (Time, Time::Span, Time::Span) -> Bool
+)
+  shrunk = {base, step, delta}
+
+  # delta
+  while delta.abs > 1.minute
+    smaller = (delta / 2)
+    break unless fails.call(base, step, smaller)
+    delta = smaller
+    shrunk = {base, step, delta}
+  end
+
+  # step
+  while step.abs > 1.minute
+    smaller = (step / 2)
+    break if smaller == 0.seconds
+    break unless fails.call(base, smaller, delta)
+    step = smaller
+    shrunk = {base, step, delta}
+  end
+
+  # normalize time-of-day
+  normalized = Time.local(base.year, base.month, base.day, 0, 0, 0, location: base.location)
+
+  if fails.call(normalized, step, delta)
+    shrunk = {normalized, step, delta}
+  end
+
+  shrunk
+end
+
 describe VirtualTime do
   it "can be initialized" do
     vt = VirtualTime.new
@@ -149,6 +188,7 @@ describe VirtualTime do
     # vt.millisecond = ->( val : Int32) { true }
     vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\ndefault_match: true\n"
   end
+
   it "converts from YAML" do
     vt = VirtualTime.from_yaml "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\ndefault_match: false\n"
     vt.month.should eq 3
@@ -596,5 +636,414 @@ describe VirtualTime do
     vt.matches?([] of Int32, 5, nil).should be_false
     vt.matches?(5, [] of Int32, nil).should be_false
     vt.matches?((1...1), 1, nil).should be_false
+  end
+
+  describe VirtualTime::Search do
+    describe ".shift_from_base" do
+      it "returns zero-based forward delta to first unblocked time" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        # Block exactly at t0, unblock at +2 minutes
+        delta = VirtualTime::Search.shift_from_base(t0, 1.minute, max_shift: nil, max_shifts: 10) do |t|
+          t <= t0 + 1.minute
+        end
+
+        delta.should eq 2.minutes
+      end
+
+      it "returns false when max_shifts is exceeded" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        delta = VirtualTime::Search.shift_from_base(t0, 1.minute, max_shift: nil, max_shifts: 2) do |_|
+          true # always blocked
+        end
+
+        delta.should be_false
+      end
+
+      it "returns false when max_shift window is exceeded" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        delta = VirtualTime::Search.shift_from_base(t0, 10.minutes, max_shift: 15.minutes, max_shifts: 10) do |_|
+          true
+        end
+
+        delta.should be_false
+      end
+
+      it "handles DST transitions correctly" do
+        loc = Time::Location.load("Europe/Berlin")
+        # DST jump: 2023-03-26 02:00 -> 03:00
+        t0 = Time.local(2023, 3, 26, 1, 30, 0, location: loc)
+
+        delta = VirtualTime::Search.shift_from_base(t0, 1.hour, max_shift: 3.hours, max_shifts: 5) do |_|
+          false
+        end
+
+        delta.should be_a(Time::Span)
+        (t0 + delta.as(Time::Span)).hour.should eq 3
+      end
+
+      it "rejects zero-length step defensively" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        delta = VirtualTime::Search.shift_from_base(t0, 0.seconds, max_shift: 10.minutes, max_shifts: 10) do |_|
+          false
+        end
+
+        delta.should be_false
+      end
+    end
+
+    describe ".is_shifted_from_base?" do
+      it "returns true when target is reachable via inverse shifting" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+        target = t0 + 2.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 3.hours, max_shifts: 5) do |base|
+          # Base is considered schedulable but shifted by +2h
+          if base == t0
+            2.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_true
+      end
+
+      it "returns false when inverse search exceeds bounds" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+        target = t0 + 5.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 10) do |base|
+          # Only bases at least 5 hours away produce a shift,
+          # which exceeds max_shift and must be rejected.
+          if (target - base) >= 5.hours
+            5.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_false
+      end
+
+      it "returns true when inverse shift delta is exactly equal to max_shift" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+        target = t0 + 2.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
+          # Only the exact base produces the exact boundary delta.
+          if base == t0
+            2.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_true
+      end
+
+      it "returns false when no base produces the target" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+        target = t0 + 1.hour
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, 30.minutes, max_shift: 2.hours, max_shifts: 5) do |_|
+          45.minutes
+        end
+
+        reachable.should be_false
+      end
+
+      it "returns true when inverse shift delta is exactly -max_shift (negative boundary)" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+        target = t0 - 2.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
+          # Only the exact base produces the exact negative boundary delta.
+          if base == t0
+            -2.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_true
+      end
+
+      it "allows exact max_shift boundary across a DST transition" do
+        loc = Time::Location.load("Europe/Berlin")
+
+        # DST jump: 2023-03-26 02:00 -> 03:00
+        base = Time.local(2023, 3, 26, 1, 30, 0, location: loc)
+
+        # Two real hours later in absolute time, despite wall-clock jump
+        target = base + 2.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |b|
+          if b == base
+            2.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_true
+      end
+
+      it "allows exact negative max_shift across a DST transition" do
+        loc = Time::Location.load("Europe/Berlin")
+
+        # DST jump: 2023-03-26 02:00 -> 03:00
+        base = Time.local(2023, 3, 26, 3, 30, 0, location: loc)
+
+        # Two real hours earlier in absolute time
+        target = base - 2.hours
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |b|
+          if b == base
+            -2.hours
+          else
+            nil
+          end
+        end
+
+        reachable.should be_true
+      end
+
+      describe ".shift_from_base_get_result successor contract" do
+        it "never returns a zero-length delta (successor semantics)" do
+          base = Time.local(2023, 5, 10, 10, 0, 0)
+
+          result = VirtualTime::Search.shift_from_base_get_result(base, 1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
+            false # never blocked
+          end
+
+          case result
+          when VirtualTime::Result::Found
+            result.delta.should_not eq 0.seconds
+          else
+            fail "expected Result::Found, got #{result.class}"
+          end
+        end
+      end
+
+      it "never returns zero delta for negative steps either" do
+        base = Time.local(2023, 5, 10, 10, 0, 0)
+
+        result = VirtualTime::Search.shift_from_base_get_result(base, -1.minute, max_shift: 10.minutes, max_shifts: 10) do |_|
+          false
+        end
+
+        result.as(VirtualTime::Result::Found).delta.should_not eq 0.seconds
+      end
+    end
+
+    describe "property-style randomized Search invariants" do
+      it "never returns true without a valid base producing the target" do
+        rng = Random.new(54321)
+
+        100.times do
+          base = Time.local(2023, 5, 10, 12, 0, 0)
+          target = base + rng.rand(-5..5).minutes
+
+          step = rng.rand(1..3).minutes
+          max_shift = 3.minutes
+          max_shifts = 5
+
+          reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |_|
+            nil # No base ever produces a delta
+          end
+
+          reachable.should be_false
+        end
+      end
+
+      it "never reports reachable unless a valid base produces the target within bounds" do
+        rng = Random.new(12345)
+
+        100.times do
+          base = Time.local(2023, 5, 10, rng.rand(0..23), rng.rand(0..59), 0)
+
+          step_minutes = rng.rand(-3..3)
+          next if step_minutes == 0
+          step = step_minutes.minutes
+
+          delta_minutes = rng.rand(-5..5)
+          delta = delta_minutes.minutes
+          target = base + delta
+
+          max_shift = 5.minutes
+          max_shifts = 10
+
+          reachable =
+            VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
+              b == base ? delta : nil
+            end
+
+          if reachable
+            # Soundness: reachable implies delta is valid
+            delta.abs.should be <= max_shift
+            (base + delta).should eq(target)
+          end
+        end
+      end
+
+      it "shift_from_base never exceeds max_shift and may fail due to step granularity" do
+        rng = Random.new(999)
+
+        100.times do
+          start = Time.local(2023, 5, 10, 10, 0, 0)
+
+          step_minutes = rng.rand(1..3)
+          step = step_minutes.minutes
+
+          blocked_for = rng.rand(0..5).minutes
+
+          max_shift = 5.minutes
+          max_shifts = 10
+
+          delta = VirtualTime::Search.shift_from_base(start, step, max_shift: max_shift, max_shifts: max_shifts) do |t|
+            t < start + blocked_for
+          end
+
+          case delta
+          when Time::Span
+            delta.abs.should be <= max_shift
+          when Bool
+            delta.should be_false
+          end
+        end
+      end
+    end
+  end
+
+  it "shrinks failing DST cases automatically" do
+    rng = Random.new(424242)
+    loc = Time::Location.load("Europe/Berlin")
+
+    # PREDECLARE so rescue can see them
+    base = Time.local(2023, 3, 26, 1, 0, 0, location: loc)
+    step = 1.minute
+    delta = 1.minute
+
+    max_shift = 6.minutes
+    max_shifts = 10
+
+    begin
+      year = 2023
+
+      200.times do
+        month = rng.rand(1..12)
+        max_day = Time.days_in_month(year, month)
+        day = rng.rand(1..max_day)
+
+        hour = rng.rand(0..23)
+        minute = rng.rand(0..59)
+
+        anchor = Time.local(year, month, day, 0, 0, 0, location: loc)
+        base = anchor + hour.hours + minute.minutes
+
+        step = rng.rand(1..3).minutes
+        delta = rng.rand(-6..6).minutes
+        target = base + delta
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
+          b == base ? delta : nil
+        end
+
+        if reachable && delta.abs > max_shift
+          raise "Invariant violation"
+        end
+      end
+    rescue
+      shrunk =
+        shrink_case(base, step, delta, max_shift, max_shifts) do |b, s, d|
+          t = b + d
+
+          VirtualTime::Search.is_shifted_from_base?(t, s, max_shift: max_shift, max_shifts: max_shifts) { |bb| bb == b ? d : nil } && d.abs > max_shift
+        end
+
+      message = "Search invariant failed. Shrunk failing case: base: #{shrunk[0]} step: #{shrunk[1]} delta: #{shrunk[2]} max_shift: #{max_shift}"
+      fail message
+    end
+  end
+
+  describe "DST-heavy Search fuzzer" do
+    it "never violates soundness across DST transitions" do
+      rng = Random.new(20240326)
+
+      zones = [
+        "Europe/Berlin",
+        "America/New_York",
+        "America/Sao_Paulo",
+        "Australia/Sydney",
+      ].map { |z| Time::Location.load(z) }
+
+      year = 2023
+
+      300.times do
+        loc = zones.sample(rng)
+
+        # Bias toward common DST-change months, but keep variety.
+        month =
+          case rng.rand(0..9)
+          when 0, 1, 2, 3
+            3 # March
+          when 4, 5, 6, 7
+            10 # October
+          else
+            rng.rand(1..12)
+          end
+
+        max_day = Time.days_in_month(year, month)
+        day = rng.rand(1..max_day)
+
+        hour = rng.rand(0..23)
+        minute = rng.rand(0..59)
+
+        # Midnight always exists; date is valid by construction.
+        anchor = Time.local(year, month, day, 0, 0, 0, location: loc)
+
+        # Move within the day using span arithmetic (DST-safe)
+        base = anchor + hour.hours + minute.minutes
+
+        step_minutes = rng.rand(-3..3)
+        next if step_minutes == 0
+        step = step_minutes.minutes
+
+        delta_minutes = rng.rand(-6..6)
+        delta = delta_minutes.minutes
+        target = base + delta
+
+        max_shift = 6.minutes
+        max_shifts = 10
+
+        reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
+          b == base ? delta : nil
+        end
+
+        # Soundness invariant only
+        if reachable
+          delta.abs.should be <= max_shift
+          (base + delta).should eq(target)
+        end
+      end
+    end
+
+    it "handles month-end dates safely (calendar fuzz)" do
+      rng = Random.new(20240327)
+      loc = Time::Location.load("Europe/Berlin")
+
+      100.times do
+        month = rng.rand(1..12)
+        max_day = Time.days_in_month(2023, month)
+        day = rng.rand(1..max_day)
+
+        anchor = Time.local(2023, month, day, 0, 0, 0, location: loc)
+        anchor.should be_a(Time) # just sanity
+      end
+    end
   end
 end

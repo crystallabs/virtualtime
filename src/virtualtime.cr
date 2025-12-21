@@ -6,15 +6,12 @@ end
 
 class VirtualTime
   VERSION_MAJOR    = 1
-  VERSION_MINOR    = 3
-  VERSION_REVISION = 3
+  VERSION_MINOR    = 4
+  VERSION_REVISION = 0
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
   include YAML::Serializable
-
-  # XXX Use Int instead of Int32 when it becomes possible in unions in Crystal
-  # XXX Possibly add Enumerable(Int32) and remove more specific types after https://github.com/crystal-lang/crystal/issues/14047
 
   alias Virtual = Nil | Bool | Int32 | Array(Int32) | Set(Int32) | Range(Int32, Int32) | Steppable::StepIterator(Int32, Int32, Int32) | VirtualProc
   alias VirtualProc = Proc(Int32, Bool)
@@ -125,7 +122,7 @@ class VirtualTime
   # Helpers:
 
   # Adjusts values to be suitable for use in comparisons.
-  # At the moment, that includes converting negative values to offsets from end of range, reorganizing ranges so ttat begin <= end, and sorting Arrays and Sets,
+  # At the moment, that includes converting negative values to offsets from end of range, reorganizing ranges so that begin <= end, and sorting Arrays and Sets.
   # If calling this function yourself, provide `max` whenever possible.
   @[AlwaysInline]
   def adjust_value(a : Virtual, max)
@@ -160,12 +157,15 @@ class VirtualTime
       else
         a
       end
-    in Enumerable(Int32)
-      if max
-        a.map { |aa| aa < 0 ? max + aa : aa }
-      else
-        a
-      end.sort
+      # Unspecific Enumerable(Int32) is not part of `alias Virtual` and other,
+      # more specific types are already listed with their own rules. Enable only
+      # if some future need arises.
+      # in Enumerable(Int32)
+      #  if max
+      #    a.map { |aa| aa < 0 ? max + aa : aa }
+      #  else
+      #    a
+      #  end.sort
     end
   end
 
@@ -208,7 +208,7 @@ class VirtualTime
     end
   end
 
-  # Materializing
+  # Materializing (returning new VTs with all fields materialized to specific, `Time`-compatible values)
   # Time: year, month, day, calendar_week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
 
   # Returns a new, "materialized" VirtualTime, i.e. an object where all fields have "materialized"/specific values
@@ -230,7 +230,7 @@ class VirtualTime
     {year: _year, month: _month, day: _day, hour: _hour, minute: _minute, second: _second, nanosecond: _nanosecond}
   end
 
-  # Materialize date part of current VT
+  # Materializes date part of current VT
   def materialize_date_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
     _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
     _month, carry = materialize(month, time.month + carry, 1, 13)
@@ -238,7 +238,7 @@ class VirtualTime
     {_day, _month, _year, carry}
   end
 
-  # Materialize time part of current VT
+  # Materializes time part of current VT
   def materialize_time_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
     _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
     _second, carry = materialize(second, time.second + carry, 0, 60)
@@ -247,8 +247,9 @@ class VirtualTime
     {_nanosecond, _second, _minute, _hour, carry}
   end
 
-  # Materialize a particular value with the help of a wanted/wanted value.
-  # If 'strict' is true and wanted value does not satisfy predefined range or requirements, it is replaced with the first/earliest value from allowed range.
+  # Materializes a particular value with the help of a wanted/hint value.
+  # If 'strict' is true and some of the `wanted` fields would not `match?` VT's requirements,
+  # they are replaced/overriden with the first/earliest value from the allowed range.
   def materialize(allowed, wanted : Int, min, max = nil, strict = true)
     allowed = adjust_value allowed, max
     wanted = adjust_value wanted, max
@@ -277,7 +278,6 @@ class VirtualTime
       end
     in Range(Int32, Int32)
       adjust_wanted_re_max
-      # XXX adjust_range...
       if max && (allowed.begin < 0 || allowed.end < 0)
         ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
         ae = allowed.end < 0 ? max + allowed.end : allowed.end
@@ -288,6 +288,7 @@ class VirtualTime
         carry += max && (wanted > allowed.begin) ? 1 : 0
         wanted = allowed.begin
       end
+      # This covers Array(Int32) and Steppable::StepIterator(Int32,Int32,Int32)
     in Enumerable(Int32)
       adjust_wanted_re_max
       allowed = allowed.dup.to_a
@@ -420,7 +421,7 @@ class VirtualTime
   end
 
   # Creates `VirtualTime` from `Time`.
-  # This can be useful to produce a VT with many fields filled in quickly, and then set fields of choice to more interesting values rather than fixed integers.
+  # This can be useful to produce a VT with values filled in quickly, and then set some fields to more interesting values rather than fixed integers.
   #
   # Note that this copies all values from `Time` to `VirtualTime`, including week number, day of week, day of year.
   # That results in a very fixed `VirtualTime` which is probably not useful unless some values are afterwards reset to nil or set to other VT-specific options.
@@ -445,13 +446,13 @@ class VirtualTime
 
   # Convenience functions
 
-  # Sets all fields to nil
+  # Sets all VT fields to nil
   def clear!
     clear_date!
     clear_time!
   end
 
-  # Sets date-related fields to nil
+  # Sets date-related VT fields to nil
   def clear_date!
     self.year = nil
     self.month = nil
@@ -462,7 +463,7 @@ class VirtualTime
     self
   end
 
-  # Sets time-related fields to nil
+  # Sets time-related VT fields to nil
   def clear_time!
     self.hour = nil
     self.minute = nil
@@ -483,14 +484,15 @@ class VirtualTime
   # Expands VirtualTime containing ranges or lists into a list of individual VirtualTimes with specific values
   # E.g. VirtualTime with `day=1..2` gets expanded into two separate VirtualTimes, day=1 and day=2
   #
-  # This function is used only in tests.
+  # This function is used only in tests so far.
   def expand
     ArrayHelper.expand(VTTuple.new year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location).map { |v| self.class.new *(VTTuple.from v) }
   end
 
   # Iterator-related stuff
 
-  # Produces closest-next `Time` that matches the current VT, starting with `from` + 1 nanosecond onwards
+  # Produces closest-next `Time` that matches the current VT, starting with `from` + 1 nanosecond onwards.
+  # (Because it always finds the "next" time, the default value is `at_end_of_minute` (:99).)
   def succ(from : Time = Time.local.at_end_of_minute)
     to_time from + 1.nanosecond
   end
@@ -500,6 +502,8 @@ class VirtualTime
     from = succ from
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
+
+  # END OF CLASS CODE
 
   # Iterator for generating successive `Time`s that match the VT constraints
   private class StepIterator(R, D, N, B)
@@ -751,6 +755,142 @@ class VirtualTime
         node.raise "Expected scalar, not #{node.class}"
       end
       Time::Location.load node.value
+    end
+  end
+
+  # Search provides monotonic, DST-safe, policy-free temporal traversal suitable for scheduling.
+  # Stateless. Not related to other methods above. Advances by at least 1 step before evaluation.
+  module Search
+    # Moves forward from `base` by repeated application of `step`
+    # (successor behavior: first candidate is base + step).
+    #
+    # Returns:
+    # - Time::Span delta to the first unblocked candidate
+    # - false if bounds are exceeded
+    #
+    # Notes:
+    # - step must be non-zero
+    # - max_shift bounds the returned delta (inclusive)
+    # - max_shifts bounds the number of step applications (inclusive)
+    # - stepping is done on Time values (DST-safe)
+    def self.shift_from_base(base : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Time::Span | Bool
+      return false if step == 0.seconds
+
+      current = base
+      delta = Time::Span.zero
+      shifts = 0
+
+      loop do
+        # successor step
+        current = current + step
+        delta += step
+        shifts += 1
+
+        return false if max_shifts && shifts > max_shifts
+        return false if max_shift && delta.abs > max_shift
+
+        unless blocked.call(current)
+          return delta
+        end
+      end
+    end
+
+    # Forward search, returning `Result` object. Behavior matches shift_from_base.
+    def self.shift_from_base_get_result(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
+      return Result::InvalidStep.new if step == 0.seconds
+
+      current = base
+      delta = Time::Span.zero
+      shifts = 0
+
+      loop do
+        # successor step
+        current = current + step
+        delta += step
+        shifts += 1
+
+        return Result::Blocked.new if max_shifts && shifts > max_shifts
+        return Result::OutOfBounds.new if max_shift && delta.abs > max_shift
+
+        if domain && !domain.contains?(current)
+          return Result::OutOfBounds.new
+        end
+
+        unless blocked.call(current)
+          return Result::Found.new(delta)
+        end
+      end
+
+      Result::Blocked.new
+    end
+
+    # Inverse reachability check: determine backwards whether `target` can be obtained as `base + delta`,
+    # stepping by `step`. Returns bool value.
+    #
+    # Notes:
+    # - successor-based: first base is `target - step`
+    # - max_shift bounds the produced delta (inclusive)
+    # - max_shifts bounds number of step applications (inclusive)
+    # - stepping is done on Time values (DST-safe)
+    def self.is_shifted_from_base?(target : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32, &producer : Time -> Time::Span?) : Bool
+      return false if step == 0.seconds
+      return false if max_shifts <= 0
+
+      # If caller does not supply a max_shift, the max delta is still bounded by
+      # the maximum number of step applications.
+      effective_max_shift = max_shift || (step.abs * max_shifts)
+
+      current = target
+      shifts = 0
+
+      loop do
+        # successor behavior is in inverse direction: first base is target - step
+        current = current - step
+        shifts += 1
+
+        return false if shifts > max_shifts
+
+        if produced = producer.call(current)
+          # produced must itself be a valid delta and must reach the target
+          if produced.abs <= effective_max_shift && current + produced == target
+            return true
+          end
+        end
+
+        # Optional: also ensure we don't walk bases so far away that even a maximal
+        # produced delta couldn't reach the target.
+        # Distance from current base to target is exactly shifts * step (in span form):
+        distance = target - current
+        return false if distance.abs > effective_max_shift
+      end
+    end
+  end
+
+  module Result
+    abstract struct Result
+    end
+
+    struct Found < Result
+      getter delta : Time::Span
+
+      def initialize(@delta : Time::Span)
+      end
+    end
+
+    struct OutOfBounds < Result
+    end
+
+    struct Blocked < Result
+    end
+
+    # NOTE: Result-returning APIs return `InvalidStep`, but bool ones return `false`.
+    struct InvalidStep < Result
+    end
+  end
+
+  struct Domain
+    def contains?(time : Time) : Bool
+      true
     end
   end
 end
