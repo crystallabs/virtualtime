@@ -3,7 +3,7 @@ require "../src/virtualtime"
 
 ITER = 50_000
 
-puts "TemporalSearch performance benchmarks ×#{ITER}"
+puts "VirtualTime::Search performance benchmarks ×#{ITER}"
 puts "Crystal #{Crystal::VERSION}"
 puts
 
@@ -18,7 +18,7 @@ puts
 Benchmark.bm do |bm|
   bm.report("Dense inverse search ×#{ITER}") do
     ITER.times do
-      VirtualTime::TemporalSearch.reachable_via_inverse_shift?(
+      VirtualTime::Search.is_shifted_from_base?(
         target,
         1.minute,
         max_shift: 1000.minutes,
@@ -31,7 +31,7 @@ Benchmark.bm do |bm|
 
   bm.report("Negative step search ×#{ITER}") do
     ITER.times do
-      VirtualTime::TemporalSearch.reachable_via_inverse_shift?(
+      VirtualTime::Search.is_shifted_from_base?(
         target,
         -1.minute,
         max_shift: 500.minutes,
@@ -49,7 +49,7 @@ Benchmark.bm do |bm|
           (base - 3.hours) <= t && t <= (base + 3.hours)
         end
 
-      VirtualTime::TemporalSearch.forward_delta(
+      VirtualTime::Search.shift_from_base(
         base,
         1.minute,
         max_shift: 1000.minutes,
@@ -61,7 +61,7 @@ Benchmark.bm do |bm|
 
   bm.report("Zero-hit search (early termination) ×#{ITER}") do
     ITER.times do
-      VirtualTime::TemporalSearch.reachable_via_inverse_shift?(
+      VirtualTime::Search.is_shifted_from_base?(
         target,
         1.minute,
         max_shift: 10.minutes,

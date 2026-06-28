@@ -98,7 +98,13 @@ class VirtualTime
       in Nil, Bool
         matches? b, a, max
       in Int
-        a.any? { |aa| aa == b }
+        # Ranges support O(1) membership tests; iterating them with `any?`
+        # would be O(n) and is catastrophic for large ranges (e.g. nanoseconds).
+        if a.is_a? Range(Int32, Int32)
+          a.includes? b
+        else
+          a.any? { |aa| aa == b }
+        end
       in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
         a.any? do |aa|
           bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
@@ -145,7 +151,7 @@ class VirtualTime
       if max && (a.begin < 0 || a.end < 0)
         ab = a.begin < 0 ? max + a.begin : a.begin
         ae = a.end < 0 ? max + a.end : a.end
-        ab..ae
+        Range.new ab, ae, a.exclusive?
       else
         a
       end
@@ -281,7 +287,7 @@ class VirtualTime
       if max && (allowed.begin < 0 || allowed.end < 0)
         ab = allowed.begin < 0 ? max + allowed.begin : allowed.begin
         ae = allowed.end < 0 ? max + allowed.end : allowed.end
-        allowed = ab..ae
+        allowed = Range.new ab, ae, allowed.exclusive?
       end
       if !strict || allowed.includes? wanted
       else
@@ -868,9 +874,10 @@ class VirtualTime
     end
   end
 
-  struct Domain
-    def contains?(time : Time) : Bool
-      true
-    end
+  # Extension point for bounding `Search` traversal to a set of acceptable
+  # `Time`s. Subclass and override `#contains?` to restrict the search; passing
+  # `domain: nil` (the default) disables the check entirely.
+  abstract struct Domain
+    abstract def contains?(time : Time) : Bool
   end
 end

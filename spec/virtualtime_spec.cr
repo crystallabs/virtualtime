@@ -1,6 +1,16 @@
 require "spec"
 require "../src/virtualtime"
 
+# Example custom search domain that accepts times up to (and including) a cutoff.
+struct CutoffDomain < VirtualTime::Domain
+  def initialize(@cutoff : Time)
+  end
+
+  def contains?(time : Time) : Bool
+    time <= @cutoff
+  end
+end
+
 # Simple shrinker for fuzzer-found problems:
 # try to reduce delta and step, then normalize time-of-day
 def shrink_case(
@@ -638,6 +648,77 @@ describe VirtualTime do
     vt.matches?((1...1), 1, nil).should be_false
   end
 
+  it "preserves range exclusivity when converting negative bounds" do
+    vt = VirtualTime.new
+    # `10...-1` with max 31 becomes `10...30` (exclusive), so 30 must not match
+    vt.matches?(10...(-1), 30, 31).should be_false
+    vt.matches?(10...(-1), 29, 31).should be_true
+    # The inclusive counterpart `10..-1` => `10..30` does match 30
+    vt.matches?(10..(-1), 30, 31).should be_true
+  end
+
+  it "matches large ranges via O(1) membership" do
+    vt = VirtualTime.new
+    # Regression: this used to iterate the whole range (O(n))
+    vt.matches?(0..999_999_999, 500_000_000, 1_000_000_000).should be_true
+    vt.matches?(0...999_999_999, 999_999_999, 1_000_000_000).should be_false
+  end
+
+  it "generates successive matching times via #succ" do
+    vt = VirtualTime.new
+    vt.hour = 10
+    vt.minute = 30
+    t = vt.succ(Time.local 2023, 1, 1, 9, 0, 0)
+    t.hour.should eq 10
+    t.minute.should eq 30
+    t.should be > Time.local(2023, 1, 1, 9, 0, 0)
+  end
+
+  it "iterates matching times via #step" do
+    vt = VirtualTime.new
+    vt.minute = 0
+    it = vt.step(1.hour, 1, Time.local(2023, 1, 1, 0, 0, 0))
+    times = Array(Time).new(3) { it.next.as(Time) }
+    times.map(&.hour).should eq [0, 1, 2]
+    times.all?(&.minute.==(0)).should be_true
+  end
+
+  it "creates a VirtualTime from a Time via .from_time" do
+    t = Time.local(2023, 3, 15, 14, 30, 45, location: Time::Location::UTC)
+    vt = VirtualTime.from_time(t)
+    vt.year.should eq 2023
+    vt.month.should eq 3
+    vt.day.should eq 15
+    vt.day_of_week.should eq 3
+    vt.day_of_year.should eq 74
+    vt.hour.should eq 14
+    vt.minute.should eq 30
+    vt.second.should eq 45
+    vt.nanosecond.should eq 0    # nanoseconds copied by default
+    vt.millisecond.should be_nil # milliseconds not copied by default
+    vt.matches?(t).should be_true
+  end
+
+  it "clears fields via clear!, clear_date! and clear_time!" do
+    t = Time.local(2023, 3, 15, 14, 30, 45, location: Time::Location::UTC)
+
+    vt = VirtualTime.from_time(t)
+    vt.clear_date!
+    vt.year.should be_nil
+    vt.day.should be_nil
+    vt.hour.should eq 14 # time part untouched
+
+    vt = VirtualTime.from_time(t)
+    vt.clear_time!
+    vt.hour.should be_nil
+    vt.second.should be_nil
+    vt.day.should eq 15 # date part untouched
+
+    vt = VirtualTime.from_time(t)
+    vt.clear!
+    vt.to_tuple.should eq({nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil, nil})
+  end
+
   describe VirtualTime::Search do
     describe ".shift_from_base" do
       it "returns zero-based forward delta to first unblocked time" do
@@ -692,6 +773,28 @@ describe VirtualTime do
         end
 
         delta.should eq VirtualTime::Result::InvalidStep.new
+      end
+
+      it "returns OutOfBounds when the candidate leaves the domain" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        # Always blocked, but the domain only permits the next 3 minutes,
+        # so the search bails out once a candidate leaves the domain.
+        result = VirtualTime::Search.shift_from_base(t0, 1.minute, domain: CutoffDomain.new(t0 + 3.minutes), max_shifts: 100) do |_|
+          true
+        end
+
+        result.should eq VirtualTime::Result::OutOfBounds.new
+      end
+
+      it "finds a candidate within the domain" do
+        t0 = Time.local(2023, 5, 10, 10, 0, 0)
+
+        result = VirtualTime::Search.shift_from_base(t0, 1.minute, domain: CutoffDomain.new(t0 + 30.minutes), max_shift: 5.minutes) do |t|
+          t < t0 + 2.minutes
+        end
+
+        result.should eq VirtualTime::Result::Found.new 2.minutes
       end
     end
 
