@@ -252,7 +252,7 @@ describe VirtualTime do
     time = Time.local year: 2020, month: 1, day: 15, location: Time::Location.load("Europe/Berlin")
     vt = VirtualTime.new location: Time::Location.load("America/New_York")
     time2 = vt.adjust_location time
-    time2.should eq time.in vt.location.not_nil!
+    time2.should eq time.in Time::Location.load("America/New_York")
   end
 
   it "raises when matching VTs with different locations" do
@@ -272,10 +272,47 @@ describe VirtualTime do
     vt = VirtualTime.new
     t = Time.local
     (vt == t).should be_true
-    (vt <=> t).should eq 1
+    (vt <=> t).should eq 0
     vt.year = 1970
     (vt == t).should be_false
-    (vt <=> t).should eq -1
+    (vt <=> t).should be_nil
+  end
+
+  it "does not order against Times (only equality is meaningful)" do
+    vt = VirtualTime.new
+    t = Time.local
+
+    # A match compares as equal, so strict ordering is false:
+    (vt < t).should be_false
+    (vt > t).should be_false
+    (vt <= t).should be_true
+    (vt >= t).should be_true
+
+    # A non-match has no defined ordering, so all ordering operators are false:
+    vt.year = 1970
+    (vt < t).should be_false
+    (vt > t).should be_false
+    (vt <= t).should be_false
+    (vt >= t).should be_false
+  end
+
+  it "#to_time preserves time-of-day when anchoring by week and day_of_week" do
+    loc = Time::Location.load("Europe/Berlin")
+    t = Time.local(2023, 5, 10, 10, 0, location: loc)
+    # A from_time VT has both week and day_of_week set, triggering the
+    # ISO-week anchoring path in #to_time.
+    vt = VirtualTime.from_time(t)
+
+    vt.to_time(t.at_beginning_of_day).should eq t
+    # Hint in January: the anchor walk crosses a DST boundary (2023-03-26),
+    # which must not disturb the materialized time part.
+    vt.to_time(Time.local(2023, 1, 1, location: loc)).should eq t
+  end
+
+  it "raises when deserializing a Proc from YAML" do
+    expect_raises(ArgumentError, /Procs cannot be deserialized/) do
+      VirtualTime.from_yaml %(---\nhour: "->(v : Int32) { true }"\n)
+    end
   end
 
   it "matches?(Nil, any, max)" do
@@ -596,8 +633,8 @@ describe VirtualTime do
 
   it "matches?(VirtualProc, Int, max)" do
     vt = VirtualTime.new
-    v_true = ->(v : Int32) { true }
-    v_false = ->(v : Int32) { false }
+    v_true = ->(_v : Int32) { true }
+    v_false = ->(_v : Int32) { false }
     v_ge_10 = ->(v : Int32) { v >= 10 }
 
     vt.matches?(v_true, 0, nil).should be_true
@@ -608,7 +645,7 @@ describe VirtualTime do
 
   it "can't do matches?(VirtualProc, VirtualProc, max)" do
     vt = VirtualTime.new
-    v_true = ->(v : Int32) { true }
+    v_true = ->(_v : Int32) { true }
     expect_raises(ArgumentError) {
       vt.matches? v_true, v_true
     }
@@ -618,7 +655,7 @@ describe VirtualTime do
     vt = VirtualTime.new
     vt.second = ->(v : Int32) { v > 10 }
     expect_raises(Exception) {
-      yaml = vt.to_yaml
+      vt.to_yaml
     }
     # vt2 = VirtualTime.from_yaml yaml
     # vt2.second.should be_a(Proc(Int32, Bool))
@@ -725,8 +762,8 @@ describe VirtualTime do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
 
         # Block exactly at t0, unblock at +2 minutes
-        delta = VirtualTime::Search.shift_from_base(t0, 1.minute, max_shift: nil, max_shifts: 10) do |t|
-          t <= t0 + 1.minute
+        delta = VirtualTime::Search.shift_from_base(t0, 1.minute, max_shift: nil, max_shifts: 10) do |time|
+          time <= t0 + 1.minute
         end
 
         delta.should eq VirtualTime::Result::Found.new 2.minutes
@@ -790,20 +827,20 @@ describe VirtualTime do
       it "finds a candidate within the domain" do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
 
-        result = VirtualTime::Search.shift_from_base(t0, 1.minute, domain: CutoffDomain.new(t0 + 30.minutes), max_shift: 5.minutes) do |t|
-          t < t0 + 2.minutes
+        result = VirtualTime::Search.shift_from_base(t0, 1.minute, domain: CutoffDomain.new(t0 + 30.minutes), max_shift: 5.minutes) do |time|
+          time < t0 + 2.minutes
         end
 
         result.should eq VirtualTime::Result::Found.new 2.minutes
       end
     end
 
-    describe ".is_shifted_from_base?" do
+    describe ".shifted_from_base?" do
       it "returns true when target is reachable via inverse shifting" do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
         target = t0 + 2.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 3.hours, max_shifts: 5) do |base|
+        reachable = VirtualTime::Search.shifted_from_base?(target, 1.hour, max_shift: 3.hours, max_shifts: 5) do |base|
           # Base is considered schedulable but shifted by +2h
           if base == t0
             2.hours
@@ -819,7 +856,7 @@ describe VirtualTime do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
         target = t0 + 5.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 10) do |base|
+        reachable = VirtualTime::Search.shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 10) do |base|
           # Only bases at least 5 hours away produce a shift,
           # which exceeds max_shift and must be rejected.
           if (target - base) >= 5.hours
@@ -836,7 +873,7 @@ describe VirtualTime do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
         target = t0 + 2.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
+        reachable = VirtualTime::Search.shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
           # Only the exact base produces the exact boundary delta.
           if base == t0
             2.hours
@@ -852,7 +889,7 @@ describe VirtualTime do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
         target = t0 + 1.hour
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, 30.minutes, max_shift: 2.hours, max_shifts: 5) do |_|
+        reachable = VirtualTime::Search.shifted_from_base?(target, 30.minutes, max_shift: 2.hours, max_shifts: 5) do |_|
           45.minutes
         end
 
@@ -863,7 +900,7 @@ describe VirtualTime do
         t0 = Time.local(2023, 5, 10, 10, 0, 0)
         target = t0 - 2.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
+        reachable = VirtualTime::Search.shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |base|
           # Only the exact base produces the exact negative boundary delta.
           if base == t0
             -2.hours
@@ -884,8 +921,8 @@ describe VirtualTime do
         # Two real hours later in absolute time, despite wall-clock jump
         target = base + 2.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |b|
-          if b == base
+        reachable = VirtualTime::Search.shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |candidate|
+          if candidate == base
             2.hours
           else
             nil
@@ -904,8 +941,8 @@ describe VirtualTime do
         # Two real hours earlier in absolute time
         target = base - 2.hours
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |b|
-          if b == base
+        reachable = VirtualTime::Search.shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |candidate|
+          if candidate == base
             -2.hours
           else
             nil
@@ -955,7 +992,7 @@ describe VirtualTime do
           max_shift = 3.minutes
           max_shifts = 5
 
-          reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |_|
+          reachable = VirtualTime::Search.shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |_|
             nil # No base ever produces a delta
           end
 
@@ -981,8 +1018,8 @@ describe VirtualTime do
           max_shifts = 10
 
           reachable =
-            VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
-              b == base ? delta : nil
+            VirtualTime::Search.shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |candidate|
+              candidate == base ? delta : nil
             end
 
           if reachable
@@ -1007,8 +1044,8 @@ describe VirtualTime do
           max_shift = 5.minutes
           max_shifts = 10
 
-          delta = VirtualTime::Search.shift_from_base(start, step, max_shift: max_shift, max_shifts: max_shifts) do |t|
-            t < start + blocked_for
+          delta = VirtualTime::Search.shift_from_base(start, step, max_shift: max_shift, max_shifts: max_shifts) do |time|
+            time < start + blocked_for
           end
 
           case delta
@@ -1052,8 +1089,8 @@ describe VirtualTime do
         delta = rng.rand(-6..6).minutes
         target = base + delta
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
-          b == base ? delta : nil
+        reachable = VirtualTime::Search.shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |candidate|
+          candidate == base ? delta : nil
         end
 
         if reachable && delta.abs > max_shift
@@ -1062,10 +1099,10 @@ describe VirtualTime do
       end
     rescue
       shrunk =
-        shrink_case(base, step, delta, max_shift, max_shifts) do |b, s, d|
-          t = b + d
+        shrink_case(base, step, delta, max_shift, max_shifts) do |shr_base, shr_step, shr_delta|
+          shr_target = shr_base + shr_delta
 
-          VirtualTime::Search.is_shifted_from_base?(t, s, max_shift: max_shift, max_shifts: max_shifts) { |bb| bb == b ? d : nil } && d.abs > max_shift
+          VirtualTime::Search.shifted_from_base?(shr_target, shr_step, max_shift: max_shift, max_shifts: max_shifts) { |candidate| candidate == shr_base ? shr_delta : nil } && shr_delta.abs > max_shift
         end
 
       message = "Search invariant failed. Shrunk failing case: base: #{shrunk[0]} step: #{shrunk[1]} delta: #{shrunk[2]} max_shift: #{max_shift}"
@@ -1082,7 +1119,7 @@ describe VirtualTime do
         "America/New_York",
         "America/Sao_Paulo",
         "Australia/Sydney",
-      ].map { |z| Time::Location.load(z) }
+      ].map { |zone| Time::Location.load(zone) }
 
       year = 2023
 
@@ -1123,8 +1160,8 @@ describe VirtualTime do
         max_shift = 6.minutes
         max_shifts = 10
 
-        reachable = VirtualTime::Search.is_shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |b|
-          b == base ? delta : nil
+        reachable = VirtualTime::Search.shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts) do |candidate|
+          candidate == base ? delta : nil
         end
 
         # Soundness invariant only

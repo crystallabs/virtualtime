@@ -103,15 +103,15 @@ class VirtualTime
         if a.is_a? Range(Int32, Int32)
           a.includes? b
         else
-          a.any? { |aa| aa == b }
+          a.any? { |e| e == b }
         end
       in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
-        a.any? do |aa|
+        a.any? do |e|
           bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
-          bb.any? { |bbb| aa == bbb }
+          bb.any? { |v| e == v }
         end
       in VirtualProc
-        a.any? { |aa| b.call(aa) }
+        a.any? { |e| b.call(e) }
       end
     in VirtualProc
       case b
@@ -131,7 +131,7 @@ class VirtualTime
   # At the moment, that includes converting negative values to offsets from end of range, reorganizing ranges so that begin <= end, and sorting Arrays and Sets.
   # If calling this function yourself, provide `max` whenever possible.
   @[AlwaysInline]
-  def adjust_value(a : Virtual, max)
+  def adjust_value(a : Virtual, max) # ameba:disable Metrics/CyclomaticComplexity
     case a
     in Nil, Bool, VirtualProc
       a
@@ -143,7 +143,7 @@ class VirtualTime
       end
     in Array(Int32), Set(Int32)
       if max
-        a.map { |aa| aa < 0 ? max + aa : aa }
+        a.map { |e| e < 0 ? max + e : e }
       else
         a.to_a
       end.sort
@@ -256,7 +256,7 @@ class VirtualTime
   # Materializes a particular value with the help of a wanted/hint value.
   # If 'strict' is true and some of the `wanted` fields would not `match?` VT's requirements,
   # they are replaced/overriden with the first/earliest value from the allowed range.
-  def materialize(allowed, wanted : Int, min, max = nil, strict = true)
+  def materialize(allowed, wanted : Int, min, max = nil, strict = true) # ameba:disable Metrics/CyclomaticComplexity
     allowed = adjust_value allowed, max
     wanted = adjust_value wanted, max
     carry = 0
@@ -319,7 +319,7 @@ class VirtualTime
 
   # Comparison with self
 
-  def ==(other : self)
+  def ==(other : self) # ameba:disable Metrics/CyclomaticComplexity
     (year == other.year) &&
       (month == other.month) &&
       (day == other.day) &&
@@ -339,16 +339,18 @@ class VirtualTime
   #
   # Alias for `matches?`.
   @[AlwaysInline]
-  def ==(time : TimeOrVirtualTime)
-    matches? time
+  def ==(other : TimeOrVirtualTime)
+    matches? other
   end
 
-  # Compares `VirtualTime` to `Time` instance
+  # Compares `VirtualTime` to `Time` instance.
+  #
+  # Returns `0` if the time matches the `VirtualTime`, and `nil` otherwise.
+  # A `VirtualTime` is a pattern without a meaningful position relative to a
+  # specific point in time, so ordering operators (`<`, `>`, `<=`, `>=`)
+  # always return `false` (`Comparable` semantics for an undefined ordering).
   def <=>(other : Time)
-    # This is one possible implementation:
-    # to_time(other) <=> other
-    # Another could be:
-    matches?(other) ? 1 : -1
+    matches?(other) ? 0 : nil
   end
 
   # "Rewinds" `day` forward enough to reach `acceptable_day`.
@@ -391,10 +393,14 @@ class VirtualTime
         year = time.year
         # ISO week 1 is the week containing Jan 4
         jan4 = Time.local(year, 1, 4, location: time.location)
-        week1_monday = jan4 - (jan4.day_of_week.to_i - 1).days
+        week1_monday = jan4.shift days: -(jan4.day_of_week.to_i - 1)
         target_week, _ = materialize week, time.calendar_week[1], 0, TimeHelper.weeks_in_year(time) + 1, strict
         target_dow, _ = materialize day_of_week, time.day_of_week.to_i, 1, 8, strict
-        time = week1_monday + (target_week - 1).weeks + (target_dow - 1).days
+        # Walk days with calendar arithmetic and rebuild the value with the
+        # already-materialized time-of-day, so that neither the walk itself
+        # nor DST transitions disturb the time part.
+        date = week1_monday.shift days: (target_week - 1) * 7 + (target_dow - 1)
+        time = Time.local(date.year, date.month, date.day, time.hour, time.minute, time.second, nanosecond: time.nanosecond, location: time.location)
       else # Apply incremental logic for partial constraints
         if week
           week_nr = time.calendar_week[1]
@@ -525,7 +531,7 @@ class VirtualTime
     def initialize(@virtualtime, @interval = 1.minute, @step = 1, @current = virtualtime.succ, @reached_end = false)
     end
 
-    def next
+    def next # ameba:disable Metrics/CyclomaticComplexity
       return stop if @reached_end
 
       end_value = nil
@@ -712,7 +718,7 @@ class VirtualTime
       parse_from node.value
     end
 
-    def self.parse_from(raw)
+    def self.parse_from(raw) # ameba:disable Metrics/CyclomaticComplexity
       value = raw.to_s.strip
 
       case value
@@ -735,8 +741,9 @@ class VirtualTime
       when /^(-?\d+)\.\.(-?\d+)$/
         $1.to_i..$2.to_i
       when /^->/
-        # XXX This one is here just to satisfy return type. It doesn't really work.
-        ->(_v : Int32) { true }
+        # Deserializing a Proc would silently produce a wrong (match-everything)
+        # rule, so it is explicitly not supported.
+        raise ArgumentError.new("Procs cannot be deserialized from YAML; set Proc-based values in code after loading")
       else
         raise ArgumentError.new("Invalid YAML input (#{value})")
       end
@@ -779,7 +786,7 @@ class VirtualTime
     # - max_shift bounds the returned delta (inclusive)
     # - max_shifts bounds the number of step applications (inclusive)
     # - stepping is done on Time values (DST-safe)
-    def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
+    def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result # ameba:disable Metrics/CyclomaticComplexity
       return Result::InvalidStep.new if step == 0.seconds
       return Result::OutOfBounds.new if max_shifts && max_shifts <= 0
 
@@ -817,7 +824,7 @@ class VirtualTime
     # - max_shift bounds the produced delta (inclusive)
     # - max_shifts bounds number of step applications (inclusive)
     # - stepping is done on Time values (DST-safe)
-    def self.is_shifted_from_base?(target : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32, &producer : Time -> Time::Span?) : Bool
+    def self.shifted_from_base?(target : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32, &producer : Time -> Time::Span?) : Bool
       return false if step == 0.seconds
       return false if max_shifts <= 0
 
@@ -848,6 +855,12 @@ class VirtualTime
         distance = target - current
         return false if distance.abs > effective_max_shift
       end
+    end
+
+    # :ditto:
+    @[Deprecated("Use `.shifted_from_base?` instead")]
+    def self.is_shifted_from_base?(target : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32, &producer : Time -> Time::Span?) : Bool # ameba:disable Naming/PredicateName
+      shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts, &producer)
     end
   end
 

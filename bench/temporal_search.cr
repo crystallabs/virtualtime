@@ -15,34 +15,34 @@ puts "Base time: #{base}"
 puts "Target:    #{target}"
 puts
 
-Benchmark.bm do |bm|
-  bm.report("Dense inverse search ×#{ITER}") do
+Benchmark.bm do |x|
+  x.report("Dense inverse search ×#{ITER}") do
     ITER.times do
-      VirtualTime::Search.is_shifted_from_base?(
+      VirtualTime::Search.shifted_from_base?(
         target,
         1.minute,
         max_shift: 1000.minutes,
         max_shifts: 1000
-      ) do |b|
-        b == base ? 1.hour : nil
+      ) do |candidate|
+        candidate == base ? 1.hour : nil
       end
     end
   end
 
-  bm.report("Negative step search ×#{ITER}") do
+  x.report("Negative step search ×#{ITER}") do
     ITER.times do
-      VirtualTime::Search.is_shifted_from_base?(
+      VirtualTime::Search.shifted_from_base?(
         target,
         -1.minute,
         max_shift: 500.minutes,
         max_shifts: 500
-      ) do |b|
-        b == base ? 1.hour : nil
+      ) do |candidate|
+        candidate == base ? 1.hour : nil
       end
     end
   end
 
-  bm.report("Blocked-window stress ×#{ITER}") do
+  x.report("Blocked-window stress ×#{ITER}") do
     ITER.times do
       blocked =
         ->(t : Time) do
@@ -59,9 +59,9 @@ Benchmark.bm do |bm|
     end
   end
 
-  bm.report("Zero-hit search (early termination) ×#{ITER}") do
+  x.report("Zero-hit search (early termination) ×#{ITER}") do
     ITER.times do
-      VirtualTime::Search.is_shifted_from_base?(
+      VirtualTime::Search.shifted_from_base?(
         target,
         1.minute,
         max_shift: 10.minutes,

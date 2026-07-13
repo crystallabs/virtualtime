@@ -1,0 +1,6 @@
+# Ameba configuration.
+#
+# TODO comments in the source are intentional development notes,
+# so the admonition rule is disabled.
+Documentation/DocumentationAdmonition:
+  Enabled: false
