@@ -24,5 +24,7 @@ jobs:
         run: crystal spec --order=random --error-on-warnings
       - name: Check formatting
         run: crystal tool format --check
+      - name: Build ameba
+        run: shards build ameba
       - name: Lint
         run: bin/ameba

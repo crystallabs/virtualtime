@@ -1,5 +1,5 @@
 name: virtualtime
-version: 1.6.0
+version: 1.6.1
 
 authors:
   - Davor Ocelic <docelic@crystallabs.io>
@@ -7,6 +7,13 @@ authors:
 crystal: ">= 1.19.0"
 
 license: AGPL-3.0
+
+# Ameba declares build targets but no `executables`, so installing it does not
+# by itself put a runnable binary in ./bin. Declaring it as a target here is the
+# flow Ameba's own README documents: `shards build ameba` compiles ./bin/ameba.
+targets:
+  ameba:
+    main: lib/ameba/bin/ameba.cr
 
 development_dependencies:
   ameba:
