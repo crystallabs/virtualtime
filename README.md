@@ -376,6 +376,38 @@ define a duration of e.g. 2.5 hours from 11:00 to 13:30.
 
 For such higher level constructs, see https://github.com/crystallabs/virtualdate.
 
+## Serialization
+
+`VirtualTime` includes `YAML::Serializable`, so `#to_yaml` and `.from_yaml` are
+available. Each field is written as a scalar, in one of these forms:
+
+| Value           | YAML          |
+|-----------------|---------------|
+| `nil`           | (field omitted) |
+| `true`/`false`  | `true`/`false`  |
+| `5`, `-1`       | `5`, `-1`       |
+| `[1, 2, -1]`    | `1,2,-1`        |
+| `10..20`        | `10..20`        |
+| `10...20`       | `10...20`       |
+| `(10..20).step(2)` | `10..20/2`   |
+| `Proc`          | not supported   |
+
+All forms round-trip, so `VirtualTime.from_yaml(vt.to_yaml).to_yaml == vt.to_yaml`.
+Note that a `Set(Int32)` is written in list form and reads back as an `Array(Int32)`.
+
+Procs cannot be serialized: `#to_yaml` raises rather than write a value that
+would silently read back as something else. Set Proc-valued fields in code after
+loading.
+
+```cr
+vt = VirtualTime.new
+vt.month = 3
+vt.day = [1, -1]
+vt.hour = (10..20).step 2
+
+vt.to_yaml # => "---\nmonth: 3\nday: 1,-1\nhour: 10..20/2\ndefault_match: true\n"
+```
+
 ## Tests
 
 Run `crystal spec` or just `crystal s`.

@@ -53,11 +53,11 @@ end
 describe VirtualTime do
   it "can be initialized" do
     vt = VirtualTime.new
-    vt.year.should eq nil
-    vt.month.should eq nil
-    vt.day.should eq nil
-    vt.day_of_week.should eq nil
-    vt.location.should eq nil
+    vt.year.should be_nil
+    vt.month.should be_nil
+    vt.day.should be_nil
+    vt.day_of_week.should be_nil
+    vt.location.should be_nil
   end
 
   it "supports all documented types of values" do
@@ -75,6 +75,30 @@ describe VirtualTime do
     vt = VirtualTime.new
     # year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
     vt.materialize(Time::UNIX_EPOCH).to_tuple.should eq({1970, 1, 1, nil, nil, nil, 0, 0, 0, nil, 0, nil})
+  end
+
+  it "carries location and default_match over when materializing" do
+    loc = Time::Location.load("Europe/Berlin")
+    hint = Time.local 2023, 5, 10, location: loc
+
+    vt = VirtualTime.new location: loc
+    vt.materialize(hint).location.should eq loc
+
+    # A `default_match?` of false needs every materialized field to be set,
+    # otherwise the VT is not materializable at all.
+    vt = VirtualTime.from_time hint
+    vt.default_match = false
+    vt.materialize(hint).default_match?.should be_false
+  end
+
+  it "honors strict when materializing" do
+    vt = VirtualTime.new day: 15
+    hint = Time.local 2023, 5, 10
+
+    # Strict (the default) snaps the hint up to the earliest allowed value
+    vt.materialize(hint).day.should eq 15
+    # Non-strict keeps the hint's own value
+    vt.materialize(hint, false).day.should eq 10
   end
 
   it "materializes respecting week and day_of_week constraints" do
@@ -196,7 +220,30 @@ describe VirtualTime do
     vt.second = true
     vt.location = Time::Location.load("Europe/Berlin")
     # vt.millisecond = ->( val : Int32) { true }
-    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10,12,14,16,18,20\nsecond: true\nlocation: Europe/Berlin\ndefault_match: true\n"
+    vt.to_yaml.should eq "---\nmonth: 3\nday: 1,2\nhour: 10..20\nminute: 10..20/2\nsecond: true\nlocation: Europe/Berlin\ndefault_match: true\n"
+  end
+
+  it "serializes a stepped range without consuming it" do
+    vt = VirtualTime.new
+    vt.minute = (10..20).step 2
+
+    # Regression: serializing used to iterate (and thereby exhaust) the
+    # iterator, so any later use of the value saw an empty sequence.
+    vt.to_yaml.should eq vt.to_yaml
+    vt.matches?(Time.local 2023, 1, 1, 0, 12).should be_true
+
+    # The step survives the round-trip, rather than degrading to a plain list
+    vt2 = VirtualTime.from_yaml vt.to_yaml
+    vt2.minute.should be_a Steppable::StepIterator(Int32, Int32, Int32)
+    vt2.matches?(Time.local 2023, 1, 1, 0, 12).should be_true
+    vt2.matches?(Time.local 2023, 1, 1, 0, 13).should be_false
+  end
+
+  it "serializes a wide stepped range compactly" do
+    vt = VirtualTime.new
+    # Listing the individual values would produce a ~100 MB document
+    vt.nanosecond = (0..999_999_999).step 10
+    vt.to_yaml.should eq "---\nnanosecond: 0..999999999/10\ndefault_match: true\n"
   end
 
   it "converts from YAML" do
@@ -204,9 +251,9 @@ describe VirtualTime do
     vt.month.should eq 3
     vt.day.should eq [1, 2]
     vt.hour.should eq 10..20
-    vt.second.should eq true
+    vt.second.should be_true
     vt.location.should eq Time::Location.load("Europe/Berlin")
-    vt.default_match?.should eq false
+    vt.default_match?.should be_false
   end
 
   it "does range comparison properly" do
@@ -646,17 +693,17 @@ describe VirtualTime do
   it "can't do matches?(VirtualProc, VirtualProc, max)" do
     vt = VirtualTime.new
     v_true = ->(_v : Int32) { true }
-    expect_raises(ArgumentError) {
+    expect_raises(ArgumentError) do
       vt.matches? v_true, v_true
-    }
+    end
   end
 
   it "does not support Proc serialization to YAML" do
     vt = VirtualTime.new
     vt.second = ->(v : Int32) { v > 10 }
-    expect_raises(Exception) {
+    expect_raises(Exception) do
       vt.to_yaml
-    }
+    end
     # vt2 = VirtualTime.from_yaml yaml
     # vt2.second.should be_a(Proc(Int32, Bool))
     # vt2.matches?(Time.local).should be_true # placeholder proc always true
@@ -699,6 +746,33 @@ describe VirtualTime do
     # Regression: this used to iterate the whole range (O(n))
     vt.matches?(0..999_999_999, 500_000_000, 1_000_000_000).should be_true
     vt.matches?(0...999_999_999, 999_999_999, 1_000_000_000).should be_false
+  end
+
+  it "intersects two large ranges without iterating them" do
+    vt = VirtualTime.new
+    # Regression: both sides used to be iterated, i.e. O(n*m)
+    vt.matches?(0..999_999_999, 500_000_000..600_000_000, 1_000_000_000).should be_true
+    vt.matches?(0..1_000, 500_000..600_000, 1_000_000_000).should be_false
+
+    # Exclusive bounds are respected on both sides
+    vt.matches?(0..10, 10..20, nil).should be_true
+    vt.matches?(0...10, 10..20, nil).should be_false
+    vt.matches?(0..10, 10...20, nil).should be_true
+    vt.matches?(0..10, (-1)...0, nil).should be_false
+
+    # A range that contains no values matches nothing
+    vt.matches?(1...1, 0..5, nil).should be_false
+    vt.matches?(0..5, 1...1, nil).should be_false
+  end
+
+  it "tests list members against a large range rather than iterating it" do
+    vt = VirtualTime.new
+    vt.matches?(0..999_999_999, [1_500_000_000, 500_000_000], nil).should be_true
+    vt.matches?(0..999_999_999, [1_500_000_000], nil).should be_false
+    vt.matches?([1_500_000_000], 0..999_999_999, nil).should be_false
+    vt.matches?([500_000_000], 0..999_999_999, nil).should be_true
+    vt.matches?(0..999_999_999, (0..999_999_999).step(250_000_000), nil).should be_true
+    vt.matches?(0..999_999_999, Set{1_500_000_000, 500_000_000}, nil).should be_true
   end
 
   it "generates successive matching times via #succ" do
@@ -844,8 +918,6 @@ describe VirtualTime do
           # Base is considered schedulable but shifted by +2h
           if base == t0
             2.hours
-          else
-            nil
           end
         end
 
@@ -861,8 +933,6 @@ describe VirtualTime do
           # which exceeds max_shift and must be rejected.
           if (target - base) >= 5.hours
             5.hours
-          else
-            nil
           end
         end
 
@@ -877,8 +947,6 @@ describe VirtualTime do
           # Only the exact base produces the exact boundary delta.
           if base == t0
             2.hours
-          else
-            nil
           end
         end
 
@@ -904,8 +972,6 @@ describe VirtualTime do
           # Only the exact base produces the exact negative boundary delta.
           if base == t0
             -2.hours
-          else
-            nil
           end
         end
 
@@ -924,8 +990,6 @@ describe VirtualTime do
         reachable = VirtualTime::Search.shifted_from_base?(target, 1.hour, max_shift: 2.hours, max_shifts: 5) do |candidate|
           if candidate == base
             2.hours
-          else
-            nil
           end
         end
 
@@ -944,8 +1008,6 @@ describe VirtualTime do
         reachable = VirtualTime::Search.shifted_from_base?(target, -1.hour, max_shift: 2.hours, max_shifts: 5) do |candidate|
           if candidate == base
             -2.hours
-          else
-            nil
           end
         end
 

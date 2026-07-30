@@ -4,3 +4,9 @@
 # so the admonition rule is disabled.
 Documentation/DocumentationAdmonition:
   Enabled: false
+
+# `alias Virtual` enumerates every value type a VirtualTime field accepts.
+# Spelling `Nil` out alongside the others documents that better than a trailing
+# `?` on a parenthesized union would.
+Style/VerboseNilType:
+  Enabled: false

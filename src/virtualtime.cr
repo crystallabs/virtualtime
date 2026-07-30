@@ -22,7 +22,7 @@ class VirtualTime
   macro virtual_time_property(*properties)
     {% for property in properties %}
       @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-      property {{property.id}} : Virtual # default comment or value
+      property {{ property.id }} : Virtual
     {% end %}
   end
 
@@ -106,9 +106,20 @@ class VirtualTime
           a.any? { |e| e == b }
         end
       in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
-        a.any? do |e|
-          bb = b.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) ? b.dup : b
-          bb.any? { |v| e == v }
+        # As above, never iterate a `Range`: test the other side's members
+        # against it, or intersect two ranges arithmetically.
+        if a.is_a? Range(Int32, Int32)
+          if b.is_a? Range(Int32, Int32)
+            RangeHelper.intersect? a, b
+          else
+            RangeHelper.restart(b).any? { |v| a.includes? v }
+          end
+        elsif b.is_a? Range(Int32, Int32)
+          a.any? { |e| b.includes? e }
+        else
+          # `b` is re-created per element of `a` because a StepIterator is
+          # consumed by iterating it.
+          a.any? { |e| RangeHelper.restart(b).any? { |v| e == v } }
         end
       in VirtualProc
         a.any? { |e| b.call(e) }
@@ -141,12 +152,20 @@ class VirtualTime
       else
         a
       end
-    in Array(Int32), Set(Int32)
-      if max
-        a.map { |e| e < 0 ? max + e : e }
+    in Array(Int32)
+      if max && a.any?(&.<(0))
+        a.map { |e| e < 0 ? max + e : e }.sort!
       else
-        a.to_a
-      end.sort
+        # Nothing to adjust; return the list itself rather than allocating a
+        # sorted copy on every match.
+        ArrayHelper.sorted?(a) ? a : a.sort
+      end
+    in Set(Int32)
+      if max && a.any?(&.<(0))
+        a.map { |e| e < 0 ? max + e : e }.sort!
+      else
+        a.to_a.sort!
+      end
     in Range(Int32, Int32)
       if max && (a.begin < 0 || a.end < 0)
         ab = a.begin < 0 ? max + a.begin : a.begin
@@ -218,16 +237,20 @@ class VirtualTime
   # Time: year, month, day, calendar_week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond, location
 
   # Returns a new, "materialized" VirtualTime, i.e. an object where all fields have "materialized"/specific values
+  #
+  # `#location` and `#default_match?` are carried over to the new object; the
+  # week number, day of week, and day of year are left unset, since they are
+  # implied by the materialized date.
   def materialize(hint = Time.local.at_beginning_of_minute, strict = true)
-    self.class.new **materialize_with_hint(hint)
+    self.class.new **materialize_with_hint(hint, strict: strict), location: location, default_match: default_match?
   end
 
   # Materializes VT and returns fields needed to create a `Time` object.
   # This function does not check that the materialized values match the week number, day of week, and day of year constraints.
   # If you need those values checked, use `#to_time`.
-  def materialize_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
-    _nanosecond, _second, _minute, _hour, carry = materialize_time_with_hint time, carry
-    _day, _month, _year, carry = materialize_date_with_hint time, carry
+  def materialize_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
+    _nanosecond, _second, _minute, _hour, carry = materialize_time_with_hint time, carry, strict
+    _day, _month, _year, carry = materialize_date_with_hint time, carry, strict
 
     # if carry > 0
     #  raise ArgumentError.new "Cannot find compliant materialized time"
@@ -237,19 +260,19 @@ class VirtualTime
   end
 
   # Materializes date part of current VT
-  def materialize_date_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
-    _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1)
-    _month, carry = materialize(month, time.month + carry, 1, 13)
-    _year, carry = materialize(year, time.year + carry, 1, 10_000)
+  def materialize_date_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
+    _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1, strict)
+    _month, carry = materialize(month, time.month + carry, 1, 13, strict)
+    _year, carry = materialize(year, time.year + carry, 1, 10_000, strict)
     {_day, _month, _year, carry}
   end
 
   # Materializes time part of current VT
-  def materialize_time_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0)
-    _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000)
-    _second, carry = materialize(second, time.second + carry, 0, 60)
-    _minute, carry = materialize(minute, time.minute + carry, 0, 60)
-    _hour, carry = materialize(hour, time.hour + carry, 0, 24)
+  def materialize_time_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
+    _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000, strict)
+    _second, carry = materialize(second, time.second + carry, 0, 60, strict)
+    _minute, carry = materialize(minute, time.minute + carry, 0, 60, strict)
+    _hour, carry = materialize(hour, time.hour + carry, 0, 24, strict)
     {_nanosecond, _second, _minute, _hour, carry}
   end
 
@@ -319,7 +342,7 @@ class VirtualTime
 
   # Comparison with self
 
-  def ==(other : self) # ameba:disable Metrics/CyclomaticComplexity
+  def ==(other : self)
     (year == other.year) &&
       (month == other.month) &&
       (day == other.day) &&
@@ -377,12 +400,7 @@ class VirtualTime
   # possibly by doing multiple iterations to find a suitable date. The process is limited to
   # some max attempts of trying to find a value that simultaneously satisfies all constraints.
   def to_time(hint = Time.local.at_beginning_of_minute, strict = true)
-    begin
-      timespec = materialize_with_hint hint
-      time = Time.local **timespec, location: hint.location
-    rescue e : ArgumentError
-      raise ArgumentError.new "#{inspect} with hint #{hint} produced an invalid Time #{timespec} (#{e.message})"
-    end
+    time = materialize_to_time hint, strict
     max_tries = 100
     tries = 0
 
@@ -390,9 +408,8 @@ class VirtualTime
       tries += 1
 
       if week && day_of_week # Anchor deterministically using ISO week rules
-        year = time.year
         # ISO week 1 is the week containing Jan 4
-        jan4 = Time.local(year, 1, 4, location: time.location)
+        jan4 = Time.local(time.year, 1, 4, location: time.location)
         week1_monday = jan4.shift days: -(jan4.day_of_week.to_i - 1)
         target_week, _ = materialize week, time.calendar_week[1], 0, TimeHelper.weeks_in_year(time) + 1, strict
         target_dow, _ = materialize day_of_week, time.day_of_week.to_i, 1, 8, strict
@@ -408,15 +425,15 @@ class VirtualTime
           time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
         end
         if day_of_week
-          day = time.day_of_week.to_i
-          value, _ = materialize(day_of_week, day, 1, 8, strict)
-          time += adjust_day(day, value, 7)
+          current_dow = time.day_of_week.to_i
+          value, _ = materialize(day_of_week, current_dow, 1, 8, strict)
+          time += adjust_day(current_dow, value, 7)
         end
       end
 
-      day = time.day_of_year
-      value, _ = materialize(day_of_year, day, 1, TimeHelper.days_in_year(time) + 1, strict)
-      time += adjust_day(day, value, TimeHelper.days_in_year(time))
+      current_doy = time.day_of_year
+      value, _ = materialize(day_of_year, current_doy, 1, TimeHelper.days_in_year(time) + 1, strict)
+      time += adjust_day(current_doy, value, TimeHelper.days_in_year(time))
 
       break if matches_date?(time)
 
@@ -430,6 +447,15 @@ class VirtualTime
     end
 
     time
+  end
+
+  # Materializes `self` into a `Time`, ignoring the week number, day of week,
+  # and day of year constraints (which `#to_time` goes on to satisfy).
+  private def materialize_to_time(hint : Time, strict : Bool) : Time
+    timespec = materialize_with_hint hint, strict: strict
+    Time.local **timespec, location: hint.location
+  rescue e : ArgumentError
+    raise ArgumentError.new "#{inspect} with hint #{hint} could not be materialized into a Time (#{e.message})"
   end
 
   # Creates `VirtualTime` from `Time`.
@@ -531,48 +557,26 @@ class VirtualTime
     def initialize(@virtualtime, @interval = 1.minute, @step = 1, @current = virtualtime.succ, @reached_end = false)
     end
 
-    def next # ameba:disable Metrics/CyclomaticComplexity
+    def next
       return stop if @reached_end
 
-      end_value = nil
-
+      # The initial value is produced by `#initialize` (via `VirtualTime#succ`),
+      # so the first call yields it rather than advancing.
       if @at_start
         @at_start = false
-
-        if end_value
-          if @current >= end_value
-            @reached_end = true
-            return stop
-          end
-        end
-
         return @current
       end
 
-      if end_value.nil? || @current < end_value
-        if end_value && (@current >= end_value)
-          @reached_end = true
-          return stop
-        end
-
-        @step.times do
-          begin
-            @current = @virtualtime.succ @current + @interval - 1.nanosecond # Or: - (@current.to_unix_ns % @interval.total_nanoseconds.to_i64 + 1).nanoseconds
-          rescue ArgumentError
-            end_value = @current
-          end
-        end
-
-        if end_value && (@current >= end_value)
-          @reached_end = true
-          stop
-        else
-          @current
-        end
-      else
+      @step.times do
+        break if @reached_end
+        # Or: - (@current.to_unix_ns % @interval.total_nanoseconds.to_i64 + 1).nanoseconds
+        @current = @virtualtime.succ @current + @interval - 1.nanosecond
+      rescue ArgumentError
+        # No further Time satisfies the VT's constraints
         @reached_end = true
-        stop
       end
+
+      @reached_end ? stop : @current
     end
   end
 
@@ -655,12 +659,53 @@ class VirtualTime
     end
   end
 
+  module RangeHelper
+    # Returns the last value included in `range`, or `nil` if it contains no values.
+    def self.last(range : Range(Int32, Int32)) : Int32?
+      last = range.exclusive? ? range.end - 1 : range.end
+      last < range.begin ? nil : last
+    end
+
+    # Returns whether the two ranges have at least one value in common.
+    #
+    # This is the O(1) counterpart of intersecting them by iteration, which
+    # matters because VirtualTime ranges can be enormous (e.g. nanoseconds).
+    def self.intersect?(a : Range(Int32, Int32), b : Range(Int32, Int32)) : Bool
+      a_last, b_last = last(a), last(b)
+      return false unless a_last && b_last
+      (a.begin <= b_last) && (b.begin <= a_last)
+    end
+
+    # Returns `value` ready to be iterated from its first element.
+    #
+    # `Steppable::StepIterator`s are stateful and are consumed by iteration,
+    # so they must be copied before every traversal; everything else is
+    # returned as-is.
+    def self.restart(value : Steppable::StepIterator(Int32, Int32, Int32))
+      value.dup
+    end
+
+    # :ditto:
+    def self.restart(value)
+      value
+    end
+  end
+
   module ArrayHelper
+    # Returns whether `list` is in ascending order.
+    #
+    # Used to skip allocating a sorted copy of a list that is already sorted,
+    # which is the common case for hand-written rules like `day: [1, 15]`.
+    def self.sorted?(list : Array(Int32)) : Bool
+      list.each_cons_pair { |x, y| return false if x > y }
+      true
+    end
+
     # Expands ranges and other expandable types into a long list of all possible options.
     # E.g. [1, 2..3, 4..5] gets expanded into [[1, 2, 4], [1,2, 5], [1,3,4], [1,3,5]].
     # Used only for convenience in tests.
     def self.expand(list)
-      Indexable.cartesian_product list.map { |e|
+      options = list.map do |e|
         case e
         when Array
           e
@@ -669,7 +714,9 @@ class VirtualTime
         else
           [e]
         end
-      }
+      end
+
+      Indexable.cartesian_product options
     end
   end
 
@@ -677,31 +724,23 @@ class VirtualTime
   class VirtualConverter
     def self.to_yaml(value : VirtualTime::Virtual, yaml : YAML::Nodes::Builder)
       case value
-      # when Nil
-      #  # Nils are ignored; they default to nil in constructor if/when a value is missing
-      #  yaml.scalar "nil"
+      # Nils are ignored; they default to nil in the constructor if/when a value is missing
       when Bool
         yaml.scalar value
-        # This case wont match
       when Int
         yaml.scalar value
       when Range(Int32, Int32)
-        # TODO seems there is no support for range with step?
-        yaml.scalar value # .begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
+        # `Range#to_s` already renders both `..` and `...` correctly
+        yaml.scalar value
+      when Steppable::StepIterator(Int32, Int32, Int32)
+        # Emitted in the `begin..end/step` form that `.parse_from` accepts, so
+        # that the step survives the round-trip. Listing the individual values
+        # instead would both lose the step and, for a wide range, produce an
+        # enormous document. Note that the iterator must not be traversed here:
+        # it is stateful, and doing so would consume the value being saved.
+        yaml.scalar "#{value.current}#{value.exclusive ? "..." : ".."}#{value.limit}/#{value.step}"
       when Array(Int32), Set(Int32)
         yaml.scalar value.join ","
-      when Enumerable
-        # The IF is here to workaround a bug in Crystal <= 0.23:
-        # https://github.com/crystal-lang/crystal/issues/4684
-        # if value.class == Range(Int32, Int32)
-        #  value = value.unsafe_as Range(Int32, Int32)
-        #  yaml.scalar value # .begin.to_s+ ".."+ (value.exclusive? ? value.end- 1 : value.end).to_s
-        # else
-        # Done in this way because in Crystal <= 0.23 there is
-        # no way to detect a step once it's set:
-        # https://github.com/crystal-lang/crystal/issues/4695
-        yaml.scalar value.join ","
-        # end
       else
         raise "Cannot convert #{value.class} to YAML"
       end
@@ -718,7 +757,7 @@ class VirtualTime
       parse_from node.value
     end
 
-    def self.parse_from(raw) # ameba:disable Metrics/CyclomaticComplexity
+    def self.parse_from(raw)
       value = raw.to_s.strip
 
       case value
@@ -778,15 +817,20 @@ class VirtualTime
     # (successor behavior: first candidate is base + step).
     #
     # Returns:
-    # - Time::Span delta to the first unblocked candidate
-    # - false if bounds are exceeded
+    # - `Result::Found` holding the Time::Span delta to the first unblocked candidate
+    # - `Result::OutOfBounds` / `Result::Blocked` if the respective bound is exceeded
+    # - `Result::InvalidStep` if `step` is zero
     #
     # Notes:
     # - step must be non-zero
     # - max_shift bounds the returned delta (inclusive)
     # - max_shifts bounds the number of step applications (inclusive)
     # - stepping is done on Time values (DST-safe)
-    def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result # ameba:disable Metrics/CyclomaticComplexity
+    # - the search is only as bounded as its arguments: if `domain`, `max_shift`,
+    #   and `max_shifts` are all nil and every candidate is blocked, it never
+    #   returns. Supply at least one bound unless the block is certain to
+    #   eventually accept a candidate.
+    def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
       return Result::InvalidStep.new if step == 0.seconds
       return Result::OutOfBounds.new if max_shifts && max_shifts <= 0
 
@@ -812,8 +856,6 @@ class VirtualTime
           return Result::Found.new(delta)
         end
       end
-
-      Result::Blocked.new
     end
 
     # Inverse reachability check: determine backwards whether `target` can be obtained as `base + delta`,
