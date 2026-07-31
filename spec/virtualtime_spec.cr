@@ -356,6 +356,198 @@ describe VirtualTime do
     vt.to_time(Time.local(2023, 1, 1, location: loc)).should eq t
   end
 
+  it "#to_time materializes a day that the hint's own month cannot hold" do
+    utc = Time::Location::UTC
+
+    # Regression: `day` was sized by the hint's month, so a hint in February
+    # produced February 31 and `Time.local` raised
+    vt = VirtualTime.new day: 31, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.to_time(Time.local(2024, 2, 28, location: utc)).should eq Time.local(2024, 3, 31, location: utc)
+
+    # A day that only some Februaries hold, reached from a non-leap year
+    vt = VirtualTime.new month: 2, day: 29, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.to_time(Time.local(2023, 1, 1, location: utc)).should eq Time.local(2024, 2, 29, location: utc)
+
+    # A negative day counts from the end of the month it lands in, not the hint's
+    vt = VirtualTime.new month: 2, day: -1, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.to_time(Time.local(2023, 1, 1, location: utc)).should eq Time.local(2023, 2, 28, location: utc)
+
+    # A day no month ever holds stays an error
+    vt = VirtualTime.new month: 4, day: 31
+    expect_raises(ArgumentError) { vt.to_time(Time.local(2023, 1, 1, location: utc)) }
+  end
+
+  it "materializes a `day` counted from the end of the month it lands in" do
+    utc = Time::Location::UTC
+
+    # Regression: the day was sized by the hint's month and kept even when the
+    # month then carried forward, so it named a real but wrong day -- `-26` is
+    # the 6th of a 31-day month but the 3rd of a 28-day one
+    vt = VirtualTime.new day: -26, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.succ(Time.local(2022, 1, 18, location: utc)).should eq Time.local(2022, 2, 3, location: utc)
+
+    # Every month in turn, each with its own last-but-one day
+    vt = VirtualTime.new day: -2, hour: 0, minute: 0, second: 0, nanosecond: 0
+    t = Time.local(2023, 1, 31, location: utc)
+    [Time.local(2023, 2, 27, location: utc), Time.local(2023, 3, 30, location: utc), Time.local(2023, 4, 29, location: utc)].each do |expected|
+      t = vt.succ t
+      t.should eq expected
+    end
+  end
+
+  it "counts weeks per ISO year rather than per weekday asked about" do
+    utc = Time::Location::UTC
+
+    # Regression: `weeks_in_year` mixed the last day of the year's ordinal with
+    # the *queried* date's day of week, so the same year reported 52 or 53
+    # depending on which date it was asked about
+    {2020 => 53, 2021 => 52}.each do |year, weeks|
+      (1..12).each do |month|
+        VirtualTime::TimeHelper.weeks_in_year(Time.local(year, month, 15, location: utc)).should eq weeks
+      end
+    end
+
+    # So `week: -1` covers exactly the seven days of the year's last ISO week
+    vt = VirtualTime.new week: -1
+    start = Time.local(2019, 12, 20, location: utc)
+    matched = (0...16).map { |offset| start.shift(days: offset) }.select { |time| vt.matches? time }
+    matched.size.should eq 7
+    matched.first.should eq Time.local(2019, 12, 23, location: utc)
+    matched.map { |time| time.calendar_week[1] }.uniq!.should eq [52]
+  end
+
+  it "materializes a `millisecond` requirement into the nanosecond" do
+    utc = Time::Location::UTC
+    hint = Time.local(2023, 1, 1, location: utc)
+
+    # Regression: `millisecond` was matched but never materialized -- a `Time`
+    # has no millisecond of its own, so the rule could not be satisfied and
+    # `#to_time` produced a value the VirtualTime did not match
+    vt = VirtualTime.new millisecond: 500
+    t = vt.to_time hint
+    t.nanosecond.should eq 500_000_000
+    vt.matches?(t).should be_true
+
+    # Moving the millisecond leaves the finer part behind it at zero, and
+    # carries into the second when it has to wrap
+    vt = VirtualTime.new millisecond: [0, 500], second: 0
+    vt.to_time(Time.local(2023, 1, 1, 0, 0, 0, nanosecond: 250_000_123, location: utc))
+      .should eq Time.local(2023, 1, 1, 0, 0, 0, nanosecond: 500_000_000, location: utc)
+  end
+
+  it "#succ never returns a time at or before the one asked for" do
+    utc = Time::Location::UTC
+
+    # Regression: the ISO-week anchor was computed within the hint's own year,
+    # so a target week already behind the hint produced a time in the past
+    vt = VirtualTime.new week: 10, day_of_week: 3, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.succ(Time.local(2023, 5, 10, 13, 37, location: utc)).should eq Time.local(2024, 3, 6, location: utc)
+
+    vt = VirtualTime.new week: 1, day_of_week: 1, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.succ(Time.local(2020, 12, 28, location: utc)).should eq Time.local(2021, 1, 4, location: utc)
+
+    # A week without a day of week lands on a day of that week, going forward
+    vt = VirtualTime.new week: 29, day: 18, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.succ(Time.local(2023, 1, 26, 14, 51, location: utc)).should eq Time.local(2023, 7, 18, location: utc)
+  end
+
+  it "#to_time keeps searching past a day that a single day step cannot reach" do
+    utc = Time::Location::UTC
+
+    # Regression: the retry loop advanced one day at a time without
+    # re-materializing, so 100 attempts fell far short of the next December 25
+    # that is a Friday
+    vt = VirtualTime.new month: 12, day: 25, day_of_week: 5, hour: 0, minute: 0, second: 0, nanosecond: 0
+    vt.succ(Time.local(2023, 1, 1, location: utc)).should eq Time.local(2026, 12, 25, location: utc)
+  end
+
+  it "#to_time keeps the time of day across a DST transition" do
+    ny = Time::Location.load("America/New_York")
+
+    # Regression: days were added as an exact `Time::Span`, so a walk over the
+    # DST forward transition moved the wall clock out of the wanted hour
+    vt = VirtualTime.new day_of_week: 1, hour: 2..4, minute: 0, second: 0, nanosecond: 0
+    t = vt.succ(Time.local(2022, 11, 4, location: ny))
+    vt.matches?(t).should be_true
+    t.should eq Time.local(2022, 11, 7, 2, 0, location: ny)
+
+    # A time of day inside the spring-forward gap does not exist on that date,
+    # so the next date that does have it is used
+    vt = VirtualTime.new hour: 2, minute: 30, second: 0, nanosecond: 0
+    t = vt.succ(Time.local(2023, 3, 12, 0, 0, location: ny))
+    vt.matches?(t).should be_true
+    t.should eq Time.local(2023, 3, 13, 2, 30, location: ny)
+  end
+
+  it "materializes in its own location, whatever zone the hint is in" do
+    berlin = Time::Location.load("Europe/Berlin")
+    utc = Time::Location::UTC
+
+    vt = VirtualTime.new hour: 10, minute: 0, second: 0, nanosecond: 0, location: berlin
+    hint = Time.local(2023, 5, 10, 0, 0, 0, location: utc)
+
+    # Regression: field values are read in the VirtualTime's own location by
+    # `#matches?` but were materialized in the hint's, so 10:00 UTC came out --
+    # a time that is 12:00 in Berlin and so does not match at all
+    t = vt.to_time hint
+    t.should eq Time.local(2023, 5, 10, 10, 0, location: berlin)
+    vt.matches?(t).should be_true
+
+    vt.materialize(hint).hour.should eq 10
+
+    # Without a location of its own the hint's zone still propagates
+    plain = VirtualTime.new hour: 10, minute: 0, second: 0, nanosecond: 0
+    plain.to_time(hint).location.should eq utc
+  end
+
+  it "hashes consistently with #==" do
+    vt = VirtualTime.new month: 3, day: [1, 2], hour: 10..12
+    same = VirtualTime.new month: 3, day: [1, 2], hour: 10..12
+
+    # Regression: `#==` was overridden without `#hash`, so equal VirtualTimes
+    # landed in different buckets and a `Set` kept both of them
+    (vt == same).should be_true
+    vt.hash.should eq same.hash
+    Set{vt, same}.size.should eq 1
+    {vt => :marker}[same]?.should eq :marker
+
+    VirtualTime.new(hour: 10..12).hash.should_not eq VirtualTime.new(hour: 10...12).hash
+  end
+
+  it "rejects a #step that would not advance" do
+    vt = VirtualTime.new minute: 0, second: 0, nanosecond: 0
+
+    # Regression: these produced an iterator that handed back the same Time
+    # forever, or -- for a negative interval -- walked backwards
+    expect_raises(ArgumentError, /interval must be positive/) { vt.step(0.seconds) }
+    expect_raises(ArgumentError, /interval must be positive/) { vt.step(-1.hour) }
+    expect_raises(ArgumentError, /`by` must be positive/) { vt.step(1.hour, 0) }
+  end
+
+  it "refuses to materialize a value that allows nothing" do
+    hint = Time.local(2023, 1, 1, location: Time::Location::UTC)
+
+    # Regression: an empty range materialized to its `begin`, handing back a
+    # Time the VirtualTime does not match
+    expect_raises(ArgumentError, /empty range/) do
+      VirtualTime.new(hour: 5...5).to_time hint
+    end
+
+    expect_raises(ArgumentError, /empty list/) do
+      VirtualTime.new(hour: [] of Int32).to_time hint
+    end
+  end
+
+  it "keeps a `false` field through a YAML round-trip" do
+    vt = VirtualTime.new hour: false, minute: 5
+
+    # Regression: `YAML::Serializable` tests a converter-backed property for
+    # truthiness, so `false` ("never match") was written out as null and read
+    # back as nil ("match anything")
+    vt.to_yaml.should contain "hour: false"
+    VirtualTime.from_yaml(vt.to_yaml).hour.should be_false
+  end
+
   it "raises when deserializing a Proc from YAML" do
     expect_raises(ArgumentError, /Procs cannot be deserialized/) do
       VirtualTime.from_yaml %(---\nhour: "->(v : Int32) { true }"\n)

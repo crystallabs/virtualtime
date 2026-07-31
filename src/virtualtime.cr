@@ -6,8 +6,8 @@ end
 
 class VirtualTime
   VERSION_MAJOR    = 1
-  VERSION_MINOR    = 6
-  VERSION_REVISION = 1
+  VERSION_MINOR    = 7
+  VERSION_REVISION = 0
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
   include Comparable(Time)
@@ -26,6 +26,9 @@ class VirtualTime
     {% end %}
   end
 
+  # Names of the value-carrying properties, in the order they are serialized
+  FIELDS = %w[year month day week day_of_week day_of_year hour minute second millisecond nanosecond]
+
   virtual_time_property year, month, day, week, day_of_week, day_of_year, hour, minute, second, millisecond, nanosecond
 
   # Location/timezone in which to perform matching, if any
@@ -34,6 +37,34 @@ class VirtualTime
 
   # Instance-default match result if one of field values matched is `nil`
   property? default_match : Bool = true
+
+  # Writes `self` as a YAML mapping.
+  #
+  # The mapping is built here rather than generated because
+  # `YAML::Serializable` tests a converter-backed property for truthiness
+  # before handing it to the converter: a field set to `false` (never match)
+  # would be written out as null and read back as `nil` (match anything),
+  # inverting the rule. Reading still goes through `VirtualConverter`, which
+  # the `@[YAML::Field]` annotations above take care of.
+  def to_yaml(yaml : YAML::Nodes::Builder)
+    yaml.mapping(reference: self) do
+      {% for field in FIELDS %}
+        value = @{{ field.id }}
+        unless value.nil?
+          yaml.scalar {{ field }}
+          VirtualConverter.to_yaml value, yaml
+        end
+      {% end %}
+
+      if loc = @location
+        yaml.scalar "location"
+        TimeLocationConverter.to_yaml loc, yaml
+      end
+
+      yaml.scalar "default_match"
+      @default_match.to_yaml yaml
+    end
+  end
 
   def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil, @default_match = true)
   end
@@ -242,6 +273,12 @@ class VirtualTime
   # week number, day of week, and day of year are left unset, since they are
   # implied by the materialized date.
   def materialize(hint = Time.local.at_beginning_of_minute, strict = true)
+    # The new object carries this one's location, so the values filled in from
+    # the hint have to be read in that same zone -- as `#to_time` does too.
+    if (loc = location) && hint.location != loc
+      hint = hint.in loc
+    end
+
     self.class.new **materialize_with_hint(hint, strict: strict), location: location, default_match: default_match?
   end
 
@@ -270,10 +307,29 @@ class VirtualTime
   # Materializes time part of current VT
   def materialize_time_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
     _nanosecond, carry = materialize(nanosecond, time.nanosecond + carry, 0, 1_000_000_000, strict)
+    _nanosecond, carry = materialize_millisecond(_nanosecond, carry, strict)
     _second, carry = materialize(second, time.second + carry, 0, 60, strict)
     _minute, carry = materialize(minute, time.minute + carry, 0, 60, strict)
     _hour, carry = materialize(hour, time.hour + carry, 0, 24, strict)
     {_nanosecond, _second, _minute, _hour, carry}
+  end
+
+  # Folds a `#millisecond` requirement into an already-materialized nanosecond.
+  #
+  # A `Time` has no millisecond of its own -- `Time#millisecond` is just the
+  # leading three digits of its nanosecond -- so a millisecond requirement can
+  # only be met by choosing a suitable nanosecond. When the millisecond has to
+  # move, the sub-millisecond remainder restarts at zero, the same way a
+  # `#minute` that moves leaves the seconds behind it at zero.
+  private def materialize_millisecond(_nanosecond : Int, carry : Int, strict : Bool)
+    return {_nanosecond, carry} unless millisecond
+
+    wanted = _nanosecond // 1_000_000
+    value, ms_carry = materialize(millisecond, wanted, 0, 1_000, strict)
+
+    return {_nanosecond, carry} if value == wanted && ms_carry == 0
+
+    {value * 1_000_000, carry + ms_carry}
   end
 
   # Materializes a particular value with the help of a wanted/hint value.
@@ -312,6 +368,11 @@ class VirtualTime
         ae = allowed.end < 0 ? max + allowed.end : allowed.end
         allowed = Range.new ab, ae, allowed.exclusive?
       end
+      # An empty range (e.g. `5...5`) permits nothing, so materializing it to
+      # its `begin` would hand back a value the VirtualTime does not match.
+      if RangeHelper.last(allowed).nil?
+        raise ArgumentError.new "A VirtualTime with empty range value `#{allowed}` isn't materializable."
+      end
       if !strict || allowed.includes? wanted
       else
         carry += max && (wanted > allowed.begin) ? 1 : 0
@@ -321,6 +382,10 @@ class VirtualTime
     in Enumerable(Int32)
       adjust_wanted_re_max
       allowed = allowed.dup.to_a
+      # :ditto: for an empty list or a stepped range that yields no values
+      if allowed.empty?
+        raise ArgumentError.new "A VirtualTime with an empty list of allowed values isn't materializable."
+      end
       if max && allowed.any?(&.<(0))
         allowed = allowed.map { |e| e < 0 ? max + e : e }
       end
@@ -355,6 +420,10 @@ class VirtualTime
       (millisecond == other.millisecond) &&
       (nanosecond == other.nanosecond)
   end
+
+  # Hashes the same fields `#==` compares, so that two `VirtualTime`s that
+  # compare equal also land in the same `Hash` bucket and dedupe in a `Set`.
+  def_hash @year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond
 
   # Comparison and conversion to and from time
 
@@ -391,6 +460,16 @@ class VirtualTime
     amount.days
   end
 
+  # Returns `time` moved by whole days, keeping its time of day.
+  #
+  # Adding a `Time::Span` would instead add an exact duration, which shifts the
+  # wall clock by an hour whenever the span crosses a DST transition -- enough
+  # to move the result out of an `#hour` or `#minute` the VirtualTime requires.
+  @[AlwaysInline]
+  private def shift_days(time : Time, span : Time::Span) : Time
+    time.shift days: span.days
+  end
+
   # Converts a VirtualTime to a specific Time object that matches the VirtualTime.
   #
   # Value is converted using a time hint, which defaults to the current time.
@@ -400,6 +479,14 @@ class VirtualTime
   # possibly by doing multiple iterations to find a suitable date. The process is limited to
   # some max attempts of trying to find a value that simultaneously satisfies all constraints.
   def to_time(hint = Time.local.at_beginning_of_minute, strict = true)
+    # The field values are expressed in the VirtualTime's own location, so that
+    # is where they have to be materialized; `#matches?` converts the time it is
+    # given the same way round. Without a location of its own, the hint's zone
+    # is used and propagates to the result.
+    if (loc = location) && hint.location != loc
+      hint = hint.in loc
+    end
+
     time = materialize_to_time hint, strict
     max_tries = 100
     tries = 0
@@ -407,55 +494,161 @@ class VirtualTime
     loop do
       tries += 1
 
-      if week && day_of_week # Anchor deterministically using ISO week rules
-        # ISO week 1 is the week containing Jan 4
-        jan4 = Time.local(time.year, 1, 4, location: time.location)
-        week1_monday = jan4.shift days: -(jan4.day_of_week.to_i - 1)
-        target_week, _ = materialize week, time.calendar_week[1], 0, TimeHelper.weeks_in_year(time) + 1, strict
-        target_dow, _ = materialize day_of_week, time.day_of_week.to_i, 1, 8, strict
-        # Walk days with calendar arithmetic and rebuild the value with the
-        # already-materialized time-of-day, so that neither the walk itself
-        # nor DST transitions disturb the time part.
-        date = week1_monday.shift days: (target_week - 1) * 7 + (target_dow - 1)
-        time = Time.local(date.year, date.month, date.day, time.hour, time.minute, time.second, nanosecond: time.nanosecond, location: time.location)
-      else # Apply incremental logic for partial constraints
-        if week
-          week_nr = time.calendar_week[1]
-          value, _ = materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
-          time += adjust_day(week_nr, value, TimeHelper.weeks_in_year(time)) * 7
-        end
+      # Anchor deterministically using ISO week rules
+      if week
+        week_nr = time.calendar_week[1]
+        target_week, _ = materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, strict)
+
         if day_of_week
-          current_dow = time.day_of_week.to_i
-          value, _ = materialize(day_of_week, current_dow, 1, 8, strict)
-          time += adjust_day(current_dow, value, 7)
+          target_dow, _ = materialize(day_of_week, time.day_of_week.to_i, 1, 8, strict)
+          time = anchor_to_iso_week time, target_week, target_dow - 1
+        elsif week_nr != target_week
+          # No day of week to hit, so land on the first day of the target week.
+          # Staying put when already inside it keeps any day of the month or day
+          # of year value that already holds from being disturbed.
+          time = anchor_to_iso_week time, target_week, 0
         end
+      elsif day_of_week # Apply incremental logic for a partial constraint
+        current_dow = time.day_of_week.to_i
+        value, _ = materialize(day_of_week, current_dow, 1, 8, strict)
+        time = shift_days time, adjust_day(current_dow, value, 7)
       end
 
       current_doy = time.day_of_year
       value, _ = materialize(day_of_year, current_doy, 1, TimeHelper.days_in_year(time) + 1, strict)
-      time += adjust_day(current_doy, value, TimeHelper.days_in_year(time))
+      time = shift_days time, adjust_day(current_doy, value, TimeHelper.days_in_year(time))
 
-      break if matches_date?(time)
+      # `matches_time?` catches a day walk that landed the materialized time of
+      # day on a date where it does not exist, i.e. inside a DST gap. Under
+      # `strict: false` the time of day is the hint's own and is not expected to
+      # satisfy the VirtualTime in the first place.
+      break if matches_date?(time) && (!strict || matches_time?(time))
 
       if tries >= max_tries
         # TODO maybe some other error, not arg err
-        raise ArgumentError.new "Could not find a date that satisfies week number, day of week, and day of year after #{max_tries} iterations (reached #{time})"
+        raise ArgumentError.new "Could not find a Time that satisfies all of #{inspect} after #{max_tries} iterations (reached #{time})"
       end
 
-      # If it didn't match, then since we are only checking for days in this loop, advance by 1 day and retry.
-      time += 1.day
+      # It didn't match, so retry from the next day. The day is re-materialized
+      # rather than merely incremented, so that the year/month/day constraints
+      # snap forward to their next allowed combination in one go; crawling day
+      # by day would exhaust `max_tries` long before reaching e.g. the next
+      # December 25 that falls on a Friday.
+      time = materialize_to_time shift_days(time, 1.day), strict
     end
 
     time
   end
 
+  # Returns `time` moved onto day `day_offset` (0 for Monday) of ISO week
+  # `target_week`, keeping its time of day.
+  #
+  # The anchor is a position within a calendar year, and the target week of the
+  # year `time` falls in may well be behind it already (e.g. week 10 when
+  # `time` is in May). Since materialization only ever moves forward, a
+  # following year's anchor is used in that case.
+  private def anchor_to_iso_week(time : Time, target_week : Int, day_offset : Int) : Time
+    year = time.year
+
+    # An anchor a year later is (nearly) a year in the future, so at most a
+    # couple of them can precede `time`.
+    3.times do
+      # ISO week 1 is the week containing Jan 4
+      jan4 = Time.local(year, 1, 4, location: time.location)
+      week1_monday = jan4.shift days: -(jan4.day_of_week.to_i - 1)
+      # Walk days with calendar arithmetic and rebuild the value with the
+      # already-materialized time-of-day, so that neither the walk itself
+      # nor DST transitions disturb the time part.
+      date = week1_monday.shift days: (target_week - 1) * 7 + day_offset
+      candidate = Time.local(date.year, date.month, date.day, time.hour, time.minute, time.second, nanosecond: time.nanosecond, location: time.location)
+
+      return candidate if candidate >= time
+
+      year += 1
+    end
+
+    # Every anchor tried lies in the past; leave `time` alone and let the caller
+    # advance it.
+    time
+  end
+
+  # Number of hints `#materialize_to_time` tries before giving up on finding a
+  # month in which the materialized date exists.
+  MAX_MATERIALIZE_TRIES = 100
+
   # Materializes `self` into a `Time`, ignoring the week number, day of week,
   # and day of year constraints (which `#to_time` goes on to satisfy).
+  #
+  # A `day` is sized by the month it ends up in -- `-1` is the last day of the
+  # month, and `31` exists only in 31-day months -- yet the month is itself
+  # known only after the day has been materialized and its carry applied. A
+  # pass therefore sizes the day by the *hint's* month, and can both name a
+  # date that does not exist (February 31) and, for a rule counting from the
+  # end of a month, name the wrong day of a perfectly real one (`-2` is the
+  # 30th of January but the 27th of February). Either way the hint is moved
+  # onto the month that pass arrived at and the materialization is repeated
+  # with the day sized by that month; if the day does not fit there either, the
+  # search moves on to the next month.
+  #
+  # A time of day can be missing from a date in the same way: a DST forward
+  # transition leaves a gap of local times that never occur, and `Time.local`
+  # silently resolves those to a neighbouring instant whose fields are no
+  # longer the ones materialized. Those retry from just past the gap.
   private def materialize_to_time(hint : Time, strict : Bool) : Time
-    timespec = materialize_with_hint hint, strict: strict
-    Time.local **timespec, location: hint.location
+    original_hint = hint
+    tries = 0
+
+    loop do
+      timespec = materialize_with_hint hint, strict: strict
+      _year, _month, _day = timespec[:year], timespec[:month], timespec[:day]
+
+      # A year or month outside `Time`'s own range is not something another
+      # hint could fix, so it is passed on to `Time.local` to report.
+      if !((1..9999).includes?(_year) && (1..12).includes?(_month)) || day_fits_month?(_day, _month, _year)
+        time = Time.local **timespec, location: hint.location
+
+        return time if exists_as_local?(time, timespec)
+
+        tries += 1
+        raise ArgumentError.new "no time of day matching #{timespec} exists in #{MAX_MATERIALIZE_TRIES} attempts" if tries >= MAX_MATERIALIZE_TRIES
+
+        # An hour is the widest DST gap in use, so this always clears it
+        hint = time + 1.hour
+        next
+      end
+
+      tries += 1
+      if tries >= MAX_MATERIALIZE_TRIES
+        raise ArgumentError.new "no month in which day #{_day} is the wanted one was found in #{MAX_MATERIALIZE_TRIES} attempts"
+      end
+
+      first_of_month = Time.local(_year, _month, 1, location: hint.location)
+      # Re-sizing the day by the month this pass reached only helps if that is
+      # a later month than the hint's own; otherwise move on by a month.
+      hint = first_of_month > hint ? first_of_month : first_of_month.shift(months: 1)
+    end
   rescue e : ArgumentError
-    raise ArgumentError.new "#{inspect} with hint #{hint} could not be materialized into a Time (#{e.message})"
+    raise ArgumentError.new "#{inspect} with hint #{original_hint} could not be materialized into a Time (#{e.message})"
+  end
+
+  # Returns whether `_day` exists in the given month and is what `#day` asks
+  # for once sized by it.
+  @[AlwaysInline]
+  private def day_fits_month?(_day : Int, _month : Int, _year : Int) : Bool
+    days = Time.days_in_month _year, _month
+    return false unless (1..days).includes? _day
+    # A nil `day` accepts whatever the hint supplied; asking `#matches?` would
+    # consult `#default_match?`, which has no say over an unconstrained field
+    # that materialization has already filled in.
+    day.nil? || matches?(day, _day, days + 1)
+  end
+
+  # Returns whether `time` really carries the date and time `timespec` asked
+  # for, i.e. whether that local time exists in `time`'s location at all.
+  @[AlwaysInline]
+  private def exists_as_local?(time : Time, timespec) : Bool
+    time.year == timespec[:year] && time.month == timespec[:month] && time.day == timespec[:day] &&
+      time.hour == timespec[:hour] && time.minute == timespec[:minute] && time.second == timespec[:second]
   end
 
   # Creates `VirtualTime` from `Time`.
@@ -536,7 +729,15 @@ class VirtualTime
   end
 
   # Returns Iterator
+  #
+  # `interval` is how far past the last match the search for the next one
+  # resumes, and `by` is how many matches each `#next` advances by. Both have
+  # to be positive: a zero `interval` or `by` would make the iterator hand back
+  # the same `Time` forever, and a negative `interval` would walk backwards.
   def step(interval = 1.minute, by = 1, from = Time.local.at_end_of_minute) : Iterator
+    raise ArgumentError.new "Step interval must be positive, got #{interval}" unless interval > Time::Span.zero
+    raise ArgumentError.new "Step `by` must be positive, got #{by}" unless by > 0
+
     from = succ from
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
@@ -583,17 +784,18 @@ class VirtualTime
   # Helper methods below
 
   module TimeHelper
-    # Returns number of weeks in a year.
-    # It is calculated as number of Mondays in the year up to the ordinal date.
+    # Returns the number of weeks (52 or 53) in the ISO year that `time` falls in.
     #
-    # Thus it is possible for this function to return value of `53` (53th week in a year) for up to 4 last days in the current year.
-    # That is, for Dec 28-31. An example of such year was 2020.
+    # Note that this is the ISO year, which is what `Time#calendar_week` (and
+    # therefore `.week`) counts weeks within: the first days of January can
+    # still belong to the previous ISO year, and the last days of December to
+    # the next one.
     #
-    # In other words, value `53` will be seen if January 1 of next year is on a Friday, or the year was a leap year.
-    #
-    # The calculation is identical as the first part of `Time#calendar_week`.
+    # A year has 53 weeks when it begins on a Thursday, or when it is a leap
+    # year beginning on a Wednesday. 2020 was such a year.
     def self.weeks_in_year(time : Time)
-      (time.at_end_of_year.day_of_year - time.day_of_week.to_i + 10) // 7
+      # December 28 is always in the last ISO week of its own year
+      Time.local(time.calendar_week[0], 12, 28, location: time.location).calendar_week[1]
     end
 
     # :nodoc:
@@ -601,14 +803,15 @@ class VirtualTime
       0
     end
 
-    # Returns current week of year.
+    # Returns the week of the year `time` falls in, counted within that
+    # calendar year rather than within the ISO year.
     #
-    # This function returns a value in range 0..53.
+    # This function returns a value in range 0..53. Up to the first 3 days of a
+    # year (Jan 1-3) may return value 0, meaning they are in the new calendar
+    # year but belong to a week that started on Monday in the previous one.
     #
-    # Up to first 3 days of a year (Jan 1-3) may return value 0. This means they are in the new year, but technically they belong to a week that started on Monday in the previous year.
-    # Week number 53 means January 1 is on a Friday, or the year was a leap year.
-    #
-    # The calculation is identical as the first part of `Time#calendar_week`.
+    # NOTE: matching (and therefore `VirtualTime#week`) uses `.week` instead,
+    # which is the ISO week and numbers those same days 52 or 53, never 0.
     def self.week_of_year(time)
       (time.day_of_year - time.day_of_week.to_i + 10) // 7
     end
@@ -623,7 +826,7 @@ class VirtualTime
       0
     end
 
-    # Returns week number (0..53) of specified `time`
+    # Returns ISO week number (1..53) of specified `time`
     def self.week(time : Time)
       time.calendar_week[1].to_i
     end
@@ -818,7 +1021,8 @@ class VirtualTime
     #
     # Returns:
     # - `Result::Found` holding the Time::Span delta to the first unblocked candidate
-    # - `Result::OutOfBounds` / `Result::Blocked` if the respective bound is exceeded
+    # - `Result::Blocked` if `max_shifts` is exhausted before a candidate is accepted
+    # - `Result::OutOfBounds` if `max_shift` or `domain` is exceeded
     # - `Result::InvalidStep` if `step` is zero
     #
     # Notes:
@@ -832,7 +1036,9 @@ class VirtualTime
     #   eventually accept a candidate.
     def self.shift_from_base(base : Time, step : Time::Span, *, domain : Domain? = nil, max_shift : Time::Span? = nil, max_shifts : Int32? = nil, &blocked : Time -> Bool) : Result::Result
       return Result::InvalidStep.new if step == 0.seconds
-      return Result::OutOfBounds.new if max_shifts && max_shifts <= 0
+      # No shift is permitted at all, which is the `max_shifts` bound being
+      # exhausted before the first candidate rather than a bound on distance.
+      return Result::Blocked.new if max_shifts && max_shifts <= 0
 
       current = base
       delta = Time::Span.zero

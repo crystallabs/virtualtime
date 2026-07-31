@@ -138,7 +138,7 @@ All VirtualTime instances contain the following properties:
 1. **Year** (0..9999)
 1. **Month** (1..12)
 1. **Day** (1..31)
-1. **Week number of year** (0..53)
+1. **Week number of year** (1..53, ISO 8601)
 1. **Day of week** (1..7, Monday == 1)
 1. **Day of year** (1..366)
 1. **Hour** (0..23)
@@ -208,16 +208,20 @@ Very useful!
 
 ### Week Numbers
 
-Another interesting case are week numbers, which are calculated as number of Mondays in the year.
-The first Monday in a year starts week number 1. But not every year starts on Monday, so up to
-the first 3 days of a new year can still technically belong to the last week of the previous year.
+Another interesting case are week numbers, which follow ISO 8601 (the same numbering
+Crystal's `Time#calendar_week` produces). Weeks start on Monday, and week 1 is the week
+containing January 4. But not every year starts on Monday, so up to the first 3 days of a
+new year can still belong to the last week of the previous year — and, likewise, up to the
+last 3 days of a year can already belong to week 1 of the next one.
 
-Therefore, this field can have values between 0 and 53 inclusively.
-Value 53 indicates a week that has started in one year (53rd Monday seen in a year),
-but at least one (and up to 3) of its days will surely overflow into the new year.
+Therefore, this field can have values between 1 and 53 inclusively. Value 53 indicates the
+last week of a year that has 53 of them (one that begins on a Thursday, or a leap year
+beginning on a Wednesday), and at least one (and up to 3) of its days will surely overflow
+into the new year.
 
-Similarly, a week number 0 matches up to the first 3 days (which inevitably must be Friday, Saturday,
-and/or Sunday) of the new year that belong to the week started in the previous year.
+Since weeks are counted within the ISO year and not the calendar year, the first days of
+January belonging to the previous year's last week match `week: 52` or `week: 53` — never
+`week: 0`, which matches nothing.
 
 Note 1: if you want to match the first or last 7 days of a year irrespective of weeks, you
 should use `day: 1..7` or `day: -7..-1` instead of `week: 1` or `week: -1`.
