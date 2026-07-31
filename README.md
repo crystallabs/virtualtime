@@ -330,7 +330,7 @@ vt.hour = 0
 hint = Time.local # 2023-12-09 12:56:26.837441132 +01:00 Local
 
 vt.materialize(hint).to_tuple # => {2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil}
-p vt.to_time(hint) # => 2018-02-15 00:56:26.837441132 +01:00 Local
+p vt.to_time(hint) # => 2018-12-15 00:56:26.837441132+01:00[Europe/Berlin]
 ```
 
 If not specified, the time hint defaults to `Time.local.at_beginning_of_minute`.

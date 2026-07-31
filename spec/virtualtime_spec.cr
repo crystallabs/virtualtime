@@ -479,6 +479,25 @@ describe VirtualTime do
     t.should eq Time.local(2023, 3, 13, 2, 30, location: ny)
   end
 
+  it "anchors a week within the ISO year, not the calendar one" do
+    utc = Time::Location::UTC
+
+    # Regression: the anchor started from the calendar year while the week
+    # number counts within the ISO year, so any date whose two years differ --
+    # the first days of January, the last of December -- was a year out and
+    # could not be resolved at all
+    [Time.local(2021, 1, 1, location: utc), Time.local(2021, 1, 3, location: utc),
+     Time.local(2019, 12, 30, location: utc), Time.local(2023, 1, 1, location: utc)].each do |time|
+      VirtualTime.from_time(time).to_time(time).should eq time
+    end
+
+    # The README's own example: week 53 of 2026 ends on January 3 2027
+    vt = VirtualTime.new week: 53, day_of_week: 7, hour: 0, minute: 0, second: 0, nanosecond: 0
+    resolved = vt.succ(Time.local(2026, 6, 1, location: utc))
+    resolved.should eq Time.local(2027, 1, 3, location: utc)
+    resolved.calendar_week.should eq({2026, 53})
+  end
+
   it "materializes in its own location, whatever zone the hint is in" do
     berlin = Time::Location.load("Europe/Berlin")
     utc = Time::Location::UTC

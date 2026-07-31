@@ -548,7 +548,10 @@ class VirtualTime
   # `time` is in May). Since materialization only ever moves forward, a
   # following year's anchor is used in that case.
   private def anchor_to_iso_week(time : Time, target_week : Int, day_offset : Int) : Time
-    year = time.year
+    # The ISO year, not the calendar one: week numbers are counted within it,
+    # and the two part company around New Year. January 3 2021 sits in week 53
+    # of ISO year 2020, and anchoring that week to 2021 would land a year out.
+    year = time.calendar_week[0]
 
     # An anchor a year later is (nearly) a year in the future, so at most a
     # couple of them can precede `time`.
