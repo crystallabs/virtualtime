@@ -6,7 +6,7 @@ end
 
 class VirtualTime
   VERSION_MAJOR    = 1
-  VERSION_MINOR    = 7
+  VERSION_MINOR    = 8
   VERSION_REVISION = 0
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
