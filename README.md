@@ -117,16 +117,16 @@ vti = vt.step(interval = 1.day, by = 1, from: Time.unix(0))
   p vti.next
 end
 
-2020-01-25 00:00:00.000000001+01:00Z
-2020-02-22 00:00:00.000000001+01:00Z
-2020-03-28 00:00:00.000000001+01:00Z
-2020-04-25 01:00:00.000000001+02:00Z
-2020-05-30 01:00:00.000000001+02:00Z
-2020-06-27 01:00:00.000000001+02:00Z
-2020-07-25 01:00:00.000000001+02:00Z
-2020-08-29 01:00:00.000000001+02:00Z
-2020-09-26 01:00:00.000000001+02:00Z
-2020-10-24 01:00:00.000000001+02:00Z
+2020-01-25 00:00:00Z
+2020-02-22 00:00:00Z
+2020-03-28 00:00:00Z
+2020-04-25 00:00:00Z
+2020-05-30 00:00:00Z
+2020-06-27 00:00:00Z
+2020-07-25 00:00:00Z
+2020-08-29 00:00:00Z
+2020-09-26 00:00:00Z
+2020-10-24 00:00:00Z
 ```
 
 Now let's take a look at implementation details.
@@ -199,12 +199,17 @@ It is also possible to use negative values in ranges, as explained next.
 Crystal allows one to define `Range`s that have `end` value smaller than `begin`.
 Such objects will simply not contain any elements.
 
-Because creating such ranges *is* allowed, VirtualTime detects such cases and creates
-copies of objects with values converted to positive and in the correct order.
+Because negative values *are* allowed, VirtualTime creates copies of such objects with
+the values converted to their positive equivalents before comparing.
 
 In other words, if you specify a range of say, `day: (10..-7).step(2)`, this will properly
 match every other day from 10th to a day 7 days before the end of a particular month.
 Very useful!
+
+Note that the endpoints are converted but never swapped: a range that still ends before it
+begins after conversion contains no elements and so matches nothing. Wrapping ranges are
+not supported, so `hour: -1..1` is an empty rule rather than "23:00 through 01:00" — write
+that as `hour: [23, 0, 1]`, or as two separate rules.
 
 ### Week Numbers
 

@@ -416,6 +416,953 @@ describe VirtualTime do
     matched.map { |time| time.calendar_week[1] }.uniq!.should eq [52]
   end
 
+  it "keeps the iterator advancing and both sides of a DST fall-back" do
+    berlin = Time::Location.load("Europe/Berlin")
+    new_york = Time::Location.load("America/New_York")
+
+    # Regression: an ambiguous wall clock let `#to_time` answer with an instant
+    # *before* the hint, and `#step` then repeated it for ever
+    vt = VirtualTime.new hour: 1, minute: 30..59, second: 0..59, nanosecond: 0..999_999_999, location: new_york
+    ambiguous = Time.utc(2022, 11, 6, 6, 30, 0).in(new_york) # 01:30 -05:00, the second of two
+    vt.to_time(ambiguous).should eq ambiguous
+    vt.succ(ambiguous).should be > ambiguous
+
+    # A rule whose only match is in the past cannot produce a successor, and an
+    # iterator must end rather than hand back the same value for ever
+    past = VirtualTime.new year: 2000, month: 1, day: 1, hour: 0, minute: 0, second: 0, nanosecond: 0
+    expect_raises(ArgumentError, /no match after/) do
+      past.succ(Time.local(2024, 1, 1, location: berlin))
+    end
+
+    # Every minute of a whole year is generated exactly once, DST and all
+    vt = VirtualTime.new minute: 30, second: 0, nanosecond: 0, location: berlin
+    from = Time.local(2024, 1, 1, location: berlin)
+    to = Time.local(2025, 1, 1, location: berlin)
+
+    generated = [] of Time
+    iterator = vt.step(1.minute, 1, from - 1.nanosecond)
+    loop do
+      value = iterator.next
+      break unless value.is_a?(Time)
+      break if value >= to
+      generated << value
+    end
+
+    expected = [] of Time
+    time = from
+    while time < to
+      expected << time if vt.matches? time
+      time += 1.minute
+    end
+
+    generated.should eq expected
+  end
+
+  it "produces both sides of a DST fall-back whatever the rule looks like" do
+    # Regression: the repeat was recovered by trying the single candidate one
+    # fold earlier, which only lands right when the next materialized match
+    # happens to be exactly a fold later
+    berlin = Time::Location.load("Europe/Berlin")
+    vt = VirtualTime.new hour: 2, minute: 30, second: 0, nanosecond: 0, location: berlin
+    first = Time.utc(2023, 10, 29, 0, 30, 0).in(berlin)  # 02:30 +02:00
+    second = Time.utc(2023, 10, 29, 1, 30, 0).in(berlin) # 02:30 +01:00
+
+    vt.matches?(first).should be_true
+    vt.matches?(second).should be_true
+    vt.succ(first).should eq second
+
+    # And the fold step is read off the zone rather than assumed to be an hour
+    lord_howe = Time::Location.load("Australia/Lord_Howe")
+    half = VirtualTime.new minute: 30, second: 0, nanosecond: 0, location: lord_howe
+    from = Time.local(2023, 4, 2, 0, 0, 0, location: lord_howe)
+
+    generated = [] of Time
+    iterator = half.step(1.minute, 1, from - 1.nanosecond)
+    loop do
+      value = iterator.next
+      break unless value.is_a?(Time)
+      break if value >= from + 1.day
+      generated << value
+    end
+
+    expected = [] of Time
+    time = from
+    while time < from + 1.day
+      expected << time if half.matches? time
+      time += 1.minute
+    end
+
+    generated.should eq expected
+  end
+
+  it "keeps the day walk on the day it asked for across a DST gap" do
+    # Regression: the walk moves whole days and keeps the time of day, and a
+    # wall clock a spring-forward swallowed came back as a neighbouring one --
+    # in Santiago's case on the day before. The date that answered was then
+    # rejected, the retry inherited the mangled time of day as its floor, and
+    # a whole matching day was stepped over
+    berlin = Time::Location.load "Europe/Berlin"
+    vt = VirtualTime.new day_of_week: [7, 1], hour: 2, minute: 39, second: 0, nanosecond: 0
+    vt.location = berlin
+
+    # 2020-03-29 02:39 does not exist in Berlin; Monday the 30th does
+    expected = Time.local(2020, 3, 30, 2, 39, 0, location: berlin)
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.local(2020, 3, 26, 0, 0, 0, location: berlin)).should eq expected
+
+    # Santiago's gap is at midnight, so the walk resolved backwards over the
+    # date boundary and abandoned the target day outright
+    santiago = Time::Location.load "America/Santiago"
+    sunday = VirtualTime.new day_of_week: 7, second: 0, nanosecond: 0
+    sunday.location = santiago
+
+    first = Time.local(2027, 9, 5, 1, 0, 0, location: santiago)
+    sunday.matches?(first).should be_true
+    sunday.to_time(Time.local(2027, 9, 2, 0, 0, 0, location: santiago)).should eq first
+    sunday.succ(Time.local(2027, 9, 1, 23, 59, 0, location: santiago)).should eq first
+
+    # And a gap on the day materialization landed on must not follow it onto
+    # the next one, where the wall clock it displaced exists again
+    monday = VirtualTime.new day_of_week: 1, second: 0, nanosecond: 0
+    monday.location = santiago
+    monday.succ(Time.local(2018, 8, 11, 23, 59, 0, location: santiago))
+      .should eq Time.local(2018, 8, 13, 0, 0, 0, location: santiago)
+  end
+
+  it "resolves a negative week against the ISO year it lands in, in a list too" do
+    # Regression: `#anchor_to_iso_week` re-resolved the week per candidate year
+    # but went on asking from the *original* week number. A negative week is 52
+    # in one year and 53 in the next, so the stale number was itself allowed in
+    # the following year -- and answered instead of that year's earliest week
+    vt = VirtualTime.new week: [32, -2], hour: 0, minute: 0, second: 0, nanosecond: 0
+
+    expected = Time.utc(2020, 8, 3)
+    vt.matches?(expected).should be_true
+    vt.succ(Time.utc(2019, 12, 22)).should eq expected
+  end
+
+  it "resolves a negative day of year against the year it lands in" do
+    # Regression: the wrap into the following year sized the wanted day by the
+    # year being left behind, which is a day out whenever a leap year is
+    # crossed -- so every year after a leap year was skipped
+    vt = VirtualTime.new day_of_year: -4, hour: 0, minute: 0, second: 0, nanosecond: 0
+
+    expected = Time.utc(2021, 12, 28)
+    vt.matches?(expected).should be_true
+    vt.succ(Time.utc(2020, 12, 28)).should eq expected
+  end
+
+  it "restarts the time of day when the date walk moves the date" do
+    # Regression: `#materialize_with_hint` rewinds the finer fields when a
+    # coarser one advances, but the week / day-of-week / day-of-year walks run
+    # afterwards and moved the date without re-asking for the time of day. The
+    # hour was picked while the date was still the hint's own
+    vt = VirtualTime.new
+    vt.year = 2021
+    vt.month = 5
+    vt.day = 1..31
+    vt.week = 1..53
+    vt.day_of_week = 4
+    vt.day_of_year = 1..366
+    vt.hour = [3, 9]
+    vt.minute = 11
+    vt.second = 0
+    vt.millisecond = 0
+    vt.nanosecond = 0
+
+    expected = Time.utc(2021, 5, 6, 3, 11)
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2021, 5, 1, 8, 40)).should eq expected
+
+    # Where the restarted time of day is missing from the date -- a DST gap --
+    # the date still keeps whatever it matches later on
+    santiago = Time::Location.load "America/Santiago"
+    gapped = VirtualTime.new day_of_week: 7, hour: [0, 16], minute: 12, second: 0, nanosecond: 0
+    gapped.location = santiago
+
+    # Sunday 2021-09-05 has no 00:12 in Santiago, but it does have 16:12
+    later = Time.local(2021, 9, 5, 16, 12, 0, location: santiago)
+    gapped.matches?(later).should be_true
+    gapped.to_time(Time.local(2021, 9, 3, 13, 13, 0, location: santiago)).should eq later
+  end
+
+  it "keeps matching commutative when the two sides disagree on default_match" do
+    # Regression: an unconstrained field was judged by the *receiver's*
+    # `#default_match?` whichever side it came from, so which of the two was
+    # asked decided the answer -- against the README's own claim
+    a = VirtualTime.new hour: 5, default_match: false
+    b = VirtualTime.new month: 3
+
+    a.matches?(b).should eq b.matches?(a)
+    a.matches?(b).should be_false
+
+    # An unconstrained field on a permissive side still lets a constrained one
+    # on the other through, whichever way round it is asked
+    c = VirtualTime.new hour: 5
+    d = VirtualTime.new month: 3
+    c.matches?(d).should be_true
+    d.matches?(c).should be_true
+  end
+
+  it "reports that nothing matches rather than wrapping past the calendar" do
+    # Regression: the year carried past 9999 wrapped modularly like the cyclic
+    # fields below it, answering a question about year 10000 with year 1
+    expect_raises ArgumentError, /within the calendar/ do
+      VirtualTime.new(month: 1, day: 1).to_time Time.utc(9999, 6, 1)
+    end
+
+    # A `#year` naming a bygone year is a different matter and still answers
+    VirtualTime.new(year: 2000, month: 1, day: 1, hour: 0, minute: 0, second: 0, nanosecond: 0)
+      .to_time(Time.utc(2024, 6, 1)).should eq Time.utc(2000, 1, 1)
+  end
+
+  it "keeps a date whose earliest allowed time of day a DST gap swallowed" do
+    # Regression: when the walk landed on a gap it stood on the gap's end,
+    # whose time of day the rule does not ask for. Restarting the time of day
+    # then refused to look again -- there was nothing earlier to find -- and
+    # the whole date was abandoned, along with every match it still had
+    zagreb = Time::Location.load "Europe/Zagreb"
+    vt = VirtualTime.new day_of_week: 7, hour: 2..23, minute: 5, second: 0, nanosecond: 0
+
+    # 2018-03-25 has no 02:05 in Zagreb; 03:05 is the day's first match
+    expected = Time.local(2018, 3, 25, 3, 5, 0, location: zagreb)
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.local(2018, 3, 22, 0, 0, 0, location: zagreb)).should eq expected
+
+    # A hint carrying a time of day the gap does not hold answered correctly
+    # already, and still does
+    vt.to_time(Time.local(2018, 3, 22, 4, 0, 0, location: zagreb)).should eq expected
+
+    # ... and with every date field constrained too, so hint filling has no say
+    ny = Time::Location.load "America/New_York"
+    fixed = VirtualTime.new day: 1..27, day_of_week: 7, hour: 2..18, minute: 45,
+      second: 0, nanosecond: 0
+
+    sunday = Time.local(2022, 3, 13, 3, 45, 0, location: ny)
+    fixed.matches?(sunday).should be_true
+    fixed.to_time(Time.local(2022, 3, 7, 2, 45, 0, location: ny)).should eq sunday
+  end
+
+  it "keeps two unconstrained fields commutative across default_match" do
+    # Regression: a nil against a nil answered with one side's `#default_match?`
+    # alone, and every field is nil by default -- so nearly every comparison
+    # between two `VirtualTime`s that disagreed on it depended on which was
+    # asked
+    a = VirtualTime.new hour: 5
+    b = VirtualTime.new hour: 5, default_match: false
+
+    a.matches?(b).should eq b.matches?(a)
+    a.matches?(b).should be_false
+
+    vt = VirtualTime.new
+    vt.matches?(nil, nil, 24, a_default: true, b_default: false)
+      .should eq vt.matches?(nil, nil, 24, a_default: false, b_default: true)
+
+    # Two permissive sides still meet
+    VirtualTime.new(hour: 5).matches?(VirtualTime.new(hour: 5)).should be_true
+  end
+
+  it "compares and hashes two identical stepped ranges as one rule" do
+    # Regression: a stepped range is a `Steppable::StepIterator`, a reference
+    # type with no equality of its own, so two rules written from the same
+    # literal fell back to identity -- and took two slots in a `Set` that
+    # `#hash`'s own doc says is meant to dedupe them
+    a = VirtualTime.new
+    a.hour = (10..20).step(2)
+    b = VirtualTime.new
+    b.hour = (10..20).step(2)
+
+    a.should eq b
+    a.hash.should eq b.hash
+    Set{a, b}.size.should eq 1
+    VirtualTime.from_yaml(a.to_yaml).should eq a
+
+    # A different step is still a different rule
+    c = VirtualTime.new
+    c.hour = (10..20).step(3)
+    c.should_not eq a
+  end
+
+  it "restarts the date when a coarser field moves past the hint" do
+    # Regression: the week / day-of-week / day-of-year walk starts from the
+    # month and day materialization took from the *hint*, carried into a year
+    # the `#year` rule moved on to. The walk only goes forward, so a target
+    # earlier in that year was stepped over -- and where the year was pinned,
+    # the wrap out of it left the rule looking unsatisfiable
+    pinned = VirtualTime.new year: 2032, week: 20
+    hint = Time.utc 2031, 8, 12, 8, 17, 37
+
+    expected = Time.utc 2032, 5, 10, 8, 17, 37
+    pinned.matches?(expected).should be_true
+    pinned.to_time(hint).should eq expected
+    # Dropping only the year already answered with that instant
+    VirtualTime.new(week: 20).to_time(hint).should eq expected
+
+    VirtualTime.new(year: 2027..2029, day_of_year: 26).to_time(Time.utc(2026, 5, 2, 6, 40, 54))
+      .should eq Time.utc(2027, 1, 26, 6, 40, 54)
+
+    # ... and with the time of day fully constrained, so hint filling has no say
+    listed = VirtualTime.new year: 2022, day_of_year: [164, 183], hour: 11, minute: 52, second: 26
+    listed.nanosecond = 0
+    listed.to_time(Time.utc(2021, 8, 21, 22, 4, 46)).should eq Time.utc(2022, 6, 13, 11, 52, 26)
+  end
+
+  it "leaves a proc-valued field alone when finer fields restart" do
+    # Regression: the restart puts every constrained finer field back at the
+    # bottom of its range and trusts materialization to bring it up again --
+    # which it cannot do for a proc, so the field stayed at zero and a rule the
+    # proc plainly accepts became unsatisfiable
+    vt = VirtualTime.new minute: 0, second: 0, day: 20
+    vt.hour = VirtualTime::VirtualProc.new { |hour| hour >= 15 }
+    hint = Time.utc 2021, 1, 6, 15, 0, 0
+
+    expected = Time.utc 2021, 1, 20, 15, 0, 0
+    vt.matches?(expected).should be_true
+    vt.materialize_with_hint(hint)[:hour].should eq 15
+    vt.to_time(hint).should eq expected
+
+    # The same rule with a date walk rather than a `#day` rule
+    walked = VirtualTime.new minute: 0, second: 0, day_of_week: 3
+    walked.hour = VirtualTime::VirtualProc.new { |hour| hour >= 15 }
+    walked.to_time(hint).should eq Time.utc(2021, 1, 6, 15, 0, 0)
+  end
+
+  it "sizes a negative day by the month the restart reached" do
+    # Regression: the restart hands the pass January, a negative `#day` was
+    # sized by that rather than by the month the pass arrived at, and the
+    # refined spec then read as *later* than the first pass -- so the whole
+    # restart was discarded, hour and all
+    vt = VirtualTime.new month: 4, day: -2, hour: 15..21, minute: 0, second: 0
+
+    expected = Time.utc 2027, 4, 29, 15, 0, 0
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2026, 9, 28, 17, 0, 0)).should eq expected
+  end
+
+  it "keeps the hint's own day under strict: false" do
+    # Regression: materialization asked the day to satisfy the rule even when
+    # it was deliberately the hint's own, so every candidate was refused and
+    # the month hops ran out before `#to_time` had anything to walk from
+    hint = Time.utc 2021, 1, 5, 20, 45, 13
+
+    VirtualTime.new(day: 15).to_time(hint, false).should eq Time.utc(2021, 1, 15, 20, 45, 13)
+    # The shapes that already worked still do
+    VirtualTime.new(hour: 10..12).to_time(hint, false).should eq hint
+    # An unconstrained day keeps the hint's own, as it does under `strict: true`
+    VirtualTime.new(month: 3).to_time(hint, false).should eq Time.utc(2021, 3, 5, 20, 45, 13)
+    VirtualTime.new(month: 3).to_time(hint, true).should eq Time.utc(2021, 3, 5, 20, 45, 13)
+
+    # A date the rule can only reach months away is named outright rather than
+    # crawled towards a day at a time, which used to run out of attempts
+    VirtualTime.new(month: 3, day: 1).to_time(Time.utc(2019, 10, 31, 20, 44, 51), false)
+      .should eq Time.utc(2020, 3, 1, 20, 44, 51)
+    # ... and a time of day the wanted date cannot hold has no say over it
+    zagreb = Time::Location.load "Europe/Zagreb"
+    gapped = VirtualTime.new day: -1, hour: 2
+    gapped.to_time(Time.local(2024, 3, 23, 17, 20, 25, location: zagreb), false)
+      .should eq Time.local(2024, 3, 31, 17, 20, 25, location: zagreb)
+  end
+
+  it "reads a stepped range as its whole run, however far it has been consumed" do
+    # Regression: a stored iterator was duplicated rather than rebuilt, so one
+    # that a caller had read a value from went on describing a shorter rule --
+    # while still comparing and hashing equal to an untouched one
+    a = VirtualTime.new
+    a.hour = (0..23).step(6)
+    b = VirtualTime.new
+    b.hour = (0..23).step(6)
+    b.hour.as(Steppable::StepIterator(Int32, Int32, Int32)).next
+
+    a.should eq b
+    midnight = Time.utc 2021, 1, 1, 0, 30, 0
+    a.matches?(midnight).should be_true
+    b.matches?(midnight).should eq a.matches?(midnight)
+
+    # A list is the same rule whichever container holds it and in whatever
+    # order it is written -- which is what a YAML round trip relies on
+    listed = VirtualTime.new
+    listed.hour = Set{17, 10}
+    VirtualTime.from_yaml(listed.to_yaml).should eq listed
+  end
+
+  it "agrees with #matches? that a stepped range yielding nothing is unusable" do
+    # Regression: `#matches?` let nothing through for a step of zero while
+    # materialization expanded it to a value, and said so only after burning
+    # every attempt it had
+    vt = VirtualTime.new minute: 0, second: 0, nanosecond: 0
+    vt.hour = (2..2).step(0)
+
+    vt.matches?(Time.utc(2021, 1, 1, 2, 0, 0)).should be_false
+    expect_raises ArgumentError, /yields nothing/ do
+      vt.to_time Time.utc(2021, 1, 1)
+    end
+  end
+
+  it "tests a large stepped range by arithmetic rather than by walking it" do
+    # The code beside it says iterating a range of nanoseconds "is
+    # catastrophic"; the stepped form used to do exactly that, taking a third
+    # of a second per comparison and a gigabyte to materialize
+    vt = VirtualTime.new hour: 12, minute: 30, second: 0
+    vt.nanosecond = (0..999_999_999).step(3)
+
+    vt.matches?(Time.utc(2021, 1, 1, 12, 30, 0, nanosecond: 999_999_999)).should be_true
+    vt.matches?(Time.utc(2021, 1, 1, 12, 30, 0, nanosecond: 999_999_998)).should be_false
+
+    answered = vt.to_time Time.utc(2021, 1, 1, 12, 30, 0, nanosecond: 1)
+    answered.nanosecond.should eq 3
+    vt.matches?(answered).should be_true
+  end
+
+  it "sizes a negative day by the month it materializes into" do
+    # Regression: the first pass sizes `day: -1` by the *hint's* month, and the
+    # restart that re-sizes it against the month reached was only ever taken
+    # when it named an *earlier* day. Correcting 30 to 31 names a later one, so
+    # it was thrown away and `#materialize` answered with a day its own rule
+    # does not allow
+    vt = VirtualTime.new
+    vt.month = 12
+    vt.day = -1
+    hint = Time.utc 2025, 9, 5
+
+    vt.materialize(hint).day.should eq 31
+    vt.to_time(hint).should eq Time.utc(2025, 12, 31)
+    vt.matches?(Time.utc(2025, 12, 31)).should be_true
+  end
+
+  it "puts an unconstrained finer field back to the hint's own value" do
+    # Regression: a carry raised to keep the answer at or after the hint stayed
+    # on an unconstrained field after a coarser one had moved past the hint and
+    # settled that question by itself -- so the answer was a minute, a day or a
+    # month later than the hint asked for, and `#succ` skipped a real match
+    VirtualTime.new(hour: 9, second: 0).to_time(Time.utc(2024, 1, 1, 8, 0, 30))
+      .should eq Time.utc(2024, 1, 1, 9, 0, 0)
+
+    # Constraining the same field to its whole domain already answered this way
+    whole = VirtualTime.new hour: 9, second: 0
+    whole.minute = 0..59
+    whole.to_time(Time.utc(2024, 1, 1, 8, 0, 30)).should eq Time.utc(2024, 1, 1, 9, 0, 0)
+
+    VirtualTime.new(month: 3, hour: 0).to_time(Time.utc(2024, 1, 5, 12)).should eq Time.utc(2024, 3, 5)
+    VirtualTime.new(year: 2026, hour: 0).to_time(Time.utc(2024, 6, 15, 12)).should eq Time.utc(2026, 6, 15)
+
+    VirtualTime.new(hour: 9, second: 0, nanosecond: 0).succ(Time.utc(2024, 1, 1, 8, 0, 0))
+      .should eq Time.utc(2024, 1, 1, 9, 0, 0)
+  end
+
+  it "never lets a restart move a field forward" do
+    # Regression: an unconstrained field went back to the hint's value, but
+    # where materialization reached its own value by *wrapping* -- December
+    # into January, the 31st into the 1st -- the hint's value is the larger of
+    # the two. The restart then named a date a year off, was thrown away for
+    # reading as later than the pass it refined, and took the constrained
+    # minute's reset with it
+    vt = VirtualTime.new day: 18, hour: 16, minute: [14, 51], second: 0
+    vt.nanosecond = 0
+    vt.to_time(Time.utc(2023, 12, 29, 0, 30, 0)).should eq Time.utc(2024, 1, 18, 16, 14)
+
+    day_wrap = VirtualTime.new hour: 3, minute: [14, 51], second: 0
+    day_wrap.nanosecond = 0
+    day_wrap.to_time(Time.utc(2024, 1, 31, 20, 30, 0)).should eq Time.utc(2024, 2, 1, 3, 14)
+  end
+
+  it "does not carry a spent carry through the date walk" do
+    # Regression: the clock an unconstrained field restarts at came from
+    # materialization, which had raised a carry to keep the answer at or after
+    # the hint. Once the walk moved onto a later date that carry was spent, but
+    # the hour restarted at the carried value all the same
+    {
+      {VirtualTime.new(day_of_week: 3, minute: 43, second: 0), Time.utc(2022, 7, 6, 8, 43)},
+      {VirtualTime.new(week: 30, minute: 43, second: 0), Time.utc(2022, 7, 25, 8, 43)},
+      {VirtualTime.new(day_of_year: 200, minute: 43, second: 0), Time.utc(2022, 7, 19, 8, 43)},
+    }.each do |(vt, expected)|
+      vt.nanosecond = 0
+      vt.matches?(expected).should be_true
+      vt.to_time(Time.utc(2022, 7, 5, 8, 54, 0)).should eq expected
+    end
+  end
+
+  it "restarts on a clock a DST gap swallowed" do
+    # Regression: the restart hint was built in the search's own zone, so a
+    # wall clock a spring-forward swallowed came back as a neighbouring one --
+    # and which side of the gap that is, is the zone's own business. It is read
+    # for its fields and never as an instant, so the zone has no business in it
+    sydney = Time::Location.load "Australia/Sydney"
+    vt = VirtualTime.new month: 10, day: [14, 20], minute: [30, 45]
+
+    expected = Time.local 2023, 10, 14, 2, 30, 9, location: sydney
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.local(2023, 1, 21, 2, 35, 9, location: sydney)).should eq expected
+  end
+
+  it "answers loosely wherever it answers strictly" do
+    # Regression: a rule the strict mode answers cannot become unsatisfiable by
+    # relaxing it, and a bygone-year answer is not made unacceptable by being
+    # before the hint -- refusing it only sent the search crawling forward
+    bygone = VirtualTime.new year: 2020, day_of_year: 310
+    bygone.to_time(Time.utc(2021, 4, 27), false).should eq bygone.to_time(Time.utc(2021, 4, 27), true)
+
+    plain = VirtualTime.new year: 2020
+    hint = Time.utc 2023, 3, 15, 17, 49, 0
+    plain.to_time(hint, false).should eq Time.utc(2020, 3, 15, 17, 49)
+    plain.to_time(hint, true).should eq plain.to_time(hint, false)
+  end
+
+  it "walks to a proc-valued day instead of hopping months past it" do
+    # Regression: materialization hands a proc the wanted value back, so
+    # insisting the day satisfy one left the search hopping months that all
+    # offer the same first day, and it gave up on a rule it plainly matches
+    vt = VirtualTime.new minute: 25, second: 0
+    vt.day = ->(day : Int32) { day == 21 }
+    vt.nanosecond = 0
+
+    expected = Time.utc 2023, 12, 21, 5, 25
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2023, 12, 12, 5, 31, 0)).should eq expected
+  end
+
+  it "settles a millisecond rule against a nanosecond one" do
+    # Regression: both name the same field of a `Time`, and folding the
+    # millisecond in named a nanosecond the nanosecond rule rejects -- so the
+    # answer satisfied neither and the search lost a whole day
+    vt = VirtualTime.new
+    vt.millisecond = 71..503
+    vt.nanosecond = [565_000_000, 238_000_000]
+
+    expected = Time.utc 2023, 6, 15, 11, 59, 58, nanosecond: 238_000_000
+    vt.matches?(expected).should be_true
+    vt.succ(Time.utc(2023, 6, 15, 11, 59, 57, nanosecond: 300_000_000)).should eq expected
+  end
+
+  it "re-sizes a negative day against a pinned month it has already gone by" do
+    # Regression: the retry that re-sizes a day by the month the pass reached
+    # only moved *forward*, so a `#year` and `#month` both pinned to a month
+    # already past left it landing on the same spec every time until its
+    # attempts ran out
+    vt = VirtualTime.new
+    vt.year = 2001
+    vt.month = 1
+    vt.day = -1
+
+    vt.matches?(Time.utc(2001, 1, 31)).should be_true
+    vt.to_time(Time.utc(2001, 2, 1)).should eq Time.utc(2001, 1, 31)
+
+    # ... and `#materialize` sized the day by the hint's own month, which for a
+    # bygone year is not one the restart pass ever notices
+    backwards = VirtualTime.new
+    backwards.year = 2001
+    backwards.month = -1
+    backwards.day = -2
+    materialized = backwards.materialize Time.utc(2002, 6, 27, 23, 3, 26)
+    materialized.day.should eq 30
+    # The hint still fills the fields nothing constrains
+    materialized.hour.should eq 23
+  end
+
+  it "walks a pinned year again from its start when the walk runs off the end" do
+    # Regression: a `#year` that cannot move has no room for a walk that left
+    # it -- the walk went forward into the next year, the year rule pulled the
+    # date back, and the search alternated between the two until it gave up
+    doy = VirtualTime.new
+    doy.year = 2004
+    doy.day_of_year = 107
+    doy.to_time(Time.utc(2004, 12, 31)).should eq Time.utc(2004, 4, 16)
+    doy.to_time(Time.utc(2004, 1, 1)).should eq Time.utc(2004, 4, 16)
+
+    week = VirtualTime.new
+    week.year = 2004
+    week.week = 20
+    answered = week.to_time Time.utc(2004, 12, 31)
+    week.matches?(answered).should be_true
+    answered.year.should eq 2004
+  end
+
+  it "walks to a proc-valued time of day by the unit it measures" do
+    # Regression: the retry only ever moved the date on, so an hour a proc
+    # decides was met with the same clock a hundred times over and the search
+    # gave up on a rule it plainly matches
+    vt = VirtualTime.new
+    vt.hour = ->(hour : Int32) { hour == 18 }
+
+    expected = Time.utc 2001, 1, 1, 18
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2001, 1, 1)).should eq expected
+
+    by_minute = VirtualTime.new hour: 5
+    by_minute.minute = ->(minute : Int32) { minute == 43 }
+    by_minute.to_time(Time.utc(2001, 1, 1)).should eq Time.utc(2001, 1, 1, 5, 43)
+  end
+
+  it "finds the end of a gap wider than a day" do
+    # Regression: the search for the instant a gap ends reached two hours
+    # either side, and Samoa skipped a whole day crossing the date line -- so
+    # `#succ` stepped over the first match on the far side of it
+    apia = Time::Location.load "Pacific/Apia"
+    vt = VirtualTime.new
+    vt.minute = [0, 15, 30, 45]
+
+    expected = Time.local 2011, 12, 31, 0, 0, 0, location: apia
+    vt.matches?(expected).should be_true
+    vt.succ(Time.local(2011, 12, 29, 23, 45, 59, nanosecond: 999_999_999, location: apia))
+      .should eq expected
+  end
+
+  it "moves on to a later month without carrying the hint's clock into it" do
+    # Regression: the retry that moves on when a day did not fit carried the
+    # hint's own clock into the month it moved to -- flooring every constrained
+    # time-of-day field at a clock that month was never about, and letting the
+    # carry that followed re-select the day. A whole month of matches was
+    # stepped over, and with a pinned month the search oscillated between two
+    # of them until its attempts ran out
+    vt = VirtualTime.new
+    vt.day = [1, 31]
+    vt.hour = 2
+    vt.minute = 0
+    vt.second = 0
+    vt.nanosecond = 0
+    vt.to_time(Time.utc(2018, 9, 29, 3, 0, 0)).should eq Time.utc(2018, 10, 1, 2)
+
+    # The constrained hour restarts at its minimum in the month reached
+    st_johns = Time::Location.load "America/St_Johns"
+    ranged = VirtualTime.new
+    ranged.year = 2025
+    ranged.month = 1..12
+    ranged.day = [1, 31]
+    ranged.hour = 8..17
+    ranged.minute = 59
+    ranged.second = 0
+    ranged.nanosecond = 0
+    ranged.to_time(Time.local(2025, 6, 24, 11, 17, 21, location: st_johns))
+      .should eq Time.local(2025, 7, 1, 8, 59, 0, location: st_johns)
+
+    pinned = VirtualTime.new
+    pinned.year = 2030
+    pinned.month = 2
+    pinned.day = [1, 31]
+    pinned.hour = 5
+    pinned.minute = 0
+    pinned.second = 0
+    pinned.nanosecond = 0
+    pinned.matches?(Time.utc(2030, 2, 1, 5)).should be_true
+    pinned.to_time(Time.utc(2030, 2, 15, 23)).should eq Time.utc(2030, 2, 1, 5)
+  end
+
+  it "re-sizes a day into a later month without carrying the hint's clock" do
+    # Regression: re-sizing a day against the month a pass reached carried the
+    # hint's own clock into it. Where that month is a *later* one, the clock
+    # has nothing to say about it -- and flooring a constrained hour at it
+    # raised a carry off the day, skipping the month entirely or answering
+    # before the hint
+    vt = VirtualTime.new
+    vt.month = 2
+    vt.day = -28
+    vt.hour = 0
+    vt.minute = 0
+    vt.second = 0
+    vt.millisecond = 0
+    vt.nanosecond = 0
+
+    # `day: -28` is the 1st of a 28-day February
+    vt.matches?(Time.utc(2025, 2, 1)).should be_true
+    vt.to_time(Time.utc(2024, 2, 29, 12)).should eq Time.utc(2025, 2, 1)
+
+    # ... and an allowed later year is not passed over for a bygone one
+    ranged = VirtualTime.new
+    ranged.year = [2024, 2025]
+    ranged.month = 1
+    ranged.day = -31
+    ranged.hour = 0
+    ranged.minute = 0
+    ranged.second = 0
+    ranged.millisecond = 0
+    ranged.nanosecond = 0
+    ranged.to_time(Time.utc(2024, 2, 29, 12)).should eq Time.utc(2025, 1, 1)
+  end
+
+  it "resolves a negative day against its month only once" do
+    # Regression: `#materialize` resolved negatives a second time on top of
+    # `#adjust_value`, which is not idempotent -- a `-31` sized by a 29-day
+    # February came back as `-2`, and a second pass turned that into 27, a day
+    # the rule never named
+    ranged = VirtualTime.new
+    ranged.month = 2
+    ranged.day = -31..-28
+    ranged.hour = 12
+    ranged.minute = 30
+    ranged.second = 0
+    ranged.millisecond = 0
+    ranged.nanosecond = 0
+
+    ranged.matches?(Time.utc(2024, 2, 1, 12, 30)).should be_true
+    ranged.to_time(Time.utc(2024, 1, 1)).should eq Time.utc(2024, 2, 1, 12, 30)
+
+    # The same in a list, where a member too large for the month is simply not
+    # one the month offers
+    listed = VirtualTime.new
+    listed.year = 2025
+    listed.month = 2
+    listed.day = [-1, -31]
+    listed.hour = 0
+    listed.minute = 0
+    listed.second = 0
+    listed.millisecond = 0
+    listed.nanosecond = 0
+
+    listed.matches?(Time.utc(2025, 2, 28)).should be_true
+    listed.to_time(Time.utc(2025, 1, 1)).should eq Time.utc(2025, 2, 28)
+  end
+
+  it "materializes a proc-valued field by asking it" do
+    # Regression: a `Proc` was left at whatever the hint supplied, so the
+    # search had to stumble onto a match by walking -- which cannot reach a
+    # time of day at all. Asking the proc which values it allows gives the same
+    # answer the equivalent list does
+    vt = VirtualTime.new
+    vt.hour = 21
+    vt.minute = VirtualTime::VirtualProc.new { |value| value % 4 == 0 }
+
+    expected = Time.utc 2025, 5, 2, 21
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2025, 5, 2, 0, 57, 0)).should eq expected
+
+    listed = VirtualTime.new
+    listed.hour = 21
+    listed.minute = (0..59).select { |value| value % 4 == 0 }
+    vt.to_time(Time.utc(2025, 5, 2, 0, 57, 0)).should eq listed.to_time(Time.utc(2025, 5, 2, 0, 57, 0))
+
+    # ... and it restarts at its own earliest allowed value like any other
+    # constrained field once a coarser one moves on. The unconstrained second
+    # and nanosecond still come from the hint, so the list is what it is held
+    # against rather than a literal
+    from = Time.utc 2025, 4, 24, 12, 49, 0
+    vt.succ(from).should eq listed.succ(from)
+    vt.succ(from).minute.should eq 0
+
+    # A nanosecond is the one field too wide to ask about value by value, and
+    # still keeps whatever it was given
+    wide = VirtualTime.new hour: 5, minute: 0, second: 0
+    wide.nanosecond = VirtualTime::VirtualProc.new(&.zero?)
+    wide.matches?(Time.utc(2025, 1, 1, 5)).should be_true
+  end
+
+  it "starts the walk again in a later allowed year rather than answering behind the hint" do
+    # Regression: restarting a pinned year at January let the walk find a match
+    # earlier in that year and settle for it, without ever checking the answer
+    # was still at or after the hint. `#succ` then raised and `#step`
+    # truncated. An answer in the past is right only where the rule has no year
+    # left at or after the hint
+    vt = VirtualTime.new
+    vt.year = [2024, 2026]
+    vt.week = 52
+
+    expected = Time.utc 2026, 12, 21
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2024, 12, 30)).should eq expected
+
+    # ... and a rule naming solely bygone years still answers in the past
+    bygone = VirtualTime.new year: 2020
+    hint = Time.utc 2023, 3, 15, 17, 49, 0
+    bygone.to_time(hint).should eq Time.utc(2020, 3, 15, 17, 49)
+  end
+
+  it "keeps a year list from wrapping back to its earliest year" do
+    # Regression: a refined spec naming a day its month cannot hold read as
+    # "earlier" on the raw integers and was accepted, and the carries that
+    # followed ran the year rule past its last allowed year and wrapped it to
+    # its first -- twenty months before the hint
+    vt = VirtualTime.new
+    vt.year = [2024, 2026]
+    vt.month = Set{2, 9}
+    vt.day = -30
+    vt.hour = 0
+
+    expected = Time.utc 2026, 9, 1
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2025, 5, 31, 6, 30, 0)).should eq expected
+  end
+
+  it "ignores a negative magnitude wider than the field beside a usable value" do
+    # Regression: removing the second negative resolution left `#materialize`
+    # picking a value no date has -- `-9` for a day of the week resolves to
+    # `-1` -- and handing it to `Time`, which refuses it. `#matches?` lets
+    # nothing through for such a value while still honouring the ones beside it
+    hint = Time.utc 2024, 2, 29, 13, 45, 17
+
+    weekly = VirtualTime.new
+    weekly.day_of_week = [-9, 1]
+    weekly.matches?(Time.utc(2024, 3, 4)).should be_true
+    weekly.to_time(hint).should eq Time.utc(2024, 3, 4, 13, 45, 17)
+
+    seconds = VirtualTime.new
+    seconds.second = [-117, 0]
+    seconds.to_time(hint).should eq Time.utc(2024, 2, 29, 13, 46)
+  end
+
+  it "carries a list value the hint's own month cannot hold on to one that can" do
+    # Regression: filtering values outside a field's domain used the field's
+    # `max`, which for a `#day` is the length of the *hint's* month -- so a 31
+    # asked about from April was thrown out as nonsense rather than carried on
+    # to a month that has one, and the list came back empty
+    listed = VirtualTime.new
+    listed.day = [31]
+
+    expected = Time.utc 2024, 5, 31
+    listed.matches?(expected).should be_true
+    listed.to_time(Time.utc(2024, 4, 5)).should eq expected
+    # Every other spelling of the same rule already answered this way
+    listed.to_time(Time.utc(2024, 4, 5)).should eq VirtualTime.new(day: 31).to_time(Time.utc(2024, 4, 5))
+
+    week = VirtualTime.new
+    week.week = [53]
+    week.to_time(Time.utc(2023, 1, 1)).should eq VirtualTime.new(week: 53).to_time(Time.utc(2023, 1, 1))
+
+    # A magnitude below the field's own floor is still nonsense and still goes
+    below = VirtualTime.new
+    below.day_of_week = [-9, 1]
+    below.to_time(Time.utc(2024, 2, 29, 13, 45, 17)).should eq Time.utc(2024, 3, 4, 13, 45, 17)
+  end
+
+  it "does not walk the clock when it is the date that has not been reached" do
+    # Regression: the retry for a proc-valued time of day ran on every failed
+    # iteration, so where `#matches_date?` was what failed the search advanced
+    # a minute at a time and spent all its attempts inside two hours
+    vt = VirtualTime.new
+    vt.day = [15, 20]
+    vt.day_of_week = 3
+    vt.minute = ->(value : Int32) { value == 0 }
+
+    expected = Time.utc 2026, 5, 20
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2026, 4, 16)).should eq expected
+  end
+
+  it "restarts the constrained finer fields when a coarser one moves on" do
+    # Every field here is constrained, so the documented "unconstrained fields
+    # come from the hint" carve-out does not apply. Regression: each field was
+    # fixed while the coarser ones still held the hint's values, and when a
+    # coarser one then moved forward the finer choice was never revisited --
+    # stepping over the earliest match
+    {
+      {VirtualTime.new(hour: 3..10, minute: [29, 54], second: 0, nanosecond: 0),
+       Time.utc(2020, 1, 1, 2, 45, 0), Time.utc(2020, 1, 1, 3, 29, 0)},
+      {VirtualTime.new(month: 6..9, day: [3, 25], hour: 0, minute: 0, second: 0, nanosecond: 0),
+       Time.utc(2020, 2, 10), Time.utc(2020, 6, 3)},
+      {VirtualTime.new(day: 10..20, hour: [5, 18], minute: 0, second: 0, nanosecond: 0),
+       Time.utc(2020, 1, 5, 9, 0, 0), Time.utc(2020, 1, 10, 5, 0, 0)},
+      {VirtualTime.new(minute: 30..50, second: [7, 40], nanosecond: 0),
+       Time.utc(2020, 1, 1, 0, 10, 20), Time.utc(2020, 1, 1, 0, 30, 7)},
+    }.each do |(vt, hint, expected)|
+      vt.matches?(expected).should be_true
+      vt.to_time(hint).should eq expected
+    end
+
+    # An unconstrained field still takes the hint's value, as documented
+    vt = VirtualTime.new year: 2018, day: 15, hour: 0
+    hint = Time.utc(2023, 12, 9, 12, 56, 26, nanosecond: 837441132)
+    vt.materialize(hint).to_tuple.should eq({2018, 12, 15, nil, nil, nil, 0, 56, 26, nil, 837441132, nil})
+  end
+
+  it "anchors a week on the wanted day, not on the hint's own" do
+    vt = VirtualTime.new week: 8, day_of_week: 1..3, hour: 12, minute: 0, second: 0, nanosecond: 0
+    monday = Time.utc(2020, 2, 17, 12, 0, 0) # the Monday of ISO week 8
+
+    vt.matches?(monday).should be_true
+
+    # Regression: the day of week was snapped to the first allowed value at or
+    # after the *hint's* day of week, so a Wednesday hint skipped to Wednesday
+    # of the target week -- and a later hint gave an earlier answer
+    vt.to_time(Time.utc(2020, 1, 1)).should eq monday # a Wednesday
+    vt.to_time(Time.utc(2020, 1, 2)).should eq monday # a Thursday
+  end
+
+  it "resumes just past a DST gap rather than beyond the matches next to it" do
+    lord_howe = Time::Location.load("Australia/Lord_Howe") # gap 02:00-02:29 on 2020-10-04
+    vt = VirtualTime.new minute: [22, 37], second: 0, nanosecond: 0, location: lord_howe
+    expected = Time.local(2020, 10, 4, 2, 37, 0, location: lord_howe)
+
+    # Regression: the retry started from whichever side of the gap `Time.local`
+    # resolved to and carried that side's time of day along, so 02:37 -- which
+    # exists and matches -- was stepped over
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.local(2020, 10, 4, 1, 38, 0, location: lord_howe)).should eq expected
+
+    santiago = Time::Location.load("America/Santiago") # gap 00:00-00:59 on 2020-09-06
+    vt = VirtualTime.new month: 9, day: 6, minute: 0, second: 0, nanosecond: 0, location: santiago
+    vt.to_time(Time.local(2020, 9, 1, 0, 0, 0, location: santiago))
+      .should eq Time.local(2020, 9, 6, 1, 0, 0, location: santiago)
+  end
+
+  it "settles rules whose week or day of year walk lands outside the month" do
+    # Regression: the retry re-materialized the day from the date the walk had
+    # reached, and the leftover day pushed the answer past every matching date
+    # -- the same way again a year later, so no number of attempts would do
+    vt = VirtualTime.new month: [2, 5], week: 16..19, second: 0, nanosecond: 0
+    vt.matches?(Time.utc(2020, 5, 1)).should be_true
+    vt.to_time(Time.utc(2020, 1, 1)).should eq Time.utc(2020, 5, 1)
+
+    vt = VirtualTime.new month: [1, 10], day_of_year: 54..281, second: 0, nanosecond: 0
+    vt.matches?(Time.utc(2020, 10, 1)).should be_true
+    vt.to_time(Time.utc(2020, 1, 1)).should eq Time.utc(2020, 10, 1)
+  end
+
+  it "keeps the restarted finer fields when a coarser one has moved on" do
+    # Regression: the restart was anchored on the *hint's* value for the field
+    # that had moved, so the second pass undid the move, landed before the hint
+    # and was thrown away -- restart and all
+    vt = VirtualTime.new year: [2021, 2023], month: 5, day: 22,
+      hour: 5..23, minute: [10, 39, 42], second: 0, nanosecond: 0
+    vt.to_time(Time.utc(2021, 9, 1, 15, 30, 0)).should eq Time.utc(2023, 5, 22, 5, 10, 0)
+
+    vt = VirtualTime.new year: 2022, month: [2, 5, 7, 10], day: 7,
+      hour: (2..22).step(2), minute: 40, second: 0, nanosecond: 0
+    vt.to_time(Time.utc(2022, 2, 28, 19, 46, 0)).should eq Time.utc(2022, 5, 7, 2, 40, 0)
+
+    # The same failure compounded into an answer *before* the hint, and a
+    # `#succ` that raised although a later match existed
+    vt = VirtualTime.new year: 2022..2023, month: 1, day: [8, 16, 24],
+      hour: 9, minute: 40, second: 0, nanosecond: 0
+    vt.day_of_week = 7
+    expected = Time.utc(2023, 1, 8, 9, 40, 0)
+
+    vt.matches?(expected).should be_true
+    vt.to_time(Time.utc(2022, 6, 21, 14, 9, 0)).should eq expected
+    vt.succ(Time.utc(2022, 6, 21, 14, 9, 0)).should eq expected
+  end
+
+  it "resolves a negative week against the year it lands in" do
+    # 2021-01-01 belongs to ISO year 2020, which has 53 weeks, while 2021 has
+    # 52. Regression: `-39` was resolved against the hint's year to week 15,
+    # while `#matches_date?` resolved it against the landing year to week 14 --
+    # so the anchor was rejected and the whole of week 14 stepped over
+    vt = VirtualTime.new hour: 11, minute: 10, second: 0, nanosecond: 0
+    vt.week = -39
+
+    vt.matches?(Time.utc(2021, 4, 5, 11, 10, 0)).should be_true
+    vt.to_time(Time.utc(2021, 1, 1)).should eq Time.utc(2021, 4, 5, 11, 10, 0)
+  end
+
+  it "keeps both sides of a fall-back through a day walk and a distant match" do
+    berlin = Time::Location.load("Europe/Berlin")
+
+    # Regression: the day-of-week walk rebuilds the value from its wall clock,
+    # and an ambiguous one comes back as the later of its two occurrences --
+    # with nothing to put it back
+    vt = VirtualTime.new hour: 2, minute: 30, second: 0, nanosecond: 0
+    vt.day_of_week = 7
+    vt.succ(Time.local(2020, 10, 24, 0, 0, 0, location: berlin))
+      .should eq Time.utc(2020, 10, 25, 0, 30, 0).in(berlin) # 02:30 +02:00
+
+    # Regression: whether a fall-back was in play was judged by comparing
+    # offsets with the answer -- which can be a year away, with several
+    # transitions in between, none of them the one that mattered
+    vt = VirtualTime.new month: 10, day: 31, hour: 2, minute: 34, second: 0, nanosecond: 0
+    first = Time.utc(2021, 10, 31, 0, 34, 0).in(berlin)  # 02:34 +02:00
+    second = Time.utc(2021, 10, 31, 1, 34, 0).in(berlin) # 02:34 +01:00
+
+    vt.matches?(first).should be_true
+    vt.matches?(second).should be_true
+    vt.succ(first).should eq second
+  end
+
   it "materializes a `millisecond` requirement into the nanosecond" do
     utc = Time::Location::UTC
     hint = Time.local(2023, 1, 1, location: utc)
@@ -479,6 +1426,23 @@ describe VirtualTime do
     t.should eq Time.local(2023, 3, 13, 2, 30, location: ny)
   end
 
+  it "is not thrown off by a week constraint the date already satisfies" do
+    utc = Time::Location::UTC
+    base = Time.utc(2023, 11, 19, 2, 18, 0)
+
+    # 2024-09-16 is a Monday, day 16, ISO week 38, so it satisfies every one of
+    # these. Regression: whenever a week rule was given, the search anchored on
+    # the current week's Monday -- behind the date it already had -- and the
+    # anchor then skipped a whole year to stay in the future
+    [nil, 1..53, 1..52, 6..49, 38].each do |week|
+      vt = VirtualTime.new day: 16, hour: 15, minute: 0, second: 0, nanosecond: 0, location: utc
+      vt.day_of_week = 1
+      vt.week = week.as(VirtualTime::Virtual)
+
+      vt.succ(base).should eq Time.utc(2024, 9, 16, 15, 0, 0)
+    end
+  end
+
   it "anchors a week within the ISO year, not the calendar one" do
     utc = Time::Location::UTC
 
@@ -519,6 +1483,165 @@ describe VirtualTime do
     plain.to_time(hint).location.should eq utc
   end
 
+  it "adjusts a negative value once, not again when the sides are swapped" do
+    vt = VirtualTime.new
+
+    # Regression: swapping went back through `#matches?`, which adjusted the
+    # already-adjusted values a second time -- with a max of 24 a `-30` became
+    # `-6` and then `18`, spuriously equalling a literal 18
+    vt.matches?(-30, 18, 24).should be_false
+    vt.matches?(-30, [18], 24).should be_false
+    vt.matches?([18], -30, 24).should be_false
+  end
+
+  it "treats a value that permits nothing as matching nothing" do
+    wildcard = VirtualTime.new
+
+    # Regression: only `false` propagated "never matches"; an empty list or
+    # range fell through to `#default_match?` and claimed a match no `Time`
+    # could satisfy
+    [[] of Int32, (5...5), (20..10), false].each do |value|
+      vt = VirtualTime.new
+      vt.day = value.as(VirtualTime::Virtual)
+
+      (1..31).none? { |day| vt.matches? Time.local(2024, 5, day) }.should be_true
+      vt.matches?(wildcard).should be_false
+    end
+  end
+
+  it "keeps matching commutative when default_match is false" do
+    all_true = VirtualTime.new default_match: false
+    all_true.year = true
+    all_true.month = true
+    all_true.day = true
+    all_true.week = true
+    all_true.day_of_week = true
+    all_true.day_of_year = true
+    all_true.hour = true
+    all_true.minute = true
+    all_true.second = true
+    all_true.millisecond = true
+    all_true.nanosecond = true
+
+    all_nil = VirtualTime.new default_match: false
+
+    # Regression: the `Bool` branch answered without consulting
+    # `#default_match?`, so `nil` against `true` and `true` against `nil`
+    # disagreed
+    all_true.matches?(all_nil).should be_false
+    all_nil.matches?(all_true).should be_false
+  end
+
+  it "leaves negative values alone when matching another VirtualTime" do
+    # The number of days in a month is unknowable for a pattern, so a negative
+    # value stays negative rather than being resolved against a max of one.
+    # Regression: `day: -1` came out as `0`, a day no date has, and so matched
+    # the literal `0`
+    VirtualTime.new(day: -1).matches?(VirtualTime.new(day: -1)).should be_true
+    VirtualTime.new(day: -1).matches?(VirtualTime.new(day: 0)).should be_false
+    VirtualTime.new(week: -1).matches?(VirtualTime.new(week: 0)).should be_false
+  end
+
+  it "round-trips values that used to produce unreadable YAML" do
+    # A fixed-offset location, which is what a timestamp parsed from an offset
+    # carries. Regression: written as "+02:00", which `Time::Location.load`
+    # rejects, so the document could not be read back
+    fixed = Time.parse_rfc3339("2024-01-01T10:00:00+02:00").location
+    vt = VirtualTime.new hour: 5, location: fixed
+    VirtualTime.from_yaml(vt.to_yaml).location.should eq fixed
+
+    # A negative step. Regression: written as "20..2/-2", which the parser
+    # refused because it accepted only a positive step
+    stepped = VirtualTime.new
+    stepped.hour = 20.step to: 2, by: -2
+    back = VirtualTime.from_yaml(stepped.to_yaml)
+    (0..23).select { |hour| back.matches? Time.local(2024, 1, 1, hour) }
+      .should eq (0..23).select { |hour| stepped.matches? Time.local(2024, 1, 1, hour) }
+
+    # An empty list has no notation, and writing it as an empty scalar read
+    # back as nil -- inverting "matches nothing" into "matches anything"
+    empty = VirtualTime.new
+    empty.day = [] of Int32
+    expect_raises(ArgumentError, /empty list/) { empty.to_yaml }
+  end
+
+  it "counts location and default_match towards equality" do
+    berlin = Time::Location.load("Europe/Berlin")
+    new_york = Time::Location.load("America/New_York")
+    moment = Time.local(2024, 1, 1, 5, 0, 0, location: berlin)
+
+    here = VirtualTime.new hour: 5, location: berlin
+    there = VirtualTime.new hour: 5, location: new_york
+
+    # Regression: only the eleven value fields were compared, so two rules
+    # matching disjoint sets of times were "equal" and collapsed in a Set
+    here.matches?(moment).should be_true
+    there.matches?(moment).should be_false
+    (here == there).should be_false
+    Set{here, there}.size.should eq 2
+
+    always = VirtualTime.new hour: 5
+    never = VirtualTime.new hour: 5, default_match: false
+    (always == never).should be_false
+  end
+
+  it "keeps location out of #clear_time! and carries default_match through #expand" do
+    berlin = Time::Location.load("Europe/Berlin")
+    new_york = Time::Location.load("America/New_York")
+    moment = Time.local(2024, 3, 6, 2, 0, 0, location: berlin) # 2024-03-05 20:00 in New York
+
+    vt = VirtualTime.new day: 5, location: new_york
+    vt.matches_date?(moment).should be_true
+
+    # Regression: `#clear_time!` dropped the location, which converts the whole
+    # timestamp and so bears on the date as well
+    vt.clear_time!
+    vt.matches_date?(moment).should be_true
+    vt.clear!.location.should be_nil
+
+    # Regression: `#expand` built its results with the default `default_match`,
+    # so expanding a rule that matches nothing gave rules matching almost
+    # everything
+    VirtualTime.new(day: 1..2, default_match: false).expand.map(&.default_match?).should eq [false, false]
+  end
+
+  it "treats a value that permits nothing as matching nothing, on either side" do
+    wildcard = VirtualTime.new
+    always = VirtualTime.new hour: true
+
+    # Regression: emptiness was only consulted for the left-hand value, so a
+    # rule permitting nothing "matched" a wildcard when it was on the right
+    [[] of Int32, (5...5), (20..10), false].each do |value|
+      vt = VirtualTime.new
+      vt.day = value.as(VirtualTime::Virtual)
+
+      vt.matches?(wildcard).should be_false
+      wildcard.matches?(vt).should be_false
+    end
+
+    empty_hour = VirtualTime.new
+    empty_hour.hour = (20..10)
+    always.matches?(empty_hour).should be_false
+    empty_hour.matches?(always).should be_false
+  end
+
+  it "reads a descending stepped range in the right order" do
+    descending = VirtualTime.new hour: 0, minute: 0, second: 0, millisecond: 0, nanosecond: 0
+    descending.day = 20.step to: 2, by: -2
+
+    ascending = VirtualTime.new hour: 0, minute: 0, second: 0, millisecond: 0, nanosecond: 0
+    ascending.day = (2..20).step(2)
+
+    # The two describe the same set of days
+    (1..31).all? { |day| descending.matches?(Time.utc(2024, 1, day)) == ascending.matches?(Time.utc(2024, 1, day)) }
+      .should be_true
+
+    # Regression: materialization picked "first value at or after the wanted
+    # one" from the list as given, which for a descending step is the largest
+    from = Time.utc(2024, 1, 6, 12, 0, 0)
+    descending.step(1.day, 1, from).first(5).to_a.should eq ascending.step(1.day, 1, from).first(5).to_a
+  end
+
   it "hashes consistently with #==" do
     vt = VirtualTime.new month: 3, day: [1, 2], hour: 10..12
     same = VirtualTime.new month: 3, day: [1, 2], hour: 10..12
@@ -531,6 +1654,23 @@ describe VirtualTime do
     {vt => :marker}[same]?.should eq :marker
 
     VirtualTime.new(hour: 10..12).hash.should_not eq VirtualTime.new(hour: 10...12).hash
+  end
+
+  it "refuses a `false` millisecond and honours strict without a max" do
+    vt = VirtualTime.new
+    vt.millisecond = false
+
+    # Regression: the millisecond guard tested truthiness, so `false` slipped
+    # past the check every other field gets and produced a materialized value
+    # the rule could never match
+    expect_raises(ArgumentError, /isn't materializable/) do
+      vt.materialize(Time.local(2024, 1, 1))
+    end
+
+    # Regression: a scalar `allowed` only replaced `wanted` when a max was
+    # given, although `strict` is what asks for the replacement
+    VirtualTime.new.materialize(5, 20, 0).should eq({5, 0})
+    VirtualTime.new.materialize(5, 20, 0, 60).should eq({5, 1})
   end
 
   it "rejects a #step that would not advance" do
