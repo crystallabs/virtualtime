@@ -1,7 +1,5 @@
 require "../src/virtualtime"
 
-
-
 base = Time.utc(2025, 1, 1)
 fails = 0
 
