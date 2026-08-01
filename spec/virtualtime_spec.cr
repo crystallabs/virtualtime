@@ -2599,4 +2599,166 @@ describe VirtualTime do
       end
     end
   end
+
+  describe "regressions" do
+    it "does not overflow on an exclusive range ending at Int32::MIN" do
+      vt = VirtualTime.new
+      vt.matches?(5...Int32::MIN, 5, nil).should be_false
+    end
+
+    it "does not overflow on stepped ranges spanning more than Int32 values" do
+      iter = (-2_000_000_000).step(to: 2_000_000_000, by: 1_000_000_000)
+      VirtualTime::RangeHelper.includes?(iter, 2_000_000_000).should be_true
+      VirtualTime::RangeHelper.includes?(iter, 1_999_999_999).should be_false
+      VirtualTime::RangeHelper.first_from((-2_000_000_000).step(to: 2_000_000_000, by: 1_500_000_000), 900_000_000)
+        .should eq 1_000_000_000
+      VirtualTime::RangeHelper.first_from((-2_000_000_000).step(to: 2_000_000_000, by: 1_500_000_000), 1_100_000_000)
+        .should be_nil
+
+      # Reachable through public materialization too
+      vt = VirtualTime.new
+      vt.nanosecond = (-1_999_999_999).step(to: 1_999_999_999, by: 1_500_000_000)
+      expect_raises(ArgumentError) do
+        vt.to_time Time.utc(2025, 1, 1, 0, 0, 0, nanosecond: 999_999_999)
+      end
+    end
+
+    it "keeps a rule equal to itself across a YAML round trip of a one-element list" do
+      vt = VirtualTime.new
+      vt.minute = [5]
+      restored = VirtualTime.from_yaml vt.to_yaml
+      restored.should eq vt
+      restored.hash.should eq vt.hash
+
+      vt2 = VirtualTime.new
+      vt2.minute = Set{7}
+      VirtualTime.from_yaml(vt2.to_yaml).should eq vt2
+    end
+
+    it "reads converter input from an IO's contents, not its #to_s" do
+      reader, writer = IO.pipe
+      writer << "5..9"
+      writer.close
+      VirtualTime::VirtualConverter.from_yaml(reader).should eq 5..9
+
+      reader2, writer2 = IO.pipe
+      writer2 << "Europe/Berlin"
+      writer2.close
+      VirtualTime::TimeLocationConverter.from_yaml(reader2).should eq Time::Location.load("Europe/Berlin")
+    end
+
+    it "does not raise from Search on spans near Time::Span::MAX" do
+      VirtualTime::Search.shift_from_base(Time.utc(2024, 1, 1), Time::Span::MAX, max_shifts: 5) { true }
+        .should be_a VirtualTime::Result::OutOfBounds
+      VirtualTime::Search.shifted_from_base?(Time.utc(2024, 1, 1), Time::Span::MAX, max_shifts: 5) { nil }
+        .should be_false
+      # Implicit max-shift product (step.abs * max_shifts) must saturate, not overflow
+      huge = Time::Span.new seconds: 7_000_000_000_000_000
+      VirtualTime::Search.shifted_from_base?(Time.utc(2024, 1, 1), huge, max_shifts: 1500) { nil }
+        .should be_false
+    end
+
+    it "moves on to a fitting month/year when a negative bound adjusts to empty against the hint" do
+      # Empty in 31-day months (16..15), holds the 15th in 30-day ones
+      vt = VirtualTime.new
+      vt.day = -16..15
+      vt.to_time(Time.utc(2027, 7, 20)).should eq Time.utc(2027, 9, 15)
+
+      # Only a 28-day February yields a value ({13})
+      vt = VirtualTime.new
+      vt.day = (-16).step(to: 14, by: 4)
+      vt.to_time(Time.utc(2022, 7, 26)).should eq Time.utc(2023, 2, 13)
+
+      # Empty in 53-week ISO years, week {3} in 52-week ones
+      vt = VirtualTime.new
+      vt.week = (-50).step(to: 3, by: 2)
+      vt.to_time(Time.utc(2020, 6, 1)).should eq Time.utc(2021, 1, 18)
+
+      # Empty in leap years (2..1), Jan 1 in common ones
+      vt = VirtualTime.new
+      vt.day_of_year = -365..1
+      vt.to_time(Time.utc(2024, 3, 1)).should eq Time.utc(2025, 1, 1)
+
+      # A list emptied by sizing, not born empty
+      vt = VirtualTime.new
+      vt.day = [-31]
+      vt.to_time(Time.utc(2023, 2, 10)).should eq Time.utc(2023, 3, 1)
+    end
+
+    it "bounds Proc comparisons against ranges too wide to enumerate" do
+      vt = VirtualTime.new
+      always = ->(_v : Int32) { true }
+      never = ->(_v : Int32) { false }
+
+      # Under the cap: answered by iteration, either side around
+      vt.matches?(0..59, always, nil).should be_true
+      vt.matches?(always, (0..59).step(2), nil).should be_true
+      vt.matches?(0..59, never, nil).should be_false
+
+      # Over the cap: a match within the scan bound still answers true...
+      vt.matches?(0..999_999_999, ->(v : Int32) { v == 50 }, nil).should be_true
+      # ...but an exhaustive "no" cannot be given, so it is refused instead of
+      # burning hundreds of millions of calls
+      expect_raises(ArgumentError, /not supported/) do
+        vt.matches?(0..999_999_999, never, nil)
+      end
+      expect_raises(ArgumentError, /not supported/) do
+        vt.matches?(never, (0..999_999_999).step(2), nil)
+      end
+    end
+
+    it "still refuses rules that are empty whatever the hint" do
+      vt = VirtualTime.new
+      vt.day = 5...5
+      expect_raises(ArgumentError) { vt.to_time Time.utc(2024, 1, 1) }
+
+      vt = VirtualTime.new
+      vt.hour = -1..1 # wrapping ranges are documented as empty
+      expect_raises(ArgumentError) { vt.to_time Time.utc(2024, 1, 1) }
+    end
+
+    it "raises from #materialize instead of leaking a below-floor sentinel" do
+      # The hint-relative-empty retry belongs to #to_time; #materialize
+      # answers for the hint it was given and must not return day 0
+      vt = VirtualTime.new
+      vt.day = -16..15
+      expect_raises(ArgumentError, /no allowed day/) { vt.materialize Time.utc(2027, 7, 20) }
+
+      # Fields with a fixed max are empty for every hint and raise outright
+      vt = VirtualTime.new
+      vt.second = 10..-55
+      expect_raises(ArgumentError) { vt.materialize Time.utc(2026, 1, 20) }
+
+      vt = VirtualTime.new
+      vt.minute = [-70]
+      expect_raises(ArgumentError) { vt.materialize Time.utc(2026, 1, 20) }
+    end
+
+    it "materializes a negative day into a month that actually allows it" do
+      vt = VirtualTime.new
+      vt.day = -31
+
+      materialized = vt.materialize Time.utc(2035, 10, 6, 16, 7, 6)
+      materialized.month.should eq 12 # first 31-day month after October
+      materialized.day.should eq 1
+
+      # And the hint's unconstrained clock survives through #succ
+      vt.succ(Time.utc(2035, 10, 6, 16, 7, 6)).should eq Time.utc(2035, 12, 1, 16, 7, 6, nanosecond: 1)
+    end
+
+    it "handles extreme descending stepped ranges without overflow" do
+      extreme = Int32::MAX.step(to: Int32::MIN, by: -1)
+      VirtualTime::RangeHelper.smallest(extreme).should eq Int32::MIN
+
+      vt = VirtualTime.new
+      vt.matches?(1..5, Int32::MAX.step(to: Int32::MIN, by: -1), nil).should be_true
+    end
+
+    it "answers false for producer spans too large to reach the target" do
+      r = VirtualTime::Search.shifted_from_base?(Time.utc(2026, 6, 1), 1.hour, max_shifts: 5) do |_base|
+        Time::Span::MAX
+      end
+      r.should be_false
+    end
+  end
 end

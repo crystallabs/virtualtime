@@ -139,6 +139,9 @@ class VirtualTime
     # A value that permits nothing matches nothing, whichever side it is on and
     # whatever it is held against: `false`, an empty list, and a range or
     # stepped range that yields no value all say the same thing.
+    # That includes a range like `10..-7` met without a max (the VT-vs-VT
+    # path): its raw form holds no values, and raw values are all that plane
+    # compares -- exactly as the specs pin down.
     return false if permits_nothing?(a) || permits_nothing?(b)
 
     case a
@@ -162,7 +165,6 @@ class VirtualTime
         b.call a
       end
     in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
-      a = RangeHelper.restart a if a.is_a? Steppable::StepIterator(Int32, Int32, Int32)
       case b
       in Nil, Bool
         matches_adjusted? b, a, b_default, a_default
@@ -175,25 +177,48 @@ class VirtualTime
         when Steppable::StepIterator(Int32, Int32, Int32)
           RangeHelper.includes? a, b
         else
-          a.any? { |e| e == b }
+          a.includes? b
         end
       in Array(Int32), Set(Int32), Range(Int32, Int32), Steppable::StepIterator(Int32, Int32, Int32)
-        # As above, never iterate a `Range`: test the other side's members
-        # against it, or intersect two ranges arithmetically.
+        # As above, never iterate a `Range` or a wide stepped range: test the
+        # other side's members against it, or intersect arithmetically.
         if a.is_a? Range(Int32, Int32)
-          if b.is_a? Range(Int32, Int32)
+          case b
+          when Range(Int32, Int32)
             RangeHelper.intersect? a, b
+          when Steppable::StepIterator(Int32, Int32, Int32)
+            # First member of the progression at or past the range's begin
+            candidate = RangeHelper.first_from b, a.begin
+            a_last = RangeHelper.last a
+            !candidate.nil? && !a_last.nil? && candidate <= a_last
           else
-            RangeHelper.restart(b).any? { |v| a.includes? v }
+            b.any? { |e| a.includes? e }
           end
         elsif b.is_a? Range(Int32, Int32)
           a.any? { |e| b.includes? e }
+        elsif b.is_a? Steppable::StepIterator(Int32, Int32, Int32)
+          a.any? { |e| RangeHelper.includes? b, e }
         else
-          # `b` is re-created per element of `a` because a StepIterator is
-          # consumed by iterating it.
-          a.any? { |e| RangeHelper.restart(b).any? { |v| e == v } }
+          a.any? { |e| b.includes? e }
         end
       in VirtualProc
+        # A proc can only be asked value by value, and a range can span a
+        # second's worth of nanoseconds. The scan is bounded by the same
+        # constant `#materialize` uses for its own proc scans: a match inside
+        # the bound still answers true, and past it the comparison is refused
+        # rather than left to burn hundreds of millions of calls -- answering
+        # `false` for values never asked about would be silently wrong.
+        if (count = RangeHelper.count(a)) && count > MAX_PROC_SCAN
+          scanned = 0
+          a.each do |e|
+            return true if b.call(e)
+            scanned += 1
+            break if scanned >= MAX_PROC_SCAN
+          end
+
+          raise ArgumentError.new "Comparing a Proc to a range of #{count} values is not supported (no match within the first #{MAX_PROC_SCAN})"
+        end
+
         a.any? { |e| b.call(e) }
       end
     in VirtualProc
@@ -352,7 +377,24 @@ class VirtualTime
   # Materializes VT and returns fields needed to create a `Time` object.
   # This function does not check that the materialized values match the week number, day of week, and day of year constraints.
   # If you need those values checked, use `#to_time`.
-  def materialize_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true) # ameba:disable Metrics/CyclomaticComplexity
+  def materialize_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
+    spec = materialize_spec time, carry, strict
+
+    # A day below the calendar's floor is the marker `#materialize` leaves
+    # when the day rule allows nothing in the month it was sized by --
+    # `day: -16..15` in a 31-day month. `#to_time` retries in other months;
+    # this API answers for the hint it was given, and a spec that cannot
+    # become a `Time` is no answer.
+    if spec[:day] < 1
+      raise ArgumentError.new "no allowed day exists in #{spec[:year]}-#{spec[:month]} for #{inspect} (hint #{time}); #to_time searches beyond the hint's month"
+    end
+
+    spec
+  end
+
+  # :ditto: but hands back the below-floor day sentinel instead of raising,
+  # for the callers whose retry machinery moves the search to another month.
+  private def materialize_spec(time : Time, carry = 0, strict = true) # ameba:disable Metrics/CyclomaticComplexity
     spec = materialize_fields time, carry, strict
 
     # A `#day` is sized by the month it lands in, and the first pass sized it
@@ -546,7 +588,7 @@ class VirtualTime
 
   # Materializes date part of current VT
   def materialize_date_with_hint(time : Time = Time.local.at_beginning_of_minute, carry = 0, strict = true)
-    _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1, strict)
+    _day, carry = materialize(day, time.day + carry, 1, TimeHelper.days_in_month(time) + 1, strict, variable_max: true)
     _month, carry = materialize(month, time.month + carry, 1, 13, strict)
     # Years are not cyclic the way the fields under them are: one carried past
     # the last the calendar holds has nowhere to wrap to, and letting it wrap
@@ -616,7 +658,15 @@ class VirtualTime
   # Materializes a particular value with the help of a wanted/hint value.
   # If 'strict' is true and some of the `wanted` fields would not `match?` VT's requirements,
   # they are replaced/overriden with the first/earliest value from the allowed range.
-  def materialize(allowed, wanted : Int, min, max = nil, strict = true) # ameba:disable Metrics/CyclomaticComplexity
+  #
+  # `variable_max` says the supplied `max` varies with the hint -- the length
+  # of a month, the weeks of an ISO year, the days of a year. Only then can a
+  # negative-bound value that adjusts to empty be empty *for this hint alone*,
+  # and only then is the below-floor sentinel returned instead of raising;
+  # a field with a fixed max (hour, minute, ...) that adjusts to empty is
+  # empty for every hint and raises outright.
+  def materialize(allowed, wanted : Int, min, max = nil, strict = true, variable_max = false) # ameba:disable Metrics/CyclomaticComplexity
+    original = allowed
     allowed = adjust_value allowed, max
     wanted = adjust_value wanted, max
     carry = 0
@@ -651,6 +701,16 @@ class VirtualTime
       # An empty range (e.g. `5...5`) permits nothing, so materializing it to
       # its `begin` would hand back a value the VirtualTime does not match.
       if RangeHelper.last(allowed).nil?
+        # Unless it is empty only after adjustment against this hint's own
+        # month or year length -- `day: -16..15` is empty in a 31-day month
+        # yet holds the 15th in a 30-day one. Answer below the field's floor:
+        # `day_fits_month?` and the week/day-of-year walks read that as
+        # "nothing here" and move the search on, exactly as they do for an
+        # Int the month cannot hold. A range born empty keeps raising.
+        if variable_max && max && original.is_a?(Range(Int32, Int32)) && (original.begin < 0 || original.end < 0)
+          return {min - 1, carry}
+        end
+
         raise ArgumentError.new "A VirtualTime with empty range value `#{allowed}` isn't materializable."
       end
       if !strict || allowed.includes? wanted
@@ -667,6 +727,13 @@ class VirtualTime
         # zero never reaches its limit
         smallest = RangeHelper.smallest allowed
         unless smallest
+          # As with the empty-range case above: empty against this hint's own
+          # month/year length is "nothing here", not "nothing anywhere".
+          if variable_max && max && original.is_a?(Steppable::StepIterator(Int32, Int32, Int32)) &&
+             (original.current < 0 || original.limit < 0)
+            return {min - 1, carry}
+          end
+
           raise ArgumentError.new "A VirtualTime with a stepped range value that yields nothing isn't materializable."
         end
 
@@ -686,7 +753,7 @@ class VirtualTime
         return {wanted, carry}
       end
 
-      allowed = allowed.dup.to_a
+      allowed = allowed.to_a
       # A magnitude larger than the field itself -- `-9` for a day of the week,
       # `-117` for a second -- resolves to a value below the field's own floor,
       # one no date ever has. `#matches?` lets nothing through for one of those
@@ -698,16 +765,20 @@ class VirtualTime
       allowed = allowed.select { |value| value >= min } if max
       # :ditto: for an empty list or a stepped range that yields no values
       if allowed.empty?
+        # A list emptied by the floor-filter above -- `day: [-31]` sized by a
+        # February -- is empty for this month only, like the ranges above; a
+        # list born empty (or emptied for any other reason) keeps raising.
+        if variable_max && max && (original.is_a?(Array(Int32)) || original.is_a?(Set(Int32))) && original.any?(&.<(0))
+          return {min - 1, carry}
+        end
+
         raise ArgumentError.new "A VirtualTime with an empty list of allowed values isn't materializable."
       end
-      # :ditto: for a list -- `#adjust_value` has resolved its negatives too
-      # Picking the next allowed value below reads the list in ascending order.
-      # `#adjust_value` sorts an `Array` or `Set`, but hands a stepped range
-      # back as it is -- and a negative step counts down.
-      allowed.sort! unless ArrayHelper.sorted? allowed
+      # The list arrives sorted: every `Array`/`Set` branch of `#adjust_value`
+      # returns an ascending list, and the filter above preserves order.
       if !strict || allowed.includes? wanted
       else
-        if candidate = allowed.dup.find &.>=(wanted)
+        if candidate = allowed.find &.>=(wanted)
           wanted = candidate
         else
           carry += max && (wanted > allowed.min) ? 1 : 0
@@ -776,7 +847,11 @@ class VirtualTime
       # in and whichever of the two containers holds it -- matching reads both
       # the same way, and YAML has no syntax that tells them apart, so a rule
       # that has been through it would otherwise stop equalling itself.
-      value.to_a.sort
+      # A one-element list is likewise the same rule as its scalar -- YAML
+      # writes `[5]` as `5` and reads an `Int32` back -- so it compares (and
+      # hashes) as the Int.
+      list = value.to_a.sort
+      list.size == 1 ? list.first : list
     else
       value
     end
@@ -880,7 +955,7 @@ class VirtualTime
     # else -- and what it settles on then answers a question about a date the
     # walk is about to leave behind.
     wanted = begin
-      materialize_with_hint hint, strict: strict
+      materialize_spec hint, strict: strict
     rescue ArgumentError
       spec_of time
     end
@@ -948,7 +1023,7 @@ class VirtualTime
       # have named outright. `strict` governs the time of day, which
       # `#matches_time?` is asked about only when it is set.
       week_nr = week ? time.calendar_week[1] : nil
-      target_week = week_nr ? materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, true)[0] : nil
+      target_week = week_nr ? materialize(week, week_nr, 0, TimeHelper.weeks_in_year(time) + 1, true, variable_max: true)[0] : nil
 
       if target_week && week_nr != target_week
         # Not in the wanted week yet: land on it, on the wanted day if there is
@@ -972,14 +1047,14 @@ class VirtualTime
 
       current_doy = time.day_of_year
       days_this_year = TimeHelper.days_in_year time
-      value, carry = materialize(day_of_year, current_doy, 1, days_this_year + 1, true)
+      value, carry = materialize(day_of_year, current_doy, 1, days_this_year + 1, true, variable_max: true)
 
       if (value < current_doy || carry != 0) && time.year < 9999
         # The wanted day lies in the year after this one, and the two need not
         # be the same length: a negative day of year counts back from the end,
         # so it is one day out for every leap year crossed. It is resolved
         # again, from the start of the year actually being landed in.
-        value, _ = materialize(day_of_year, 1, 1, Time.days_in_year(time.year + 1) + 1, true)
+        value, _ = materialize(day_of_year, 1, 1, Time.days_in_year(time.year + 1) + 1, true, variable_max: true)
         time = shift_days time, ((days_this_year - current_doy) + value).days
       else
         time = shift_days time, adjust_day(current_doy, value, days_this_year)
@@ -1263,7 +1338,7 @@ class VirtualTime
       # allowed week before it -- which is exactly what a list holding a
       # negative week does, that resolving to 52 in one year and 53 in the next.
       from_week = attempt.zero? ? time.calendar_week[1] : 1
-      target_week, _ = materialize(week, from_week, 0, TimeHelper.weeks_in_iso_year(year, time.location) + 1, strict)
+      target_week, _ = materialize(week, from_week, 0, TimeHelper.weeks_in_iso_year(year, time.location) + 1, strict, variable_max: true)
       # Walk days with calendar arithmetic and rebuild the value with the
       # already-materialized time-of-day, so that neither the walk itself
       # nor DST transitions disturb the time part.
@@ -1307,7 +1382,7 @@ class VirtualTime
     tries = 0
 
     loop do
-      timespec = materialize_with_hint hint, strict: strict
+      timespec = materialize_spec hint, strict: strict
       _year, _month, _day = timespec[:year], timespec[:month], timespec[:day]
 
       # A year or month outside `Time`'s own range is not something another
@@ -1848,6 +1923,9 @@ class VirtualTime
   module RangeHelper
     # Returns the last value included in `range`, or `nil` if it contains no values.
     def self.last(range : Range(Int32, Int32)) : Int32?
+      # Nothing lies below Int32::MIN, so an exclusive range ending there is
+      # empty -- said before the subtraction below can overflow.
+      return if range.exclusive? && range.end == Int32::MIN
       last = range.exclusive? ? range.end - 1 : range.end
       last < range.begin ? nil : last
     end
@@ -1883,7 +1961,8 @@ class VirtualTime
         return false if value.exclusive ? element <= last : element < last
       end
 
-      (element - first) % step == 0
+      # In `Int64`: the distance between two `Int32`s can itself overflow `Int32`
+      (element.to_i64 - first) % step == 0
     end
 
     # Returns the smallest value the stepped range yields, or nil when it
@@ -1894,8 +1973,11 @@ class VirtualTime
       step = value.step
       return value.current if step > 0
 
-      last = value.exclusive ? value.limit + 1 : value.limit
-      value.current + ((value.current - last) // -step) * step
+      # In `Int64`: the span between the bounds can overflow `Int32`, and the
+      # left operand decides a Crystal arithmetic result's type -- so it is
+      # the one promoted. The result itself lies between the bounds and fits.
+      last = value.exclusive ? value.limit.to_i64 + 1 : value.limit.to_i64
+      (value.current + ((value.current.to_i64 - last) // -step) * step).to_i32
     end
 
     # Returns the smallest value the stepped range yields that is at least
@@ -1909,8 +1991,12 @@ class VirtualTime
       if step > 0
         return first if element <= first
 
-        candidate = first + ((element - first + step - 1) // step) * step
-        includes?(value, candidate) ? candidate : nil
+        # In `Int64`, since the distances involved can overflow `Int32`. The
+        # candidate is a member ≥ `first` by construction, so only the upper
+        # limit is left to check before narrowing back down.
+        candidate = first.to_i64 + ((element.to_i64 - first + step - 1) // step) * step
+        last = value.exclusive ? value.limit.to_i64 - 1 : value.limit.to_i64
+        candidate <= last ? candidate.to_i32 : nil
       else
         return if element > first
 
@@ -1919,7 +2005,28 @@ class VirtualTime
         bottom = smallest value
         return bottom if bottom && element <= bottom
 
-        first - ((first - element) // -step) * -step
+        # In `Int64` for the same reason; the result lies between `element`
+        # and `first` and fits.
+        span = value.step.to_i64.abs
+        (first - ((first.to_i64 - element) // span) * span).to_i32
+      end
+    end
+
+    # Returns how many values the range or stepped range yields, or nil for
+    # a value whose size is not knowable arithmetically.
+    #
+    # In `Int64`, since a range over `Int32` bounds can hold more values than
+    # `Int32` counts.
+    def self.count(value) : Int64?
+      case value
+      when Range(Int32, Int32)
+        (last = last(value)) ? last.to_i64 - value.begin + 1 : 0_i64
+      when Steppable::StepIterator(Int32, Int32, Int32)
+        first = smallest value
+        return 0_i64 unless first
+
+        bound = value.step > 0 ? (value.exclusive ? value.limit.to_i64 - 1 : value.limit.to_i64) : value.current.to_i64
+        (bound - first) // value.step.abs + 1
       end
     end
 
@@ -2019,7 +2126,9 @@ class VirtualTime
     end
 
     def self.from_yaml(value : String | IO) : VirtualTime::Virtual
-      parse_from value
+      # Read an IO's contents, not its `#to_s` -- only `IO::Memory` happens to
+      # render as its buffer; a pipe or file renders as its inspect text.
+      parse_from(value.is_a?(IO) ? value.gets_to_end : value)
     end
 
     def self.from_yaml(value : YAML::ParseContext, node : YAML::Nodes::Node) : VirtualTime::Virtual
@@ -2066,14 +2175,12 @@ class VirtualTime
   # A custom to/from YAML converter for Time::Location.
   class TimeLocationConverter
     def self.to_yaml(value : Time::Location, yaml : YAML::Nodes::Builder)
-      case value
-      when Time::Location
-        yaml.scalar value.name
-      end
+      yaml.scalar value.name
     end
 
     def self.from_yaml(value : String | IO) : Time::Location
-      load value.to_s
+      # As in `VirtualConverter`: read an IO's contents, not its `#to_s`
+      load(value.is_a?(IO) ? value.gets_to_end : value)
     end
 
     def self.from_yaml(value : YAML::ParseContext, node : YAML::Nodes::Node) : Time::Location
@@ -2134,10 +2241,12 @@ class VirtualTime
       loop do
         # successor step. Walking far enough runs off the end of the calendar
         # `Time` can represent, which is a bound like any other rather than
-        # something for a caller of a Result-returning method to catch.
+        # something for a caller of a Result-returning method to catch. A span
+        # near `Time::Span::MAX` overflows the `Int64` arithmetic inside
+        # `Time#+` before the range check can speak -- same bound, other voice.
         begin
           current = current + step
-        rescue ArgumentError
+        rescue ArgumentError | OverflowError
           return Result::OutOfBounds.new
         end
 
@@ -2171,8 +2280,14 @@ class VirtualTime
       return false if max_shifts <= 0
 
       # If caller does not supply a max_shift, the max delta is still bounded by
-      # the maximum number of step applications.
-      effective_max_shift = max_shift || (step.abs * max_shifts)
+      # the maximum number of step applications. The product (and `abs` itself,
+      # for `Time::Span::MIN`) can overflow for enormous steps; a bound larger
+      # than every representable span is simply no bound.
+      effective_max_shift = max_shift || begin
+        step.abs * max_shifts
+      rescue OverflowError
+        Time::Span::MAX
+      end
 
       current = target
       shifts = 0
@@ -2180,10 +2295,11 @@ class VirtualTime
       loop do
         # successor behavior is in inverse direction: first base is target - step.
         # Running off the end of the representable calendar means there is no
-        # such base left to find.
+        # such base left to find -- whether the range check or the `Int64`
+        # arithmetic inside `Time#-` is the one to say so.
         begin
           current = current - step
-        rescue ArgumentError
+        rescue ArgumentError | OverflowError
           return false
         end
 
@@ -2191,18 +2307,19 @@ class VirtualTime
 
         return false if shifts > max_shifts
 
-        if produced = producer.call(current)
-          # produced must itself be a valid delta and must reach the target
-          if produced.abs <= effective_max_shift && current + produced == target
-            return true
-          end
-        end
-
-        # Optional: also ensure we don't walk bases so far away that even a maximal
-        # produced delta couldn't reach the target.
-        # Distance from current base to target is exactly shifts * step (in span form):
+        # A base farther out than the bound cannot reach the target with a
+        # legal delta at all -- the only delta that reaches it *is* that
+        # distance -- so it is not worth asking the producer about.
         distance = target - current
         return false if distance.abs > effective_max_shift
+
+        if produced = producer.call(current)
+          # `current + produced == target` is exactly `produced == distance`,
+          # and comparing spans cannot overflow the way adding an enormous
+          # produced span to a `Time` would. Being within
+          # `effective_max_shift` follows, since a match equals `distance`.
+          return true if produced == distance
+        end
       end
     end
   end

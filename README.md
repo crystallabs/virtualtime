@@ -46,7 +46,7 @@ Then we can check if the current Time matches it:
 
 ```cr
 vt = VirtualTime.new
-vt.day = -8..-1
+vt.day = -7..-1
 vt.day_of_week = [6,7]
 
 # Check if current time matches
@@ -64,7 +64,7 @@ We could do this with:
 ```cr
 # Same VT as before:
 vt = VirtualTime.new
-vt.day = -8..-1
+vt.day = -7..-1
 vt.day_of_week = [6,7]
 
 # Check if the specified VT matches any day in month of March
@@ -255,6 +255,13 @@ If they are not both defined, or they contain a value of any other type (e.g. a 
 So comparing VTs to VTs is always done without the conversion of negative values to
 actual values.
 
+One consequence: a range written across the two sign domains, such as `day: 10..-7`,
+cannot be resolved without knowing the month's length. Against a `Time` it works as
+described above, but in VT-to-VT comparisons its raw form contains no values, so it
+behaves like `false` there — it matches nothing, not even an identical rule. Scalars
+and lists (e.g. `day: [10, -7]`), and ranges written within one sign domain
+(`-7..-1`), compare fine.
+
 ### Unsupported Comparisons
 
 Comparisons between `VirtualTime` property values which are both a `Proc` are not supported
@@ -358,7 +365,7 @@ t = Time.local 2023, 10, 10, hour: 18, location: Time::Location.load("America/Ne
 vt.matches?(t) # => true, because hours `16..20` include hour `18`
 
 t = Time.local 2023, 10, 10, hour: 0, location: Time::Location.load("Europe/Berlin")
-vt.matches?(t) # => nil, because 00 hours is not between 16 and 20
+vt.matches?(t) # => false, because 00 hours is not between 16 and 20
 
 vt.location = Time::Location.load("America/New_York")
 vt.matches?(t) # => true, because time instant 0 hours converted to NY time (-6) is 18 hours
@@ -420,6 +427,10 @@ vt.to_yaml # => "---\nmonth: 3\nday: 1,-1\nhour: 10..20/2\ndefault_match: true\n
 ## Tests
 
 Run `crystal spec` or just `crystal s`.
+
+Longer-running randomized and brute-force checks live in `fuzz/`; run them all
+with `fuzz/run.sh` (see `fuzz/README.md`). They are suited for release checks
+or a nightly CI job rather than every test run.
 
 ## API Documentation
 

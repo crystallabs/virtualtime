@@ -10,3 +10,9 @@ Documentation/DocumentationAdmonition:
 # `?` on a parenthesized union would.
 Style/VerboseNilType:
   Enabled: false
+
+# Fuzzers/oracles are throwaway-style verification harnesses, not library
+# code; `lib` restores the default exclusion this key would otherwise replace
+Excluded:
+  - fuzz
+  - lib
