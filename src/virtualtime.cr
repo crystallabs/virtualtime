@@ -493,14 +493,8 @@ class VirtualTime
   # Returns the first of the month `spec` reached, carrying `like`'s time of
   # day, or nil where that wall clock does not exist.
   private def month_start_like(spec, like : Time) : Time?
-    start = Time.local spec[:year], spec[:month], 1, like.hour, like.minute, like.second,
+    TimeHelper.local? spec[:year], spec[:month], 1, like.hour, like.minute, like.second,
       nanosecond: like.nanosecond, location: like.location
-    return unless start.year == spec[:year] && start.month == spec[:month] && start.day == 1 &&
-                  start.hour == like.hour && start.minute == like.minute && start.second == like.second
-
-    start
-  rescue ArgumentError
-    nil
   end
 
   # Returns what a finer field starts over at once a coarser one has moved on.
@@ -793,7 +787,7 @@ class VirtualTime
   def hash(hasher)
     hasher = @location.hash hasher
     hasher = @default_match.hash hasher
-    {% for field in %w[year month day week day_of_week day_of_year hour minute second millisecond nanosecond] %}
+    {% for field in FIELDS %}
       hasher = comparable(@{{ field.id }}).hash hasher
     {% end %}
     hasher
@@ -1113,10 +1107,9 @@ class VirtualTime
         return
       end
 
-    start = Time.local time.year, month, 1, time.hour, time.minute, time.second,
+    start = TimeHelper.local? time.year, month, 1, time.hour, time.minute, time.second,
       nanosecond: time.nanosecond, location: time.location
-    return unless start.month == month && start.day == 1 && start.hour == time.hour &&
-                  start.minute == time.minute && start.second == time.second
+    return unless start
 
     earliest_materialization restart_time_of_day(start, wanted, strict), strict
   rescue ArgumentError
@@ -1135,14 +1128,8 @@ class VirtualTime
 
   # :ditto: for a year of one's own choosing.
   private def january_of_year(year : Int32, time : Time) : Time?
-    start = Time.local year, 1, 1, time.hour, time.minute, time.second,
+    TimeHelper.local? year, 1, 1, time.hour, time.minute, time.second,
       nanosecond: time.nanosecond, location: time.location
-    return unless start.year == year && start.month == 1 && start.day == 1 &&
-                  start.hour == time.hour && start.minute == time.minute && start.second == time.second
-
-    start
-  rescue ArgumentError
-    nil
   end
 
   # Returns how far the retry moves on when a time-of-day field is a `Proc`:
@@ -1179,23 +1166,14 @@ class VirtualTime
   # Returns the first instant of `time`'s own day, or nil where a DST gap
   # swallowed it.
   private def day_start(time : Time) : Time?
-    start = Time.local time.year, time.month, time.day, 0, 0, 0, location: time.location
-    start.day == time.day && start.hour == 0 && start.minute == 0 && start.second == 0 ? start : nil
-  rescue ArgumentError
-    nil
+    TimeHelper.local? time.year, time.month, time.day, location: time.location
   end
 
   # Returns `time`'s date carrying `clock`'s time of day, or nil where that
   # wall clock does not exist on it.
   private def with_time_of_day(time : Time, clock : Time) : Time?
-    built = Time.local time.year, time.month, time.day, clock.hour, clock.minute, clock.second,
+    TimeHelper.local? time.year, time.month, time.day, clock.hour, clock.minute, clock.second,
       nanosecond: clock.nanosecond, location: time.location
-    return unless built.day == time.day && built.hour == clock.hour &&
-                  built.minute == clock.minute && built.second == clock.second
-
-    built
-  rescue ArgumentError
-    nil
   end
 
   # Returns `time` with its time of day started over: every constrained field
@@ -1285,7 +1263,7 @@ class VirtualTime
       # allowed week before it -- which is exactly what a list holding a
       # negative week does, that resolving to 52 in one year and 53 in the next.
       from_week = attempt.zero? ? time.calendar_week[1] : 1
-      target_week, _ = materialize(week, from_week, 0, weeks_in_iso_year(year, time.location) + 1, strict)
+      target_week, _ = materialize(week, from_week, 0, TimeHelper.weeks_in_iso_year(year, time.location) + 1, strict)
       # Walk days with calendar arithmetic and rebuild the value with the
       # already-materialized time-of-day, so that neither the walk itself
       # nor DST transitions disturb the time part.
@@ -1300,12 +1278,6 @@ class VirtualTime
     # Every anchor tried lies in the past; leave `time` alone and let the caller
     # advance it.
     time
-  end
-
-  # Returns the number of weeks -- 52 or 53 -- in the given ISO year.
-  private def weeks_in_iso_year(year : Int, location : Time::Location) : Int32
-    # December 28 is always in the last ISO week of its own year
-    Time.local(year, 12, 28, location: location).calendar_week[1]
   end
 
   # Number of hints `#materialize_to_time` tries before giving up on finding a
@@ -1352,7 +1324,7 @@ class VirtualTime
           # the first of the two is skipped, and fall forward to the later one
           # when the chosen instant is behind the hint, which would otherwise
           # answer with a `Time` before the one asked about.
-          fold = dst_fold_at time
+          fold = TimeHelper.dst_fold_at time
 
           if fold > Time::Span.zero
             earlier = time - fold
@@ -1442,28 +1414,13 @@ class VirtualTime
   # that would have matched -- and go on doing so, a year at a time, until the
   # attempts run out on a rule that is perfectly satisfiable.
   private def earliest_materialization(hint : Time, strict : Bool) : Time
-    best = materialize_to_time hint, strict
+    seeds = ->(best : Time) { unit_starts best, hint }
 
-    MAX_RESET_PASSES.times do
-      improved = false
-
-      unit_starts(best, hint).each do |seed|
-        candidate = begin
-          materialize_to_time seed, strict
-        rescue ArgumentError
-          next
-        end
-
-        next unless hint <= candidate < best
-
-        best = candidate
-        improved = true
-      end
-
-      break unless improved
+    TimeHelper.refine_earliest materialize_to_time(hint, strict), hint, MAX_RESET_PASSES, seeds do |seed|
+      materialize_to_time seed, strict
+    rescue ArgumentError
+      nil
     end
-
-    best
   end
 
   # Returns the starts of the day, month and year `time` falls in, dropping any
@@ -1491,7 +1448,7 @@ class VirtualTime
       after = resolved + reach
       next unless before.offset < after.offset
 
-      found = transition_between before, after
+      found = TimeHelper.transition_between before, after
       return found if found
     end
 
@@ -1504,30 +1461,14 @@ class VirtualTime
   # Returns the earlier of the two instants sharing `time`'s wall clock where a
   # DST fall-back repeats it, provided that one is still at or after `floor`.
   private def prefer_earlier_fold(time : Time, floor : Time) : Time
-    fold = dst_fold_at time
+    fold = TimeHelper.dst_fold_at time
     return time unless fold > Time::Span.zero
 
     earlier = time - fold
     return time unless earlier >= floor
-    return time unless earlier.hour == time.hour && earlier.minute == time.minute &&
-                       earlier.second == time.second && earlier.day == time.day
+    return time unless TimeHelper.same_wall_clock? earlier, time
 
     earlier
-  end
-
-  # Returns how much offset a DST fall-back gives up around `time`, or a zero
-  # span when there is no fall-back within a couple of hours either side.
-  #
-  # Read off the zone rather than assumed, and from both sides, since `time`
-  # may be either the first or the second of the two occurrences. Most zones
-  # step back an hour; Lord Howe steps back half of one.
-  @[AlwaysInline]
-  private def dst_fold_at(time : Time) : Time::Span
-    fold = ((time - 2.hours).offset - (time + 2.hours).offset).seconds
-    fold > Time::Span.zero ? fold : Time::Span.zero
-  rescue ArgumentError
-    # Too near the end of the representable calendar to look either way
-    Time::Span.zero
   end
 
   # Returns whether `time` really carries the date and time `timespec` asked
@@ -1635,7 +1576,7 @@ class VirtualTime
     # by comparing offsets with the answer: materialization can land a year
     # away, and the span between would then hold several transitions -- none of
     # them the one that matters.
-    if (fold = dst_fold_at from) > Time::Span.zero
+    if (fold = TimeHelper.dst_fold_at from) > Time::Span.zero
       repeated = repeat_of_fold from, time, fold
       time = repeated if repeated
     end
@@ -1659,7 +1600,9 @@ class VirtualTime
   # fields, so it meets each of those once and steps over the repeat entirely;
   # searching the earlier stretch and carrying the hit forward reaches it.
   private def repeat_of_fold(from : Time, time : Time, fold : Time::Span) : Time?
-    transition = transition_between from - 2.hours, from + 2.hours
+    transition = TimeHelper.transition_between from - 2.hours, from + 2.hours
+    return unless transition
+
     # Start where `from` itself falls in the earlier stretch, so the match
     # found is the first one that is genuinely after it
     lower = {from + 1.nanosecond, transition}.max
@@ -1673,28 +1616,6 @@ class VirtualTime
   rescue ArgumentError
     # The earlier stretch holds no match of its own
     nil
-  end
-
-  # Returns the instant at which the UTC offset changes between `earlier` and
-  # `later`, which are expected to carry different offsets.
-  #
-  # The search runs down to the nanosecond rather than stopping a second short:
-  # the result is used to build a hint, and a stray fraction of a second in it
-  # would carry all the way up through the materialized fields.
-  private def transition_between(earlier : Time, later : Time) : Time
-    low, high = earlier, later
-
-    while (high - low) > 1.nanosecond
-      middle = low + (high - low) / 2
-
-      if middle.offset == low.offset
-        low = middle
-      else
-        high = middle
-      end
-    end
-
-    high
   end
 
   # Returns Iterator
@@ -1757,36 +1678,28 @@ class VirtualTime
   # Helper methods below
 
   module TimeHelper
+    # Returns the number of weeks -- 52 or 53 -- in the given ISO year.
+    #
+    # A year has 53 weeks when it begins on a Thursday, or when it is a leap
+    # year beginning on a Wednesday. 2020 was such a year.
+    def self.weeks_in_iso_year(year : Int, location : Time::Location) : Int32
+      # December 28 is always in the last ISO week of its own year
+      Time.local(year, 12, 28, location: location).calendar_week[1]
+    end
+
     # Returns the number of weeks (52 or 53) in the ISO year that `time` falls in.
     #
     # Note that this is the ISO year, which is what `Time#calendar_week` (and
     # therefore `.week`) counts weeks within: the first days of January can
     # still belong to the previous ISO year, and the last days of December to
     # the next one.
-    #
-    # A year has 53 weeks when it begins on a Thursday, or when it is a leap
-    # year beginning on a Wednesday. 2020 was such a year.
     def self.weeks_in_year(time : Time)
-      # December 28 is always in the last ISO week of its own year
-      Time.local(time.calendar_week[0], 12, 28, location: time.location).calendar_week[1]
+      weeks_in_iso_year time.calendar_week[0], time.location
     end
 
     # :nodoc:
     def self.weeks_in_year(time : VirtualTime)
       0
-    end
-
-    # Returns the week of the year `time` falls in, counted within that
-    # calendar year rather than within the ISO year.
-    #
-    # This function returns a value in range 0..53. Up to the first 3 days of a
-    # year (Jan 1-3) may return value 0, meaning they are in the new calendar
-    # year but belong to a week that started on Monday in the previous one.
-    #
-    # NOTE: matching (and therefore `VirtualTime#week`) uses `.week` instead,
-    # which is the ISO week and numbers those same days 52 or 53, never 0.
-    def self.week_of_year(time)
-      (time.day_of_year - time.day_of_week.to_i + 10) // 7
     end
 
     # Returns number of days in month of specified `time`
@@ -1832,6 +1745,103 @@ class VirtualTime
     # Returns number of days in current year. For a VT this is always `0` since value is not determinable
     def self.days_in_year(time : VirtualTime)
       0
+    end
+
+    # Returns whether the two carry the same wall clock, whatever offset each
+    # reads it with.
+    def self.same_wall_clock?(a : Time, b : Time) : Bool
+      a.year == b.year && a.month == b.month && a.day == b.day &&
+        a.hour == b.hour && a.minute == b.minute && a.second == b.second &&
+        a.nanosecond == b.nanosecond
+    end
+
+    # Returns a `Time` carrying exactly the wall clock asked for, or nil where
+    # that wall clock does not exist.
+    #
+    # A DST forward transition leaves a gap of local times that never occur,
+    # and `Time.local` silently resolves one of those to a neighbouring instant
+    # whose fields are no longer the ones asked for -- which in some zones even
+    # reads as the day before. A date the calendar does not hold at all (the
+    # 30th of February) is refused by `Time.local` outright, and answers nil
+    # just the same.
+    def self.local?(year : Int, month : Int, day : Int, hour : Int = 0, minute : Int = 0, second : Int = 0, *, nanosecond : Int = 0, location : Time::Location) : Time?
+      time = Time.local year, month, day, hour, minute, second, nanosecond: nanosecond, location: location
+      # The nanosecond is not checked: UTC offsets are whole seconds, so no
+      # resolution `Time.local` performs can disturb it.
+      return unless time.year == year && time.month == month && time.day == day &&
+                    time.hour == hour && time.minute == minute && time.second == second
+
+      time
+    rescue ArgumentError
+      nil
+    end
+
+    # Returns the instant at which the UTC offset changes between `earlier` and
+    # `later`, or nil when the two carry the same offset.
+    #
+    # The search runs down to the nanosecond rather than stopping a second
+    # short: the result is used both to build materialization hints and to
+    # bound stretches of matching time, and a stray fraction of a second in it
+    # would carry all the way up through the fields worked out from it.
+    def self.transition_between(earlier : Time, later : Time) : Time?
+      return if earlier.offset == later.offset
+
+      low, high = earlier, later
+
+      while (high - low) > 1.nanosecond
+        middle = low + (high - low) / 2
+        break if middle == low || middle == high
+
+        if middle.offset == low.offset
+          low = middle
+        else
+          high = middle
+        end
+      end
+
+      high
+    end
+
+    # Returns how much offset a DST fall-back gives up around `time`, or a zero
+    # span when there is no fall-back within a couple of hours either side.
+    #
+    # Read off the zone rather than assumed, and from both sides, since `time`
+    # may be either the first or the second of the two occurrences. Most zones
+    # step back an hour; Lord Howe steps back half of one.
+    def self.dst_fold_at(time : Time) : Time::Span
+      fold = ((time - 2.hours).offset - (time + 2.hours).offset).seconds
+      fold > Time::Span.zero ? fold : Time::Span.zero
+    rescue ArgumentError
+      # Too near the end of the representable calendar to look either way
+      Time::Span.zero
+    end
+
+    # Returns the earliest answer at or after `floor` that `block` can be
+    # brought to give, by re-asking it from the seeds `seeds` names for each
+    # answer in turn.
+    #
+    # A `VirtualTime` fills a rule's unconstrained fields from the hint it is
+    # handed, so an answer overshoots whenever the hint carries more detail
+    # than the question: a rule naming only a month, asked from the 28th, lands
+    # on the 28th of that month rather than on its 1st. Re-asking from the
+    # start of the unit the answer fell in brings it back down, and a few
+    # rounds of it settle, each seed being coarser than the detail it corrects.
+    def self.refine_earliest(best : Time, floor : Time, passes : Int32, seeds : Time -> Array(Time), & : Time -> Time?) : Time
+      passes.times do
+        improved = false
+
+        seeds.call(best).each do |seed|
+          candidate = yield seed
+          next unless candidate && floor <= candidate < best
+
+          best = candidate
+          improved = true
+        end
+
+        break unless improved
+      end
+
+      best
     end
   end
 
@@ -2194,12 +2204,6 @@ class VirtualTime
         distance = target - current
         return false if distance.abs > effective_max_shift
       end
-    end
-
-    # :ditto:
-    @[Deprecated("Use `.shifted_from_base?` instead")]
-    def self.is_shifted_from_base?(target : Time, step : Time::Span, *, max_shift : Time::Span? = nil, max_shifts : Int32, &producer : Time -> Time::Span?) : Bool # ameba:disable Naming/PredicateName
-      shifted_from_base?(target, step, max_shift: max_shift, max_shifts: max_shifts, &producer)
     end
   end
 
