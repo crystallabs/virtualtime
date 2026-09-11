@@ -252,8 +252,12 @@ if both `year` and `month` are defined and contain integers.
 If they are not both defined, or they contain a value of any other type (e.g. a range
 `2023..2030`), it is ambiguous or indeterminable what the exact value should be.
 
-So comparing VTs to VTs is always done without the conversion of negative values to
-actual values.
+So for these three fields -- `day`, `week`, and `day_of_year` -- comparing VTs to VTs
+is done without the conversion of negative values to actual values.
+
+The other fields have a fixed range, so their negative values are resolved in VT-to-VT
+comparisons just as they are against a `Time`: `hour: -1` matches `hour: 23`,
+`month: -1` matches `month: 12`, and `day_of_week: -1` matches `day_of_week: 7`.
 
 One consequence: a range written across the two sign domains, such as `day: 10..-7`,
 cannot be resolved without knowing the month's length. Against a `Time` it works as

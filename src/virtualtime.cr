@@ -6,7 +6,7 @@ end
 
 class VirtualTime
   VERSION_MAJOR    = 1
-  VERSION_MINOR    = 8
+  VERSION_MINOR    = 9
   VERSION_REVISION = 0
   VERSION          = [VERSION_MAJOR, VERSION_MINOR, VERSION_REVISION].join '.'
 
@@ -19,10 +19,26 @@ class VirtualTime
   alias TimeOrVirtualTime = Time | self
 
   # Macro to define properties with a common YAML converter
+  #
+  # A stepped range is a `Steppable::StepIterator`, and iterating one moves
+  # its `current` bound: after two `#next` calls a `(0..23).step(6)` reads as
+  # `6..23/6`, and everything worked out from the bounds -- matching, `#==`,
+  # `#hash`, YAML -- would go on describing that shorter rule. So the stored
+  # iterator is never shared: the setter keeps a fresh copy of what it is
+  # given, and the getter hands out a fresh copy each time, leaving the one
+  # that is kept for a caller's iteration to disturb nowhere in reach.
   macro virtual_time_property(*properties)
     {% for property in properties %}
       @[YAML::Field(converter: VirtualTime::VirtualConverter)]
-      property {{ property.id }} : Virtual
+      @{{ property.id }} : Virtual
+
+      def {{ property.id }} : Virtual
+        RangeHelper.restart @{{ property.id }}
+      end
+
+      def {{ property.id }}=(value : Virtual)
+        @{{ property.id }} = RangeHelper.restart value
+      end
     {% end %}
   end
 
@@ -67,12 +83,25 @@ class VirtualTime
   end
 
   def initialize(@year = nil, @month = nil, @day = nil, @hour = nil, @minute = nil, @second = nil, *, @millisecond = nil, @nanosecond = nil, @day_of_week = nil, @day_of_year = nil, @week = nil, @location = nil, @default_match = true)
+    detach_stepped_ranges
   end
 
   def initialize(*, @year, @week, @day_of_week = nil, @hour = nil, @minute = nil, @second = nil, @millisecond = nil, @nanosecond = nil, @location = nil, @default_match = true)
+    detach_stepped_ranges
   end
 
   def initialize(@year, @month, @day, @week, @day_of_week, @day_of_year, @hour, @minute, @second, @millisecond, @nanosecond, @location, @default_match = true)
+    detach_stepped_ranges
+  end
+
+  # Replaces every stepped range the constructor was handed with a fresh copy
+  # of its own, for the reason the setters do the same -- see
+  # `virtual_time_property`. (The YAML constructor needs none of this: the
+  # converter builds each iterator itself and nothing else ever holds it.)
+  private def detach_stepped_ranges
+    {% for field in FIELDS %}
+      @{{ field.id }} = RangeHelper.restart @{{ field.id }}
+    {% end %}
   end
 
   # Matching
@@ -96,12 +125,15 @@ class VirtualTime
     # `#default_match?`, so that which of the two is asked does not matter.
     other = time.is_a?(Time) ? default_match? : time.default_match?
 
-    matches?(year, time.year, 10_000, b_default: other) &&
-      matches?(month, time.month, 13, b_default: other) &&
-      matches?(day, time.day, concrete ? TimeHelper.days_in_month(time) + 1 : nil, b_default: other) &&
-      matches?(week, TimeHelper.week(time), concrete ? TimeHelper.weeks_in_year(time) + 1 : nil, b_default: other) &&
-      matches?(day_of_week, TimeHelper.day_of_week(time), 8, b_default: other) &&
-      matches?(day_of_year, TimeHelper.day_of_year(time), concrete ? TimeHelper.days_in_year(time) + 1 : nil, b_default: other)
+    # The fields are read directly rather than through their getters: a getter
+    # hands out a copy of a stepped range, and `#adjust_value` makes its own
+    # copy to iterate anyway -- this is the hot path, and one copy is enough.
+    matches?(@year, time.year, 10_000, b_default: other) &&
+      matches?(@month, time.month, 13, b_default: other) &&
+      matches?(@day, time.day, concrete ? TimeHelper.days_in_month(time) + 1 : nil, b_default: other) &&
+      matches?(@week, TimeHelper.week(time), concrete ? TimeHelper.weeks_in_year(time) + 1 : nil, b_default: other) &&
+      matches?(@day_of_week, TimeHelper.day_of_week(time), 8, b_default: other) &&
+      matches?(@day_of_year, TimeHelper.day_of_year(time), concrete ? TimeHelper.days_in_year(time) + 1 : nil, b_default: other)
   end
 
   # Returns whether `VirtualTime` matches the time part of specified time
@@ -109,11 +141,12 @@ class VirtualTime
     time = adjust_location time
     other = time.is_a?(Time) ? default_match? : time.default_match?
 
-    matches?(hour, time.hour, 24, b_default: other) &&
-      matches?(minute, time.minute, 60, b_default: other) &&
-      matches?(second, time.second, 60, b_default: other) &&
-      matches?(millisecond, time.millisecond, 1_000, b_default: other) &&
-      matches?(nanosecond, time.nanosecond, 1_000_000_000, b_default: other)
+    # Read directly, as in `#matches_date?`
+    matches?(@hour, time.hour, 24, b_default: other) &&
+      matches?(@minute, time.minute, 60, b_default: other) &&
+      matches?(@second, time.second, 60, b_default: other) &&
+      matches?(@millisecond, time.millisecond, 1_000, b_default: other) &&
+      matches?(@nanosecond, time.nanosecond, 1_000_000_000, b_default: other)
   end
 
   # Performs matching between VirtualTime and other supported types
@@ -467,7 +500,9 @@ class VirtualTime
     spec
   end
 
-  # Number of times `#materialize_with_hint` lets the finer fields start over.
+  # Number of times `#materialize_with_hint` lets the finer fields start over
+  # -- and, likewise, how many rounds of re-asking `#succ` and
+  # `#earliest_materialization` give an answer to settle.
   MAX_RESET_PASSES = 3
 
   private def materialize_fields(time : Time, carry, strict)
@@ -1510,6 +1545,21 @@ class VirtualTime
     ].select &.>=(floor)
   end
 
+  # :ditto: down to the second `time` falls in, and dropping any that is not
+  # strictly before `time` either -- a start that *is* `time` has nothing to
+  # improve on. Units whose starts coincide -- the minute and the hour, when
+  # the minute is zero -- are asked about once, since each seed costs a
+  # `#to_time`.
+  private def clock_unit_starts(time : Time, floor : Time) : Array(Time)
+    location = time.location
+
+    ([
+      Time.local(time.year, time.month, time.day, time.hour, time.minute, time.second, location: location),
+      Time.local(time.year, time.month, time.day, time.hour, time.minute, 0, location: location),
+      Time.local(time.year, time.month, time.day, time.hour, 0, 0, location: location),
+    ] + unit_starts(time, floor)).select { |start| floor <= start < time }.uniq!
+  end
+
   # Returns the instant at which a DST gap around `resolved` ends, or nil when
   # no forward transition is found within a couple of hours either side.
   private def gap_end_near(resolved : Time) : Time?
@@ -1637,7 +1687,24 @@ class VirtualTime
   # Produces closest-next `Time` that matches the current VT, starting with `from` + 1 nanosecond onwards.
   # (Because it always finds the "next" time, the default value is `at_end_of_minute` (:99).)
   def succ(from : Time = Time.local.at_end_of_minute)
-    time = to_time from + 1.nanosecond
+    floor = from + 1.nanosecond
+    time = to_time floor
+
+    # An unconstrained field takes the hint's own value, so once the answer
+    # has moved past `from` in some coarser field the finer ones still carry
+    # what `from` happened to read there -- a rule of `hour: 5, minute: 0`
+    # asked from 04:30:15.7 answers 05:00:15.7, when 05:00:00 also matches and
+    # comes first. Re-asking from the start of each unit the answer fell in
+    # brings those fields down to their floor, the way the date walks do for
+    # theirs; a seed that would reach back to or before `from` is left out,
+    # so an answer `from` itself sits inside keeps the hint's values.
+    seeds = ->(best : Time) { clock_unit_starts best, floor }
+
+    time = TimeHelper.refine_earliest(time, floor, MAX_RESET_PASSES, seeds) do |seed|
+      to_time seed
+    rescue ArgumentError
+      nil
+    end
 
     # A DST fall-back repeats a stretch of wall clock: every instant in
     # `[transition, transition + fold)` reads as a wall clock that already
@@ -1695,6 +1762,7 @@ class VirtualTime
 
   # Returns Iterator
   #
+  # The first `Time` produced is the earliest match at or after `from`;
   # `interval` is how far past the last match the search for the next one
   # resumes, and `by` is how many matches each `#next` advances by. Both have
   # to be positive: a zero `interval` or `by` would make the iterator hand back
@@ -1703,7 +1771,10 @@ class VirtualTime
     raise ArgumentError.new "Step interval must be positive, got #{interval}" unless interval > Time::Span.zero
     raise ArgumentError.new "Step `by` must be positive, got #{by}" unless by > 0
 
-    from = succ from
+    # `from` itself is a candidate, the way every later match is found at or
+    # after the previous one plus `interval`: `#succ` answers strictly after
+    # what it is handed, so it is handed the nanosecond before.
+    from = succ from - 1.nanosecond
     StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
   end
 
@@ -2050,6 +2121,11 @@ class VirtualTime
     # `Steppable::StepIterator`s are stateful and are consumed by iteration,
     # so they must be copied before every traversal; everything else is
     # returned as-is.
+    #
+    # The copy is only as complete as `value` itself: iterating past the first
+    # element moves an iterator's `current` bound, and nothing records where
+    # it started. That is why a `VirtualTime` never lets the iterator it
+    # stores out of its hands -- see `virtual_time_property`.
     def self.restart(value : Steppable::StepIterator(Int32, Int32, Int32))
       # Rebuilt rather than duplicated: `#dup` carries the consumption state
       # with it, so an iterator someone has read one value from would go on
@@ -2083,7 +2159,9 @@ class VirtualTime
         when Array
           e
         when Enumerable
-          e.dup.to_a
+          # A stepped range is rebuilt rather than duplicated: `#dup` keeps
+          # the consumption state, and a consumed copy expands short
+          RangeHelper.restart(e).to_a
         else
           [e]
         end

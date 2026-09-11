@@ -785,6 +785,143 @@ describe VirtualTime do
     VirtualTime.from_yaml(listed.to_yaml).should eq listed
   end
 
+  it "keeps a stepped range whole however far anyone iterates it" do
+    # Regression: the first `#next` leaves an iterator's `current` bound
+    # alone, and only that case was covered. The second moves it, and a rule
+    # rebuilt from the bounds then read `(0..23).step(6)` as `6..23/6` --
+    # in matching, `#==`, `#hash`, YAML and `#expand` alike.
+    midnight = Time.utc 2021, 1, 1, 0, 30, 0
+    pristine = VirtualTime.new hour: (0..23).step(6)
+
+    # Iterated through the getter
+    via_getter = VirtualTime.new hour: (0..23).step(6)
+    3.times { via_getter.hour.as(Steppable::StepIterator(Int32, Int32, Int32)).next }
+    iterated = via_getter.hour.as(Steppable::StepIterator(Int32, Int32, Int32))
+    3.times { iterated.next }
+
+    # Iterated through the reference that was assigned
+    handed_in = (0..23).step(6)
+    via_setter = VirtualTime.new
+    via_setter.hour = handed_in
+    3.times { handed_in.next }
+
+    # Iterated through the reference the constructor was given
+    constructed_with = (0..23).step(6)
+    via_ctor = VirtualTime.new hour: constructed_with
+    3.times { constructed_with.next }
+
+    {via_getter, via_setter, via_ctor}.each do |rule|
+      rule.should eq pristine
+      rule.hash.should eq pristine.hash
+      rule.matches?(midnight).should be_true
+      rule.to_yaml.should eq pristine.to_yaml
+      rule.expand.size.should eq 4
+      rule.to_time(Time.utc(2021, 1, 1, 0, 30, 0)).should eq midnight
+    end
+
+    # A single `#next` -- which leaves `current` alone -- used to shorten
+    # `#expand` all the same, since it duplicated the consumption state
+    once = VirtualTime.new hour: (0..23).step(6)
+    once.hour.as(Steppable::StepIterator(Int32, Int32, Int32)).next
+    once.expand.size.should eq 4
+  end
+
+  it "answers #succ with the closest match, not the hint's leftover clock" do
+    # Regression: an unconstrained field takes the hint's value, and `#succ`
+    # bumps the hint by a nanosecond -- so once the answer had moved on to a
+    # later hour or day, the seconds and nanoseconds `from` happened to carry
+    # came along, and the sequence read 05:00:15.000000701 daily when
+    # 05:00:00 matched and came first
+    vt = VirtualTime.new hour: 5, minute: 0
+    from = Time.utc 2024, 1, 1, 4, 30, 15, nanosecond: 700
+    vt.succ(from).should eq Time.utc(2024, 1, 1, 5, 0, 0)
+
+    it = vt.step 1.minute, from: from
+    Array.new(3) { it.next.as(Time) }.should eq [
+      Time.utc(2024, 1, 1, 5, 0, 0),
+      Time.utc(2024, 1, 2, 5, 0, 0),
+      Time.utc(2024, 1, 3, 5, 0, 0),
+    ]
+
+    # Where `from` itself sits inside a match, the closest next one really is
+    # a nanosecond on, and the hint's finer fields stay
+    inside = Time.utc 2024, 1, 1, 5, 0, 15, nanosecond: 700
+    vt.succ(inside).should eq inside + 1.nanosecond
+
+    # The same nanosecond used to tell the two occurrences of a wall clock a
+    # DST fall-back repeats apart from each other, and from the day after
+    berlin = Time::Location.load "Europe/Berlin"
+    vt = VirtualTime.new hour: 2, minute: 30
+    it = vt.step 1.minute, from: Time.local(2024, 10, 26, 12, 0, 0, location: berlin)
+    Array.new(3) { it.next.as(Time) }.should eq [
+      Time.local(2024, 10, 27, 2, 30, 0, location: berlin) - 1.hour,
+      Time.local(2024, 10, 27, 2, 30, 0, location: berlin),
+      Time.local(2024, 10, 28, 2, 30, 0, location: berlin),
+    ]
+  end
+
+  it "starts #step at `from` itself when that matches" do
+    # Regression: the first element was found strictly after `from` while
+    # every later one is found at or after the previous plus the interval, so
+    # a walk from midnight over a rule midnight satisfies began a nanosecond
+    # late -- and carried that nanosecond into every element after it
+    vt = VirtualTime.new day: 1..3, hour: 0, minute: 0
+    it = vt.step 1.day, from: Time.utc(2024, 1, 1)
+    Array.new(4) { it.next.as(Time) }.should eq [
+      Time.utc(2024, 1, 1),
+      Time.utc(2024, 1, 2),
+      Time.utc(2024, 1, 3),
+      Time.utc(2024, 2, 1),
+    ]
+  end
+
+  it "keeps #succ's start exclusive" do
+    # A successor is strictly after its argument, however well the argument
+    # itself matches -- `#step` starts at `from` by asking a nanosecond
+    # earlier, not by `#succ` bending the rule
+    at_midnight = Time.utc 2024, 1, 1
+
+    # With the finer fields unconstrained the closest match after `from` is
+    # a nanosecond on
+    loose = VirtualTime.new day: 1..3, hour: 0, minute: 0
+    loose.succ(at_midnight).should eq at_midnight + 1.nanosecond
+
+    # With them pinned, the next one is a whole unit away
+    pinned = VirtualTime.new hour: 0, minute: 0, second: 0, nanosecond: 0
+    pinned.succ(at_midnight).should eq Time.utc(2024, 1, 2)
+
+    # And a `from` that only the past matches has no successor at all
+    bygone = VirtualTime.new year: 2020
+    expect_raises ArgumentError, /no match after/ do
+      bygone.succ at_midnight
+    end
+
+    # The iterator relies on the same contract to advance: each element is
+    # found at or after the previous plus the interval, never at the previous
+    it = pinned.step 1.hour, from: at_midnight
+    Array.new(3) { it.next.as(Time) }.should eq [
+      at_midnight,
+      Time.utc(2024, 1, 2),
+      Time.utc(2024, 1, 3),
+    ]
+  end
+
+  it "resolves negative values against a fixed range between VirtualTimes too" do
+    # Only `day`, `week` and `day_of_year` have a range no pattern can know
+    # the size of; every other field's negatives count back from a fixed end,
+    # against a VirtualTime just as against a Time
+    VirtualTime.new(hour: -1).matches?(VirtualTime.new(hour: 23)).should be_true
+    VirtualTime.new(minute: -1).matches?(VirtualTime.new(minute: 59)).should be_true
+    VirtualTime.new(month: -1).matches?(VirtualTime.new(month: 12)).should be_true
+    VirtualTime.new(day_of_week: -1).matches?(VirtualTime.new(day_of_week: 7)).should be_true
+    VirtualTime.new(hour: 22..-1).matches?(VirtualTime.new(hour: 23)).should be_true
+    VirtualTime.new(hour: 22..-1).matches?(VirtualTime.new(hour: 22..-1)).should be_true
+
+    VirtualTime.new(day: -1).matches?(VirtualTime.new(day: 31)).should be_false
+    VirtualTime.new(week: -1).matches?(VirtualTime.new(week: 52)).should be_false
+    VirtualTime.new(day_of_year: -1).matches?(VirtualTime.new(day_of_year: 365)).should be_false
+  end
+
   it "agrees with #matches? that a stepped range yielding nothing is unusable" do
     # Regression: `#matches?` let nothing through for a step of zero while
     # materialization expanded it to a value, and said so only after burning
@@ -2742,8 +2879,9 @@ describe VirtualTime do
       materialized.month.should eq 12 # first 31-day month after October
       materialized.day.should eq 1
 
-      # And the hint's unconstrained clock survives through #succ
-      vt.succ(Time.utc(2035, 10, 6, 16, 7, 6)).should eq Time.utc(2035, 12, 1, 16, 7, 6, nanosecond: 1)
+      # `#succ` lands in the same month, and answers with the closest match
+      # in it rather than with the hint's leftover clock
+      vt.succ(Time.utc(2035, 10, 6, 16, 7, 6)).should eq Time.utc(2035, 12, 1)
     end
 
     it "handles extreme descending stepped ranges without overflow" do
