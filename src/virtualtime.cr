@@ -1767,6 +1767,11 @@ class VirtualTime
   # resumes, and `by` is how many matches each `#next` advances by. Both have
   # to be positive: a zero `interval` or `by` would make the iterator hand back
   # the same `Time` forever, and a negative `interval` would walk backwards.
+  #
+  # Nothing is searched for until `#next` is called: an iterator is a promise
+  # of values, not the values themselves, and a rule with no match at or after
+  # `from` yields an empty sequence rather than raising here -- the same way
+  # the sequence ends once no further match exists.
   def step(interval = 1.minute, by = 1, from = Time.local.at_end_of_minute) : Iterator
     raise ArgumentError.new "Step interval must be positive, got #{interval}" unless interval > Time::Span.zero
     raise ArgumentError.new "Step `by` must be positive, got #{by}" unless by > 0
@@ -1774,8 +1779,7 @@ class VirtualTime
     # `from` itself is a candidate, the way every later match is found at or
     # after the previous one plus `interval`: `#succ` answers strictly after
     # what it is handed, so it is handed the nanosecond before.
-    from = succ from - 1.nanosecond
-    StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from)
+    StepIterator(self, Time::Span, Int32, Time).new(self, interval, by, from - 1.nanosecond)
   end
 
   # END OF CLASS CODE
@@ -1787,20 +1791,32 @@ class VirtualTime
     @virtualtime : R
     @interval : D
     @step : N
+    # Before the first `#next`, the instant the first match is searched strictly
+    # after; from then on, the last value yielded
     @current : B
     @reached_end : Bool
     @at_start = true
 
-    def initialize(@virtualtime, @interval = 1.minute, @step = 1, @current = virtualtime.succ, @reached_end = false)
+    def initialize(@virtualtime, @interval = 1.minute, @step = 1, @current = Time.local.at_end_of_minute - 1.nanosecond, @reached_end = false)
     end
 
     def next
       return stop if @reached_end
 
-      # The initial value is produced by `#initialize` (via `VirtualTime#succ`),
-      # so the first call yields it rather than advancing.
+      # The first call finds the first match rather than advancing past one:
+      # `@current` holds the nanosecond before the hint the iterator was built
+      # from, so `#succ` answers with the earliest match at or after the hint.
+      # A rule with no match there has an empty sequence, ended the same way it
+      # would be once later matches run out.
       if @at_start
         @at_start = false
+        begin
+          @current = @virtualtime.succ @current
+        rescue ArgumentError
+          @reached_end = true
+          return stop
+        end
+
         return @current
       end
 

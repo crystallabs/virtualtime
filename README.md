@@ -291,6 +291,12 @@ generate) an event on every minute of that hour.
 In that case, you could easily request the step to be e.g.  1 hour or 1 day, so that
 there would be reasonable space between the generated `Time`s.
 
+The iterator returned by `#step` is lazy: nothing is searched for until `#next` is
+called. A rule that has no match at or after `from` (for example one pinned to a
+bygone year) produces an empty iterator rather than raising, the same way an
+iterator ends once no further match exists. Use `#succ` when you want an
+`ArgumentError` for a rule that cannot produce a match.
+
 Here are examples for both cases:
 
 ```cr

@@ -1820,6 +1820,29 @@ describe VirtualTime do
     expect_raises(ArgumentError, /`by` must be positive/) { vt.step(1.hour, 0) }
   end
 
+  it "builds an iterator without searching, and ends it at once when there is no match" do
+    # An iterator is lazy: nothing is materialized until `#next`, so a rule that
+    # has no match at or after `from` yields an empty sequence rather than
+    # raising from `#step` itself -- the way the sequence ends once no further
+    # match exists, instead of one path raising and the other stopping
+    past = VirtualTime.new year: 2000, month: 1, day: 1, hour: 0, minute: 0, second: 0, nanosecond: 0
+    from = Time.utc(2024, 1, 1)
+    expect_raises(ArgumentError, /no match after/) { past.succ from }
+
+    it = past.step 1.day, from: from
+    it.next.should eq Iterator::Stop::INSTANCE
+    it.next.should eq Iterator::Stop::INSTANCE
+    past.step(1.day, from: from).to_a.should be_empty
+
+    # Not materializable at all, either
+    never = VirtualTime.new hour: false
+    never.step(1.day, from: from).to_a.should be_empty
+
+    # And a rule that does match still yields `from` itself first
+    hourly = VirtualTime.new minute: 0, second: 0, nanosecond: 0
+    hourly.step(1.hour, from: from).first(2).to_a.should eq [from, from + 1.hour]
+  end
+
   it "refuses to materialize a value that allows nothing" do
     hint = Time.local(2023, 1, 1, location: Time::Location::UTC)
 
